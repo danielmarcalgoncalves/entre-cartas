@@ -3,7 +3,58 @@
 > 📄 **Avaliação P1 (Relatório Bimestral de Atividades):**
 > Acesse o relatório completo em PDF: [**P1_ISW055_Daniel_Marcal.pdf**](docs/P1_ISW055_Daniel_Marcal.pdf)
 >
+> 📖 **Documentação Técnica Completa (Engenharia Reversa):**
+> Acesse a especificação completa, arquitetura detalhada, regras de negócio ("se X, então Y") e modelo de dados em: [**DOCUMENTACAO.md**](DOCUMENTACAO.md).
+>
 > 🎓 Projeto desenvolvido por **Daniel Marçal Gonçalves** para a disciplina de **Introdução à Computação em Nuvem (ISW055)** lecionada pelo professor **[@siriani](https://github.com/siriani)**.
+
+---
+
+## ☁️ Classificação SaaS, PaaS e IaaS do Projeto
+
+O sistema opera de forma híbrida distribuído pelas três camadas de computação em nuvem, balanceando controle, facilidade de manutenção e velocidade de entrega:
+
+```mermaid
+graph TB
+    subgraph SAAS["SaaS — Software as a Service (Consumo via APIs / Zero Infraestrutura Nossa)"]
+        S1["💳 Stripe (Pagamentos & Checkout PCI-DSS)"]
+        S2["📧 Brevo (SMTP Transacional para OTP)"]
+        S3["🎬 TMDB API (Catálogo de Filmes & Metadados)"]
+    end
+
+    subgraph PAAS["PaaS — Platform as a Service (Ambiente de Execução / Docker Compose)"]
+        P1["📦 tomhanks_app (Frontend Vite + Backend Express)"]
+        P2["🔐 tomhanks_auth (Microsserviço de Autenticação & RBAC)"]
+        P3["📋 tomhanks_log (Microsserviço de Auditoria)"]
+        P4["⚡ tomhanks_redis (Fila de Logs com Redis Streams)"]
+        P5["🪣 tomhanks_minio (Object Storage S3 para Avatares)"]
+        P6["🗄️ tomhanks_mariadb (Banco Relacional Transacional)"]
+    end
+
+    subgraph IAAS["IaaS — Infrastructure as a Service (Infraestrutura Gerenciada do SO pra Cima)"]
+        I1["🖥️ Máquina Virtual Proxmox Fatec (Ubuntu Server 22.04 LTS + Docker Engine + Rede)"]
+    end
+
+    SAAS -.->|"Consumido por"| PAAS
+    PAAS -->|"Executado sobre"| IAAS
+```
+
+### Tabela de Mapeamento por Camada de Responsabilidade
+
+| Componente / Peça do Sistema | Camada de Nuvem | Justificativa Técnica |
+| :--- | :---: | :--- |
+| **VM Proxmox Fatec (Ubuntu + Docker Engine)** | **IaaS** | O provedor (datacenter Fatec/Proxmox) entrega máquina virtual, disco virtual e rede; nós instalamos e configuramos o SO Ubuntu Server, o Docker e a segurança de rede. |
+| **Catálogo & BFF (`tomhanks_app`)** | **PaaS** | Não gerenciamos o sistema operacional do host nem patches de kernel; entregamos o código-fonte/imagem Docker e a plataforma cuida do runtime Node.js e orquestração. |
+| **Serviço de Autenticação (`tomhanks_auth`)** | **PaaS** | Empacotado como microsserviço isolado em contêiner, onde o ambiente de execução e portas internas são providos pela camada de contêineres Docker. |
+| **Serviço de Auditoria (`tomhanks_log`)** | **PaaS** | Microsserviço conteinerizado responsável pela ingestão desacoplada de logs, executando sob o runtime provido pela infraestrutura de contêineres. |
+| **Redis Streams (`tomhanks_redis`)** | **PaaS** | Imagem oficial conteinerizada gerenciada como serviço de plataforma, fornecendo armazenamento em memória sem a necessidade de provisionar uma VM exclusiva. |
+| **MinIO Object Storage (`tomhanks_minio`)** | **PaaS** | Instância conteinerizada que entrega a plataforma de armazenamento de objetos compatível com a API AWS S3 sem necessidade de gerenciar o storage físico. |
+| **MariaDB (`tomhanks_mariadb`)** | **PaaS** | Banco de dados relacional executando em contêiner com volumes persistentes, fornecendo a plataforma de dados transacional sem administração de hardware. |
+| **Stripe (Checkout & Assinaturas)** | **SaaS** | Consumimos diretamente a plataforma completa de pagamentos e conformidade PCI-DSS via API/SDK, sem hospedar ou administrar nenhuma infraestrutura financeira. |
+| **Brevo / Sendinblue (E-mail Transacional)** | **SaaS** | Consumimos o serviço de despacho de e-mails prontos e entregabilidade via servidor SMTP externo, sem gerenciar servidores Postfix ou reputação de IP. |
+| **TMDB API (The Movie Database)** | **SaaS** | Consumimos o produto de catálogo pronto e atualizado através de endpoints REST externos via internet, sem manter servidores com bases mundiais de filmes. |
+
+> 📌 Para a documentação reversa completa contendo a especificação detalhada de uso, fluxo de dados, regras de negócio no formato *"se X, então Y"* e modelo de dados, consulte o [**DOCUMENTACAO.md**](DOCUMENTACAO.md).
 
 ---
 
