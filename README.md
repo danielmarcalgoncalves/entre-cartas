@@ -1,325 +1,160 @@
-# 🎬 Catálogo de Filmes — Tom Hanks (ISW055 · Fatec Pompeia)
+# 💌 Entre Cartas
 
-> 📄 **Avaliação P1 (Relatório Bimestral de Atividades):**
-> Acesse o relatório completo em PDF: [**P1_ISW055_Daniel_Marcal.pdf**](docs/P1_ISW055_Daniel_Marcal.pdf)
+> 🎓 Projeto desenvolvido por **Daniel Marçal Gonçalves** para a disciplina de **Introdução à Computação em Nuvem (ISW055)** lecionada pelo professor **[@siriani](https://github.com/siriani)** (Fatec Pompeia).
 >
-> 📖 **Documentação Técnica Completa (Engenharia Reversa):**
-> Acesse a especificação completa, arquitetura detalhada, regras de negócio ("se X, então Y") e modelo de dados em: [**DOCUMENTACAO.md**](DOCUMENTACAO.md).
->
-> 🎓 Projeto desenvolvido por **Daniel Marçal Gonçalves** para a disciplina de **Introdução à Computação em Nuvem (ISW055)** lecionada pelo professor **[@siriani](https://github.com/siriani)**.
+> 📌 **Continuidade de Projeto:** Este repositório é o fork oficial evolutivo da arquitetura anterior ([filmecc](https://github.com/danielmarcalgoncalves/filmecc)), reaproveitando integralmente os microsserviços, banco relacional, object storage, mensageria e gateways de pagamento na mesma infraestrutura e subdomínio.
 
 ---
 
-## ☁️ Classificação SaaS, PaaS e IaaS do Projeto
+## 1. Nome e Frase
 
-O sistema opera de forma híbrida distribuído pelas três camadas de computação em nuvem, balanceando controle, facilidade de manutenção e velocidade de entrega:
-
-```mermaid
-graph TB
-    subgraph SAAS["SaaS — Software as a Service (Consumo via APIs / Zero Infraestrutura Nossa)"]
-        S1["💳 Stripe (Pagamentos & Checkout PCI-DSS)"]
-        S2["📧 Brevo (SMTP Transacional para OTP)"]
-        S3["🎬 TMDB API (Catálogo de Filmes & Metadados)"]
-    end
-
-    subgraph PAAS["PaaS — Platform as a Service (Ambiente de Execução / Docker Compose)"]
-        P1["📦 tomhanks_app (Frontend Vite + Backend Express)"]
-        P2["🔐 tomhanks_auth (Microsserviço de Autenticação & RBAC)"]
-        P3["📋 tomhanks_log (Microsserviço de Auditoria)"]
-        P4["⚡ tomhanks_redis (Fila de Logs com Redis Streams)"]
-        P5["🪣 tomhanks_minio (Object Storage S3 para Avatares)"]
-        P6["🗄️ tomhanks_mariadb (Banco Relacional Transacional)"]
-    end
-
-    subgraph IAAS["IaaS — Infrastructure as a Service (Infraestrutura Gerenciada do SO pra Cima)"]
-        I1["🖥️ Máquina Virtual Proxmox Fatec (Ubuntu Server 22.04 LTS + Docker Engine + Rede)"]
-    end
-
-    SAAS -.->|"Consumido por"| PAAS
-    PAAS -->|"Executado sobre"| IAAS
-```
-
-### Tabela de Mapeamento por Camada de Responsabilidade
-
-| Componente / Peça do Sistema | Camada de Nuvem | Justificativa Técnica |
-| :--- | :---: | :--- |
-| **VM Proxmox Fatec (Ubuntu + Docker Engine)** | **IaaS** | O provedor (datacenter Fatec/Proxmox) entrega máquina virtual, disco virtual e rede; nós instalamos e configuramos o SO Ubuntu Server, o Docker e a segurança de rede. |
-| **Catálogo & BFF (`tomhanks_app`)** | **PaaS** | Não gerenciamos o sistema operacional do host nem patches de kernel; entregamos o código-fonte/imagem Docker e a plataforma cuida do runtime Node.js e orquestração. |
-| **Serviço de Autenticação (`tomhanks_auth`)** | **PaaS** | Empacotado como microsserviço isolado em contêiner, onde o ambiente de execução e portas internas são providos pela camada de contêineres Docker. |
-| **Serviço de Auditoria (`tomhanks_log`)** | **PaaS** | Microsserviço conteinerizado responsável pela ingestão desacoplada de logs, executando sob o runtime provido pela infraestrutura de contêineres. |
-| **Redis Streams (`tomhanks_redis`)** | **PaaS** | Imagem oficial conteinerizada gerenciada como serviço de plataforma, fornecendo armazenamento em memória sem a necessidade de provisionar uma VM exclusiva. |
-| **MinIO Object Storage (`tomhanks_minio`)** | **PaaS** | Instância conteinerizada que entrega a plataforma de armazenamento de objetos compatível com a API AWS S3 sem necessidade de gerenciar o storage físico. |
-| **MariaDB (`tomhanks_mariadb`)** | **PaaS** | Banco de dados relacional executando em contêiner com volumes persistentes, fornecendo a plataforma de dados transacional sem administração de hardware. |
-| **Stripe (Checkout & Assinaturas)** | **SaaS** | Consumimos diretamente a plataforma completa de pagamentos e conformidade PCI-DSS via API/SDK, sem hospedar ou administrar nenhuma infraestrutura financeira. |
-| **Brevo / Sendinblue (E-mail Transacional)** | **SaaS** | Consumimos o serviço de despacho de e-mails prontos e entregabilidade via servidor SMTP externo, sem gerenciar servidores Postfix ou reputação de IP. |
-| **TMDB API (The Movie Database)** | **SaaS** | Consumimos o produto de catálogo pronto e atualizado através de endpoints REST externos via internet, sem manter servidores com bases mundiais de filmes. |
-
-> 📌 Para a documentação reversa completa contendo a especificação detalhada de uso, fluxo de dados, regras de negócio no formato *"se X, então Y"* e modelo de dados, consulte o [**DOCUMENTACAO.md**](DOCUMENTACAO.md).
+**Entre Cartas** — Um arquivo afetivo e epistolar interativo em formato de scrapbook para pessoas sensíveis descobrirem, colecionarem e eternizarem cartas reais, desabafos e memórias humanas como objetos físicos digitais.
 
 ---
 
-## 🏗️ Arquitetura de Microsserviços Desacoplados
+## 2. A Dor
 
-O ambiente é orquestrado via **Docker Compose** com isolamento estrito de responsabilidades e rede interna privada:
-
-```mermaid
-graph TD
-    Client["🌐 Usuário / Navegador"] -->|"HTTP / Porta 3000"| App["📦 app (Catálogo + Frontend Vite)"]
-    App -->|"HTTP (Rede Interna)"| Auth["🔐 auth-service"]
-    App -->|"HTTP POST /logs (Assíncrono)"| Log["📋 log-service"]
-    Auth -->|"HTTP POST /logs (Assíncrono)"| Log
-    App -->|"TCP 3306"| MariaDB[("🗄️ MariaDB (Relacional)")]
-    Auth -->|"TCP 3306"| MariaDB
-    Log -->|"TCP 6379"| Redis[("⚡ Redis Streams (logs:audit)")]
-    App -->|"S3 API / Porta 9000"| MinIO[("🪣 MinIO (Object Storage S3)")]
-```
-
-| Serviço | Contêiner | Porta Host | Função |
-| :--- | :--- | :---: | :--- |
-| **`app`** | `tomhanks_app` | `3000:3000` | Gateway do Catálogo, Frontend React (Vite) e BFF da aplicação |
-| **`auth-service`** | `tomhanks_auth` | *Privada* | Registro, autenticação JWT, confirmação de conta via OTP Brevo e RBAC |
-| **`log-service`** | `tomhanks_log` | *Privada* | **Microserviço de Auditoria**: Ingestão e consulta de logs |
-| **`redis`** | `tomhanks_redis` | *Privada* | Armazenamento chave-valor de altíssima vazão com **Redis Streams** (`logs:audit`) |
-| **`minio`** | `tomhanks_minio` | `9010:9000` / `9011:9001` | **Object Storage S3-compatível**: Armazenamento seguro de fotos de perfil |
-| **`mariadb`** | `tomhanks_mariadb` | `127.0.0.1:3307` | Banco relacional para usuários, listas, filmes favoritos e comentários |
+* **Quem sofre:** Jovens e adultos (especialmente na faixa de 18 a 35 anos: estudantes universitários, leitores ávidos, entusiastas de escrita reflexiva, *journaling*, comunidades de *dark academia* e papelaria artesanal) que sofrem de esgotamento, ansiedade e alienação diante da superficialidade, efemeridade e toxicidade das redes sociais contemporâneas (feeds algorítmicos infinitos, busca viciante por métricas de vaidade, stories descartáveis que expiram em 24h e interfaces cinzentas corporativas sem calor humano).
+* **Quando ocorre:** Durante momentos de introspecção e quietude, madrugadas solitárias, processos de luto emocional (términos de relacionamentos, saudades de quem partiu, distanciamento de amigos da infância) ou na busca por um refúgio criativo onde possam expressar e ler sentimentos verdadeiros sem o medo de julgamentos sociais.
+* **Quanto custa hoje:**
+  * **Custo Emocional e Tempo:** Horas diárias gastas em rolagem passiva de feeds que acentuam a sensação de vazio, inadequação e solidão ("fadiga digital de conexões fáceis").
+  * **Custo Financeiro:** Gastos recorrentes de R$ 50,00 a R$ 200,00 mensais com insumos físicos de papelaria artesanal, cadernos importados de *scrapbook*, tintas, selos e canetas para registrar memórias que acabam confinadas em caixas de sapato, sem busca, sem categorização e sem segurança.
+  * **Risco Real:** Risco de perda irreversível, mofo, deterioração física ou extravio de correspondências em mudanças; e, no ambiente digital tradicional, o perigo iminente de expor vulnerabilidades íntimas em redes sociais abertas (como Twitter/X ou Instagram) sujeitando-se ao cancelamento, ridicularização ou invasão de privacidade por conhecidos.
+* **Como resolvem hoje (e por que falham):**
+  * *Diários físicos e gavetas trancadas:* São seguros contra a exposição, porém geram isolamento absoluto: o indivíduo não descobre que outras pessoas ao redor do mundo compartilham das mesmas dores e sentimentos, e não contam com backup em nuvem.
+  * *Fóruns de desabafo (Reddit r/UnsentLetters, r/desabafos):* Plataformas com estética fria, cinzenta, puramente funcional e hostil, frequentadas por usuários tóxicos e comentários desrespeitosos.
+  * *Pastas no Pinterest ou Notion:* Coleções puramente visuais e desconexas de imagens estéticas ou blocos rígidos corporativos, incapazes de transmitir a emoção tátil de abrir um envelope, romper um lacre de cera ou desdobrar uma carta amarelada pelo tempo.
 
 ---
 
-## ⚡ Por que Redis Streams e NÃO o Banco Relacional (MariaDB)?
+## 3. Persona Concreta
 
-Na arquitetura de sistemas distribuídos e computação em nuvem, **logs de auditoria** e **dados transacionais de negócio** possuem perfis de acesso diametralmente opostos:
-
-1. **Padrão de Acesso (Write-Heavy vs. Read-Heavy):**
-   - Logs de auditoria são gerados em praticamente qualquer interação do usuário (altíssima taxa de escrita contínua e append-only).
-   - Consultas de auditoria ocorrem esporadicamente, quase que exclusivamente por administradores ou pipelines de segurança.
-   - Escrever logs no MariaDB sobrecarregaria o banco relacional com locks de escrita, fragmentação de índices e crescimento acelerado de tabelas de transação.
-
-2. **Ausência de Necessidade de Transações Complexas (ACID):**
-   - Logs não realizam operações `JOIN`, não possuem chaves estrangeiras dinâmicas e não participam de transações distribuídas (Two-Phase Commit).
-   - Um erro no envio de log **não deve** travar ou abortar a ação legítima do usuário no catálogo.
-
-3. **Vantagens do Redis Streams (`XADD` e `XREVRANGE`):**
-   - **Performance em Memória:** Operações de append com latência sub-milissegundo (`O(1)` amortizado).
-   - **Ordenação Temporal Nativa:** Os IDs gerados pelo Redis (`<millisecondsTime>-<sequenceNumber>`) são estritamente ordenados no tempo.
-   - **Zero Alteração no MariaDB:** O schema relacional permaneceu 100% intacto.
+* **Nome:** Clara Menezes
+* **Idade:** 24 anos
+* **Localização e Ocupação:** Formada em Letras, trabalha como assistente de conteúdo em regime home office em São Paulo. Passa mais de 8 horas diárias diante de telas repletas de métricas de engajamento, e-mails corporativos assépticos e ferramentas padronizadas.
+* **O que tenta fazer:** Ao final de um dia exaustivo, Clara busca desacelerar. Ela gosta de colocar um disco de vinil suave na vitrola, preparar uma xícara de chá e ler memórias humanas autênticas — cartas de amor não correspondidas guardadas no tempo, desabafos que nunca foram remetidos, reflexões sobre a passagem dos anos e cartas anônimas de desconhecidos. Ela também escreve textos viscerais que gostaria de soltar no mundo de forma anônima e sonha em organizar seu acervo de cartas favoritas em pastas temáticas delicadas, como se fossem fichários de uma biblioteca antiga.
+* **O que a atrapalha:** As redes sociais convencionais quebram seu momento de refúgio com propagandas agressivas, comentários desnecessários e notificações urgentes. Guardar tudo apenas no seu diário de papel a faz se sentir sozinha no mundo com seus sentimentos, sem a certeza de que outras almas sensíveis entendem a sua melancolia.
 
 ---
 
-## 🔍 Comandos Redis Streams Utilizados no `log-service`
+## 4. Concorrentes e Alternativas
 
-O microserviço `log-service` interage com o Redis utilizando a chave de stream `logs:audit`:
-
-### 1. Ingestão de Log: `XADD`
-Para cada evento capturado pelo catálogo ou serviço de autenticação, o microserviço executa:
-```redis
-XADD logs:audit * usuario_id "1" acao "FAVORITAR_FILME" timestamp "2026-09-08T10:30:00.000Z" ip "172.20.0.1" detalhes "{\"tmdb_movie_id\":13,\"titulo\":\"Forrest Gump\"}"
-```
-- `*` instrui o Redis a gerar automaticamente um ID baseado em milissegundos UTC.
-
-### 2. Consulta de Auditoria: `XREVRANGE`
-Para que os administradores visualizem os eventos ordenados do mais recente para o mais antigo:
-```redis
-XREVRANGE logs:audit + - COUNT 100
-```
-- `+`: Representa o ID mais recente existente no stream.
-- `-`: Representa o ID mais antigo.
-- `COUNT 100`: Retorna a janela mais recente de 100 eventos para renderização veloz na interface.
-
----
-
-## 📋 Eventos Auditados e Estrutura dos Dados
-
-Todos os eventos contêm os campos obrigatórios: `usuario_id`, `acao`, `timestamp`, `ip` e o campo opcional enriquecido `detalhes`.
-
-| Evento (`acao`) | Origem | Descrição / Detalhes |
+| Concorrente / Alternativa | O que é | O que faz mal / Onde falha |
 | :--- | :--- | :--- |
-| `LOGIN_SUCESSO` | `auth-service` / `backend` | Login autenticado com sucesso e emissão de token JWT |
-| `LOGIN_FALHA` | `auth-service` / `backend` | Tentativa com credenciais inválidas ou conta inexistente |
-| `LOGOUT` | `backend` | Encerramento de sessão e descarte de credenciais |
-| `FAVORITAR_FILME` | `backend` | Filme adicionado aos favoritos (`tmdb_movie_id`, `titulo`) |
-| `DESFAVORITAR_FILME` | `backend` | Remoção de filme dos favoritos |
-| `CRIAR_COMENTARIO` | `backend` | Postagem de resenha da comunidade (`tmdb_movie_id`, trecho) |
-| `DELETAR_COMENTARIO_PROPRIO` | `backend` | Usuário apagou seu próprio comentário |
-| `MODERAR_COMENTARIO_ADMIN` | `backend` | **Ação Admin**: Moderação e exclusão de comentário de terceiros |
-| `ALTERAR_PAPEL_USUARIO` | `auth-service` | **Ação Admin**: Promoção ou rebaixamento de papel de usuário |
-| `EXCLUIR_USUARIO` | `auth-service` | **Ação Admin**: Exclusão definitiva de conta de usuário |
-| `🚨 BLOQUEIO_RBAC_403` | `backend` | **403 Forbidden**: Papel insuficiente para acessar endpoint sensível |
-| `🚨 BLOQUEIO_RBAC_ADMIN_403`| `backend` / `auth-service` | **403 Forbidden**: Não-administrador tentando acessar rota de admin |
-| `🚨 BLOQUEIO_LIMITE_FAVORITOS_403` | `backend` | **403 Forbidden**: Usuário Comum tentando passar de 5 favoritos |
-| `🚨 BLOQUEIO_EMAIL_NAO_VERIFICADO_403` | `backend` / `auth-service`| **403 Forbidden**: Tentativa de acesso com conta pendente de OTP |
+| **Reddit** (*r/UnsentLetters, r/desabafos*) | Fóruns abertos de texto e desabafos anônimos | Interface cinzenta, puramente textual e sem qualquer apelo sensorial; ambiente propenso a trolls e comentários hostis; zero sensação de colecionismo ou preservação estética. |
+| **Pinterest & Tumblr** | Redes visuais de pins e reposts de estética nostálgica | Foco em imagens estéticas desconexas e links quebrados; poluição por anúncios agressivos e memes fora de contexto; não prioriza a leitura atenta do texto da carta. |
+| **Slowly** | App de troca de cartas virtuais com demora de entrega | Foco restrito a bate-papo bilateral (onde frequentemente ocorrem abandono e *ghosting* das conversas); não opera como um museu ou acervo público catalogado para leitura livre e descoberta de memórias. |
+| **Cadernos Físicos & Scrapbooks** | Diários caseiros de papel e caixas de memórias | Insumos caros; não permite compartilhar o sentimento com o mundo nem encontrar conforto na dor alheia; deteriora com o tempo e não possui busca ou indexação. |
 
 ---
 
-## 🛡️ Consulta de Auditoria e Proteção RBAC
+## 5. Proposta de Valor
 
-A consulta de logs é restrita **exclusivamente aos administradores** via endpoint e interface web:
-
-- **Endpoint de Consulta:** `GET /api/admin/logs` (e alias `GET /api/auth/logs`)
-- **Middlewares Aplicados:** `authMiddleware` + `requireAdmin`
-- **Comportamento de Segurança:**
-  - Se um usuário comum ou VIP (`premium`) tentar requisitar o endpoint, o backend responde imediatamente com **HTTP 403 Forbidden** e **registra no próprio Redis a tentativa de violação**:
-    ```json
-    {
-      "error": "Acesso permitido apenas para administradores."
-    }
-    ```
-  - Se um administrador autenticado requisitar, recebe os logs ordenados:
-    ```json
-    {
-      "total": 50,
-      "stream": "logs:audit",
-      "logs": [
-        {
-          "id": "1725798234567-0",
-          "usuario_id": "1",
-          "acao": "BLOQUEIO_RBAC_ADMIN_403",
-          "timestamp": "2026-09-08T10:35:12.000Z",
-          "ip": "172.20.0.1",
-          "detalhes": { "rota": "/api/admin/logs", "motivo": "Acesso não autorizado" }
-        }
-      ]
-    }
-    ```
+> *\"Transformamos o resgate e o desabafo das emoções humanas em uma experiência tátil, íntima e nostálgica de abrir cartas reais em papel envelhecido, longe da pressa e do ruído das redes sociais.\"*
 
 ---
 
-## 💻 Visualização no Frontend (AdminDashboard)
+## 6. Modelo de Receita com Stripe
 
-No painel administrativo (`AdminDashboard.jsx`), a aba **"Auditoria (Redis Streams)"** apresenta:
-1. **Indicador de Conexão com o Stream:** Sinalizador `REDIS STREAM: logs:audit` com animação de pulso.
-2. **Filtros Rápidos por Categoria:** `Todos`, `🚨 403 Forbidden`, `🔑 Logins`, `⭐ Favoritos`, `💬 Comentários`, `🛡️ Moderação`.
-3. **Badges Estilizadas:** Cores exclusivas para bloqueios 403 (vermelho carmesim), logins válidos (verde esmeralda), moderação (roxo) e favoritos (âmbar).
-4. **Sincronização em Tempo Real:** Botão **"Atualizar Logs"** com consulta imediata ao Redis via `XREVRANGE`.
+O Entre Cartas adota o modelo **Freemium com Assinatura Recorrente Mensal** gerenciada via **Stripe Billing / Checkout**:
 
----
+### Comparativo de Planos
 
-## 🧪 Roteiro de Demonstração e Verificação
+| Recursos e Limitações | Plano Leitor (Free — R$ 0,00/mês) | Clube do Remetente Pro (R$ 14,90/mês) |
+| :--- | :--- | :--- |
+| **Acesso ao Acervo Público** | Ilimitado (Cartas da Comunidade) | Ilimitado + Acervo Histórico Curado |
+| **Experiência Sonora e Tátil** | Abertura de envelopes e papéis | Efeitos sonoros e visuais imersivos completos |
+| **Pastas de Arquivo Pessoal** | Até 3 pastas de arquivo | **Pastas e caixas de memórias ilimitadas** |
+| **Limite de Cartas Guardadas** | Até 5 cartas guardadas na caixa | **Cartas guardadas ilimitadas** |
+| **Carimbos de Marcação** | Carimbo padrão (*\"LIDA\"*, *\"GUARDADA\"*) | **Carimbos de Colecionador** (*\"FAVORITA\"*, *\"ETERNA\"*, *\"RARA\"*) |
+| **Envio de Cartas Anônimas** | Até 2 cartas/mês (fila comum de curadoria) | **Envio ilimitado** com curadoria e catalogação prioritária |
+| **Estúdio de Papelaria** | Papel padrão (datilografado simples) | **Papéis raros** (linho, pergaminho, rasgado), lacres de cera e tipografias exclusivas |
+| **Exportação Tipográfica** | Visualização web | **Download em PDF tipográfico de alta resolução** para impressão e colagem |
 
-### 1. Iniciar os Contêineres
-```bash
-docker compose up -d --build
-```
-
-### 2. Inspecionar Diretamente o Redis Streams via CLI
-Para inspecionar os eventos crus armazenados no Redis:
-```bash
-docker exec -it tomhanks_redis redis-cli XREVRANGE logs:audit + - COUNT 10
-```
-
-Para verificar o tamanho do stream e estatísticas da chave:
-```bash
-docker exec -it tomhanks_redis redis-cli XLEN logs:audit
-```
-
-### 3. Testar Registro de Bloqueio 403 (Tentativa Não Autorizada)
-1. Faça login com um usuário comum e obtenha seu token.
-2. Tente acessar o endpoint de logs:
-```bash
-curl -i -X GET http://localhost:3000/api/admin/logs \
-  -H "Authorization: Bearer <TOKEN_USUARIO_COMUM>"
-```
-> **Retorno:** `HTTP/1.1 403 Forbidden`.
-3. Consulte o Redis novamente: você verá o evento `BLOQUEIO_RBAC_ADMIN_403` gravado no stream em tempo real.
-
-### 4. Consultar Logs como Administrador
-```bash
-curl -X GET http://localhost:3000/api/admin/logs \
-  -H "Authorization: Bearer <TOKEN_ADMIN>"
-```
-> **Retorno:** `HTTP/1.1 200 OK` com a lista JSON dos eventos auditados.
+* **Por que alguém paga o Pro?** O público do nicho de *journaling*, literatura e papelaria já investe dezenas de reais mensalmente em itens físicos descartáveis. Por **R$ 14,90/mês** (menos que o valor de um cappuccino), o assinante desbloqueia ferramentas de personalização artística únicas, personaliza suas cartas com selos e lacres de cera, salva acervos ilimitados e apoia a manutenção de um refúgio literário livre de anúncios.
 
 ---
 
-## 🪣 Armazenamento de Fotos de Perfil com MinIO (Object Storage S3)
+## 7. Métricas de Sucesso
 
-### Por que usar MinIO (Object Storage) em vez de gravar imagens no MariaDB (BLOB)?
-1. **Evita Inchaço do Banco Relacional:** Salvar arquivos binários (`BLOB`) no MariaDB causaria fragmentação do InnoDB Buffer Pool, backups gigantescos e lentidão em operações de `SELECT` ou `JOIN`.
-2. **Escalabilidade Horizontal:** O MinIO opera sob a API S3, permitindo migração direta para AWS S3, Cloudflare R2 ou Google Cloud Storage sem alterar uma única linha de regra de negócio.
-3. **Desacoplamento:** O MariaDB armazena apenas a referência (`avatar_url`), enquanto os arquivos binários são servidos pelo gateway de streaming da aplicação (`/api/profile/avatar/:filename`).
-
----
-
-## 🛡️ Proteção Anti-IDOR (Insecure Direct Object Reference)
-
-Para evitar que um usuário mal-intencionado edite o perfil de outro modificando o ID na URL ou no corpo da requisição:
-- O backend extrai a identidade real diretamente do **Token JWT assinado** (`req.usuarioId`).
-- Se o usuário tentar enviar `PUT /api/profile/:id` ou `{ usuario_id: outro_id }`, o sistema detecta a divergência e rejeita imediatamente com **`HTTP 403 Forbidden`**:
-
-```json
-{
-  "error": "Acesso negado: você não tem autorização para editar o perfil de outro usuário (Proteção Anti-IDOR)."
-}
-```
-Além disso, a tentativa de ataque é registrada automaticamente no **Redis Streams** (`BLOQUEIO_IDOR_403`).
-
-### Como Demonstrar a Tentativa Recusada (Anti-IDOR):
-Execute no terminal ou no DevTools Console (estando logado com o usuário ID 1 e tentando alterar o perfil do usuário 99):
-```bash
-curl -i -X PUT http://localhost:3000/api/profile/99 \
-  -H "Authorization: Bearer <SEU_TOKEN_JWT>" \
-  -H "Content-Type: application/json" \
-  -d '{"nome": "Tentativa Hacker"}'
-```
-> **Resultado:** `HTTP/1.1 403 Forbidden` com código `IDOR_BLOCK`.
+1. **Assinantes Pagantes (Clube Pro):** Meta de atingir **150 assinantes Pro nos primeiros 90 dias**, gerando uma receita previsível de R$ 2.235,00/mês.
+2. **MRR (Monthly Recurring Revenue):** Escalar para **R$ 5.000,00 de MRR** ao final do 6º mês, impulsionado por divulgações orgânicas em comunidades de leitores (#BookTok e #Journaling).
+3. **Retenção & Churn:** Manter o **Churn Rate mensal abaixo de 5%**, sustentado pelo apego emocional dos usuários às cartas arquivadas em suas coleções pessoais.
+4. **Engajamento Afetivo:** Média de **4 cartas abertas** e pelo menos **1 carta favoritada/carimbada por sessão** por usuário ativo.
 
 ---
 
-## 💳 Plano Premium com Stripe (Modo de Teste)
+## 8. Lean Canvas (9 Blocos)
 
-O projeto inclui a funcionalidade de **Assinatura do Plano Premium** com cobrança simulada via **Stripe Checkout** em modo de teste (`test mode`), mantendo conformidade com os regulamentos de segurança PCI-DSS.
-
-### 🌟 Benefícios do Plano Premium vs Plano Gratuito
-
-| Recurso | 🎬 Plano Gratuito | 👑 Plano Premium (R$ 9,90/mês) |
-| :--- | :---: | :---: |
-| **Limite de Favoritos** | Máximo 5 filmes | **Ilimitado** |
-| **Criação de Listas** | Sim | **Ilimitado** |
-| **Comentários & Avaliações** | Sim | **Selo exclusivo no perfil** |
-| **Selo de Perfil** | `Membro` | `👑 Premium` |
-
----
-
-### 🏗️ Arquitetura e Fluxo de Pagamento com Stripe
-
-1. **Sessão de Checkout**: O usuário autenticado clica em **"Assinar Plano Premium"**, solicitando ao backend (`POST /api/stripe/checkout`). O backend cria uma sessão no Stripe Checkout via SDK oficial (`stripe.checkout.sessions.create`) com a referência do usuário (`client_reference_id = usuarioId`).
-2. **Checkout Seguro**: O usuário é redirecionado para a página hospedada pelo Stripe (`checkout.stripe.com`). **Nenhum dado de cartão passa pelos nossos servidores.**
-3. **Confirmação Assíncrona via Webhook**: O Stripe dispara um evento `checkout.session.completed` ou `invoice.paid` para o endpoint `POST /api/stripe/webhook`.
-4. **Validação Cryptográfica de Assinatura**: O webhook valida o header `stripe-signature` usando o segredo `STRIPE_WEBHOOK_SECRET` com `stripe.webhooks.constructEvent()`.
-5. **Idempotência**: O ID do evento do Stripe (`evt_...`) é registrado na tabela `stripe_webhook_events`. Eventos duplicados são ignorados com retorno `200 OK`.
-6. **Atualização de Papel (RBAC)**: Ao confirmar o pagamento, o backend atualiza a coluna `papel` na tabela `usuarios` para `'premium'`, liberando instantaneamente a cota ilimitada de favoritos.
-7. **Cancelamento/Expiração**: Eventos `customer.subscription.deleted` ou `invoice.payment_failed` rebaixam o papel do usuário de volta para `'usuario'`.
+| Bloco | Resposta do Entre Cartas |
+| :--- | :--- |
+| **1. Problema** | • Redes sociais superficiais, velozes e tóxicas que geram ansiedade e solidão.<br>• Falta de um espaço acolhedor e visualmente poético para ler e desabafar sentimentos verdadeiros.<br>• Caixas de memórias e diários físicos são caros, isolados e sujeitos a perda ou deterioração. |
+| **2. Segmentos de Clientes** | • Jovens adultos (18–35 anos), leitores, escritores, fãs de *scrapbook*, *junk journals* e estética *vintage* / *dark academia*.<br>• *Early adopters:* Leitores de comunidades literárias (BookTok, Bookstagram, Letterboxd) e praticantes de escrita terapêutica. |
+| **3. Proposta Única de Valor** | Um catálogo afetivo e sensorial de cartas e memórias humanas vivenciado como um scrapbook físico interativo — longe do ruído dos algoritmos. |
+| **4. Solução** | • Catálogo de cartas abertas categorizadas por sentimento (Amor, Desabafo, Luto, Nunca Enviadas).<br>• Interface física (envelopes que abrem, papel que desdobra, marcas de carimbo, lacres de cera).<br>• Pastas de arquivo para colecionar memórias e estúdio de papelaria digital. |
+| **5. Canais** | • Divulgação orgânica no TikTok e Instagram (#BookTok, #Journaling, #Scrapbook, #Poesia).<br>• Parcerias com clubes do livro e newsletters literárias independentes.<br>• Botão de compartilhamento estético que gera a prévia da carta em formato de papel antigo para redes. |
+| **6. Fontes de Receita** | • Assinatura mensal no Stripe: **Clube do Remetente Pro** (R$ 14,90/mês ou R$ 149,00/ano).<br>• Futura venda de caixas físicas de papelaria colecionável com cartas impressas curadas. |
+| **7. Estrutura de Custos** | • Hospedagem VPS / Servidor Cloud (Docker, MariaDB, Redis, MinIO).<br>• Taxas de processamento do Stripe (3,99% + R$ 0,39 por transação).<br>• Armazenamento de arquivos e texturas no MinIO/S3.<br>• Custos de domínio e serviço transacional de e-mail (Brevo). |
+| **8. Métricas-Chave** | • Leitores cadastrados e Cartas abertas/lidas por dia.<br>• Assinantes ativos do Clube Pro e MRR (Receita Recorrente Mensal).<br>• Taxa de conversão Free → Pro (meta: 4% a 6%).<br>• Taxa de Churn mensal (< 5%). |
+| **9. Vantagem Injusta** | • Identidade visual e experiência física (*Skeuomorphic Scrapbook UI*) inigualável, impossível de ser replicada por redes corporativas.<br>• Curadoria humana e apego emocional profundo dos usuários ao seu acervo de memórias salvas. |
 
 ---
 
-### 💳 Cartões de Teste Oficiais para Avaliação
+## 9. Mapa de Reaproveitamento da Arquitetura
 
-Ao testar a aplicação na tela de checkout do Stripe, utilize os dados de teste abaixo (qualquer data futura e qualquer CVC de 3 dígitos):
+Toda a infraestrutura desenvolvida anteriormente foi ressignificada para dar vida ao ecossistema do **Entre Cartas**:
 
-* **Sucesso na Assinatura (Pagamento Aprovado)**: `4242 4242 4242 4242`
-* **Cartão Recusado (Falha de Pagamento)**: `4000 0027 6000 3184`
-* **Saldo Insuficiente**: `4000 0002 0000 0005`
+| Peça do Projeto Anterior | O que vira no Entre Cartas | Aplicação Prática no Domínio Epistolar |
+| :--- | :--- | :--- |
+| **Catálogo de Filmes (TMDB)** | **Catálogo de Cartas & Acervo Epistolar** | O catálogo passa a listar cartas reais e anônimas classificadas por sentimentos (*Amor, Desabafo, Nunca Enviadas, Luto, Memórias*), contendo metadados como remetente, data lírica, tipo de papel e selo. |
+| **Microsserviço de Login + RBAC** | **Gestão de Identidades e Papéis** | Papéis: `leitor` (usuário gratuito), `remetente_pro` (assinante com estúdio de papelaria e acervo ilimitado) e `curador` / `admin` (responsável por moderar e aprovar cartas públicas). |
+| **Logs e Auditoria (Redis Streams)** | **Eventos Sensoriais e de Negócio** | Rastreamento de ações do usuário na fila: `\"carta_deslacrada\"`, `\"carimbo_aplicado\"`, `\"carta_arquivada_na_pasta\"`, `\"assinatura_pro_renovada\"`. |
+| **Upload e Perfil (MinIO / S3)** | **Mídias Físicas e Elementos de Papelaria** | Armazenamento de fotos estilo Polaroid anexadas às cartas, recortes de jornal escaneados, texturas de papel de alta resolução e selos postais customizados. |
+| **Plano Premium (Stripe)** | **Assinatura do Clube do Remetente** | Assinatura recorrente mensal de R$ 14,90 gerenciada com Stripe Checkout, Customer Portal e Webhooks para liberação imediata dos privilégios Pro. |
+| **Swagger / CI/CD / Observabilidade** | **Documentação de APIs & Deploy Contínuo** | Documentação completa dos endpoints de cartas, coleções e carimbos no Swagger; deploy automatizado na stack existente do Portainer. |
 
 ---
 
-### 🔧 Como Configurar os Webhooks do Stripe em Ambiente Local
+## 10. Backlog das Próximas Entregas (Issues no GitHub)
 
-Para testar os webhooks localmente utilizando o Stripe CLI:
+As issues abaixo formam o roteiro de execução técnica para as próximas etapas (Atividades 10 e 11):
 
-1. **Instalar o Stripe CLI**: [stripe.com/docs/stripe-cli](https://stripe.com/docs/stripe-cli)
-2. **Autenticar na sua conta Stripe**:
-   ```bash
-   stripe login
-   ```
-3. **Encaminhar webhooks para a aplicação local**:
-   ```bash
-   stripe listen --forward-to localhost:3000/api/stripe/webhook
-   ```
-4. Copie o segredo informado (`whsec_...`) e defina na variável `STRIPE_WEBHOOK_SECRET` no seu arquivo `.env`.
+1. **Issue #1 — Modelagem do Banco de Dados: Tabelas de Cartas, Categorias Emocionais e Pastas**
+   - Substituição da estrutura de filmes pela modelagem epistolar do Entre Cartas no MariaDB.
+   - Criação da tabela `cartas` com atributos de papel, selo, lacre e curadoria.
+   - Criação da tabela `pastas_memorias` e `carta_favoritos` com carimbos visuais.
+   - Seed de cartas iniciais poéticas para demonstração rica e imediata.
+
+2. **Issue #2 — Autenticação e RBAC: Implementação dos Papéis Leitor, Remetente Pro e Curador**
+   - Ajustar o microsserviço de autenticação para os papéis de negócio do Entre Cartas.
+   - Papel `leitor`: Acesso padrão de leitura e limite de cartas guardadas.
+   - Papel `remetente_pro`: Permissões para pastas ilimitadas, papéis nobres e envio prioritário.
+   - Papel `curador` / `admin`: Painel de moderação para aprovar ou recusar cartas da comunidade.
+
+3. **Issue #3 — Design System Tátil: Componentes Paper, TornPaper, Envelope, Stamp, WaxSeal e Folder**
+   - Criação dos componentes visuais de papelaria artesanal e scrapbook.
+   - Texturas de papel envelhecido, sombras realistas e rotações orgânicas sutis.
+   - Componente `Envelope` com aba dobrável e lacre de cera.
+   - Componente `Stamp` simulando impacto físico de tinta desgastada.
+
+4. **Issue #4 — Motor de Leitura e Interações Físicas: Animação de Abrir Envelope e Carimbar Carta**
+   - Animação interativa com Framer Motion: clique no envelope, ruptura do lacre e desdobrar do papel.
+   - Efeito de impacto tátil e sonoro do carimbo ao favoritar/guardar a carta.
+   - Animação de arquivamento da carta deslizando fisicamente para dentro da pasta.
+
+5. **Issue #5 — Integração Stripe: Assinatura do Clube do Remetente Pro e Webhook de Ativação**
+   - Configuração de produto e preço recorrente no Stripe Billing (R$ 14,90/mês).
+   - Fluxo de Checkout seguro com Stripe Hosted Checkout e Customer Portal.
+   - Webhook para escutar eventos de pagamento e atualizar o papel do usuário no banco.
+
+6. **Issue #6 — Sistema de Upload no MinIO: Polaroids, Selos e Recortes Anexados às Cartas**
+   - Configuração de bucket no MinIO para anexos fotográficos e de arte.
+   - Upload de fotos estilo Polaroid anexadas com fita adesiva (washi tape) às cartas.
+   - Tratamento e compressão de imagens para garantir carregamento instantâneo.
 
 ---
 
 ## 👤 Autor e Créditos
-- **Disciplina:** Computação em Nuvem / Infraestrutura
-- **Professor:** **[@siriani](https://github.com/siriani)**
-- **API Externa de Filmes:** [The Movie Database (TMDB)](https://www.themoviedb.org/)
-
+* **Autor:** Daniel Marçal Gonçalves
+* **Disciplina:** Introdução à Computação em Nuvem (ISW055)
+* **Professor:** [@siriani](https://github.com/siriani) — Fatec Pompeia

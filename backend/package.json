@@ -1,7 +1,7 @@
 {
-  "name": "tomhanks-backend",
+  "name": "entre-cartas-backend",
   "version": "1.0.0",
-  "description": "Backend API para o Catálogo de Filmes do Tom Hanks - Disciplina do Professor @siriani",
+  "description": "Backend API para o Entre Cartas — Arquivo Epistolar & Scrapbook - Disciplina do Professor @siriani",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

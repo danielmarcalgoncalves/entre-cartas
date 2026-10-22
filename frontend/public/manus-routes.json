@@ -1,0 +1,9 @@
+{
+  "routes": [
+    { "path": "/", "title": "Entre Cartas — início" },
+    { "path": "/discover", "title": "Descobrir cartas" },
+    { "path": "/favorites", "title": "Cartas favoritas" },
+    { "path": "/collections", "title": "Coleções guardadas" },
+    { "path": "/letter/:id", "title": "Leitura da carta" }
+  ]
+}

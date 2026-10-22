@@ -6,8 +6,14 @@ backend/node_modules/
 # Builds e Distribuição
 dist/
 frontend/dist/
+frontend/out/
+frontend/.next/
+.next/
+out/
 backend/public/
 build/
+frontend_old_backup/
+entrecartas-completo/
 
 # Variáveis de Ambiente e Segredos (NUNCA COMMITTAR)
 .env

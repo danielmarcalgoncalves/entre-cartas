@@ -137,11 +137,52 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+/**
+ * Middleware de Autenticação Opcional:
+ * Se o token for fornecido e válido, injeta req.usuarioId e req.usuarioPapel.
+ * Se não for fornecido, segue a requisição como visitante anônimo sem bloquear com 401.
+ */
+async function optionalAuth(req, res, next) {
+  let token = null;
+  if (req.cookies && req.cookies.access_token) {
+    token = req.cookies.access_token;
+  } else if (req.headers['authorization']) {
+    const authHeader = req.headers['authorization'];
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      token = parts[1];
+    }
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded && decoded.id) {
+      const [rows] = await pool.query(
+        'SELECT id, papel FROM usuarios WHERE id = ?',
+        [decoded.id]
+      );
+      if (rows.length > 0) {
+        req.usuarioId = Number(rows[0].id);
+        req.usuarioPapel = rows[0].papel || 'usuario';
+      }
+    }
+  } catch (err) {
+    // Silencioso se o token for inválido em rota opcional
+  }
+  next();
+}
+
 const requirePremiumOrAdmin = requireRole('premium', 'admin');
 
 module.exports = {
   authMiddleware,
+  optionalAuth,
   requireRole,
   requireAdmin,
   requirePremiumOrAdmin
 };
+

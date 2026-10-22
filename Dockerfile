@@ -1,15 +1,14 @@
 # ====================================================================
-# Dockerfile Multi-Stage: Frontend (Vite) + Backend (Node.js/Express)
-# Catálogo de Filmes - Tom Hanks - Professor @siriani
+# Dockerfile Multi-Stage: Frontend (Next.js) + Backend (Node.js/Express)
+# Entre Cartas — Arquivo Epistolar — Professor @siriani
 # ====================================================================
 
-# Estágio 1: Build do Frontend React
+# Estágio 1: Build do Frontend Next.js (Static Export)
 FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 
-# Copia apenas o package.json e .npmrc para evitar que o lockfile do Windows omita binários do Linux
-COPY frontend/package.json frontend/.npmrc* ./
-RUN npm install --include=optional
+COPY frontend/package*.json ./
+RUN npm install --legacy-peer-deps
 
 COPY frontend/ ./
 ENV NODE_OPTIONS="--max-old-space-size=2048"
@@ -27,8 +26,8 @@ RUN npm install --omit=dev
 # Copia o código fonte do backend
 COPY backend/ ./
 
-# Copia os arquivos compilados do frontend para a pasta estática do backend
-COPY --from=frontend-builder /app/frontend/dist ./public
+# Copia os arquivos estáticos exportados do Next.js para a pasta pública do backend
+COPY --from=frontend-builder /app/frontend/out ./public
 
 # Define variáveis padrão
 ENV PORT=3000

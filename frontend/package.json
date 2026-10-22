@@ -1,24 +1,26 @@
 {
-  "name": "tomhanks-frontend",
+  "name": "entre-cartas",
+  "version": "0.1.0",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev --hostname 0.0.0.0 --port 3000",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port 3000",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@tailwindcss/postcss": "4.3.3",
+    "framer-motion": "14.6.0",
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwindcss": "4.3.3"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^4.5.3"
-  },
-  "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "3.30.0",
-    "@rollup/rollup-linux-x64-musl": "3.30.0",
-    "@esbuild/linux-x64": "^0.18.20"
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3"
   }
 }
