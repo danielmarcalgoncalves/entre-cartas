@@ -12,6 +12,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.folder-root[data-open] {
+  z-index: 90;
+}
+
 .folder-root[data-theme='light'] {
   --folder-ground: rgba(24, 22, 40, 0.16);
   --folder-ground-soft: rgba(24, 22, 40, 0.1);

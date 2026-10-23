@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,9 +13,11 @@ import {
 } from "@/components/JournalEditor";
 import { api } from "@/services/api";
 import Folder from "@/components/ReactBitsFolder/Folder";
+import PostalTrashCan from "@/components/PostalTrashCan";
 
 const SAVED_ENTRIES_KEY = "entre-cartas:journal:entries";
 const NOTEBOOKS_STORAGE_KEY = "entre-cartas:notebooks:v2";
+const TRASH_STORAGE_KEY = "entre-cartas:journal:trash";
 
 export default function PersonalJournalShelf() {
   const { user, isPro } = useAuth();
@@ -24,6 +26,14 @@ export default function PersonalJournalShelf() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [lettersWritten, setLettersWritten] = useState<JournalEntry[]>([]);
   const [letterFolders, setLetterFolders] = useState<LetterFolder[]>([]);
+  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
+
+  // Lixeira Postal Metálica Vintage
+  const trashCanRef = useRef<HTMLDivElement>(null);
+  const [isTrashHovered, setIsTrashHovered] = useState(false);
+  const [trashLetters, setTrashLetters] = useState<JournalEntry[]>([]);
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  const [trashFeedback, setTrashFeedback] = useState<string | null>(null);
 
   // Leitura Imersiva Noturna de Caderno
   const [readingNotebook, setReadingNotebook] = useState<Notebook | null>(null);
@@ -36,18 +46,41 @@ export default function PersonalJournalShelf() {
   const limiteCartas = isPro ? 30 : 10;
 
   const carregarDadosEstante = () => {
-    // 1. Carrega todos os cadernos inteiros do LocalStorage
+    // 1. Carrega todos os cadernos inteiros do LocalStorage (apenas criados pelo usuário)
     try {
       const storedNb = window.localStorage.getItem(NOTEBOOKS_STORAGE_KEY);
       if (storedNb) {
         const parsedNb = JSON.parse(storedNb);
-        if (Array.isArray(parsedNb) && parsedNb.length > 0) {
-          setNotebooks(parsedNb);
+        if (Array.isArray(parsedNb)) {
+          const reais = parsedNb.filter(
+            (n: Notebook) => n.id !== "default-caderno" && n.id !== "caderno-noturno"
+          );
+          setNotebooks(reais);
+        } else {
+          setNotebooks([]);
+        }
+      } else {
+        setNotebooks([]);
+      }
+    } catch {
+      setNotebooks([]);
+    }
+
+    // 2. Carrega lixeira postal
+    let descartadas: JournalEntry[] = [];
+    try {
+      const rawTrash = window.localStorage.getItem(TRASH_STORAGE_KEY);
+      if (rawTrash) {
+        const parsedTrash = JSON.parse(rawTrash);
+        if (Array.isArray(parsedTrash)) {
+          descartadas = parsedTrash;
+          setTrashLetters(descartadas);
         }
       }
     } catch {}
+    const trashIds = new Set(descartadas.map((d) => d.id));
 
-    // 2. Carrega as cartas escritas pelo usuário (locais e backend)
+    // 3. Carrega as cartas escritas pelo usuário (locais e backend)
     let cartasLocais: JournalEntry[] = [];
     try {
       const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
@@ -55,14 +88,16 @@ export default function PersonalJournalShelf() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           cartasLocais = parsed.filter(
-            (e: any) => Boolean(e.selo_carta) || e.humor !== "reflexao"
+            (e: any) =>
+              (Boolean(e.selo_carta) || e.humor !== "reflexao") &&
+              !trashIds.has(e.id)
           );
           setLettersWritten(cartasLocais);
         }
       }
     } catch {}
 
-    // 3. Mescla com cartas do backend MariaDB
+    // 4. Mescla com cartas do backend MariaDB
     api.cartas
       .minhas()
       .then((res: any) => {
@@ -80,35 +115,130 @@ export default function PersonalJournalShelf() {
 
           setLettersWritten((atuais) => {
             const idsAtuais = new Set(atuais.map((e) => e.id));
-            const novas = remotas.filter((r) => !idsAtuais.has(r.id));
+            const novas = remotas.filter((r) => !idsAtuais.has(r.id) && !trashIds.has(r.id));
             return [...atuais, ...novas];
           });
         }
       })
       .catch(() => {});
 
-    // 4. Carrega as pastas de correspondência do LocalStorage
+    // 5. Carrega as pastas de correspondência do LocalStorage (apenas criadas pelo usuário)
     try {
       const storedFld = window.localStorage.getItem(LETTER_FOLDERS_STORAGE_KEY);
       if (storedFld) {
         const parsedFld = JSON.parse(storedFld);
-        if (Array.isArray(parsedFld) && parsedFld.length > 0) {
-          setLetterFolders(parsedFld);
+        if (Array.isArray(parsedFld)) {
+          const reais = parsedFld.filter(
+            (f: LetterFolder) => f.id !== "pasta-principal"
+          );
+          setLetterFolders(reais);
         } else {
-          setLetterFolders([
-            { id: "pasta-principal", nome: "Correspondências", cor: "#5a3820", criadoEm: new Date().toISOString() },
-          ]);
+          setLetterFolders([]);
         }
       } else {
-        setLetterFolders([
-          { id: "pasta-principal", nome: "Correspondências", cor: "#5a3820", criadoEm: new Date().toISOString() },
-        ]);
+        setLetterFolders([]);
       }
     } catch {
-      setLetterFolders([
-        { id: "pasta-principal", nome: "Correspondências", cor: "#5a3820", criadoEm: new Date().toISOString() },
-      ]);
+      setLetterFolders([]);
     }
+  };
+
+  const descartarCarta = (carta: JournalEntry) => {
+    // 1. Remove da estante ativa
+    setLettersWritten((prev) => prev.filter((l) => l.id !== carta.id));
+
+    // Remove do LocalStorage de entradas ativas
+    try {
+      const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const rest = parsed.filter((p: any) => p.id !== carta.id);
+          window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(rest));
+        }
+      }
+    } catch {}
+
+    // 2. Guarda na lixeira postal
+    setTrashLetters((prev) => {
+      const updated = [carta, ...prev.filter((t) => t.id !== carta.id)];
+      try {
+        window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setTrashFeedback(`"${carta.titulo || "Carta"}" foi guardada na lixeira postal.`);
+    setTimeout(() => setTrashFeedback(null), 4500);
+
+    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+  };
+
+  const restaurarCarta = (carta: JournalEntry) => {
+    // 1. Remove da lixeira
+    setTrashLetters((prev) => {
+      const updated = prev.filter((t) => t.id !== carta.id);
+      try {
+        window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 2. Devolve para as cartas ativas
+    setLettersWritten((prev) => {
+      const updated = [carta, ...prev.filter((l) => l.id !== carta.id)];
+      try {
+        const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
+        let list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) list = [];
+        list = [carta, ...list.filter((l: any) => l.id !== carta.id)];
+        window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(list));
+      } catch {}
+      return updated;
+    });
+
+    setTrashFeedback(`"${carta.titulo || "Carta"}" foi restaurada para a pasta.`);
+    setTimeout(() => setTrashFeedback(null), 4500);
+
+    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+  };
+
+  const handleItemDrag = (info: { index: number; clientX: number; clientY: number; item: any }) => {
+    if (!trashCanRef.current) return false;
+    const rect = trashCanRef.current.getBoundingClientRect();
+    const pad = 40;
+    const isOver =
+      info.clientX >= rect.left - pad &&
+      info.clientX <= rect.right + pad &&
+      info.clientY >= rect.top - pad &&
+      info.clientY <= rect.bottom + pad;
+
+    setIsTrashHovered(isOver);
+    return isOver;
+  };
+
+  const handleItemDragEnd = (
+    info: { index: number; clientX: number; clientY: number; item: any; inside: boolean },
+    cartasDaPasta: JournalEntry[]
+  ) => {
+    setIsTrashHovered(false);
+    if (!trashCanRef.current) return false;
+    const rect = trashCanRef.current.getBoundingClientRect();
+    const pad = 40;
+    const isOver =
+      info.clientX >= rect.left - pad &&
+      info.clientX <= rect.right + pad &&
+      info.clientY >= rect.top - pad &&
+      info.clientY <= rect.bottom + pad;
+
+    if (isOver) {
+      const carta = cartasDaPasta[info.index];
+      if (carta && !carta.id.startsWith("placeholder-")) {
+        descartarCarta(carta);
+        return true;
+      }
+    }
+    return false;
   };
 
   useEffect(() => {
@@ -246,102 +376,151 @@ export default function PersonalJournalShelf() {
             <span className="section-kicker">CORRESPONDÊNCIA & CONFISSÕES</span>
             <h2 id="letters-section-title">Minhas Cartas</h2>
           </div>
-          <span style={{ fontSize: "12px", fontFamily: "var(--serif, serif)", color: "#776550" }}>
-            {lettersWritten.length} de {limiteCartas} cartas arquivadas • {letterFolders.length} de {limiteCadernos} pastas
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <span style={{ fontSize: "12px", fontFamily: "var(--serif, serif)", color: "#776550" }}>
+              {lettersWritten.length} de {limiteCartas} cartas arquivadas • {letterFolders.length} de {limiteCadernos} pastas
+            </span>
+            {trashLetters.length > 0 && (
+              <button
+                type="button"
+                className="postal-trash-counter-badge"
+                onClick={() => setIsTrashModalOpen(true)}
+                title="Abrir Lixeira Postal"
+              >
+                🗑 {trashLetters.length} descartada{trashLetters.length === 1 ? "" : "s"}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Linha de Pastas 3D limpas diretamente sobre a estante, sem nenhum frame em volta */}
-        <div className="letters-folders-3d-row">
-          {(letterFolders.length > 0
-            ? letterFolders
-            : [
-                {
-                  id: "pasta-principal",
-                  nome: "Correspondências",
-                  cor: "#5a3820",
-                  criadoEm: new Date().toISOString(),
-                },
-              ]
-          ).map((folder) => {
-            const defaultId = letterFolders[0]?.id || "pasta-principal";
-            const cartasDaPasta = lettersWritten.filter(
-              (carta) =>
-                carta.pasta_id === folder.id ||
-                (!carta.pasta_id && folder.id === defaultId)
-            );
+        {/* Feedback visual discreto de descarte/restauração */}
+        <AnimatePresence>
+          {trashFeedback && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="postal-trash-toast"
+            >
+              <span>{trashFeedback}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            const pastelPalette = [
-              "#faf6ee", // Creme marfim pastel
-              "#f3efe6", // Pergaminho suave
-              "#ebf1ec", // Sálvia pastel suave
-              "#f6ece8", // Rosa blush vintage pastel
-              "#eaf1f5", // Azul névoa suave pastel
-              "#efe8da", // Linho cru clássico
-            ];
+        <div className="letters-archive-layout">
+          {/* Se nenhuma pasta foi criada ainda pelo usuário */}
+          {letterFolders.length === 0 ? (
+            <div className="empty-journal-box" style={{ maxWidth: "480px", margin: "20px auto" }}>
+              <span className="empty-pen-icon" aria-hidden="true">✉</span>
+              <h3>Nenhuma pasta de cartas criada ainda.</h3>
+              <p>Escreva uma carta na escrivaninha acima para criar sua primeira pasta postal.</p>
+            </div>
+          ) : (
+            <div className="letters-folders-3d-row">
+              {letterFolders.map((folder) => {
+                const defaultId = letterFolders[0]?.id;
+                const cartasDaPasta = lettersWritten.filter(
+                  (carta) =>
+                    carta.pasta_id === folder.id ||
+                    (!carta.pasta_id && folder.id === defaultId)
+                );
 
-            const folderItems = (
-              cartasDaPasta.length > 0
-                ? cartasDaPasta.slice(0, 6)
-                : [
-                    {
-                      id: `placeholder-${folder.id}`,
-                      titulo: "Pasta Vazia",
-                      conteudo: `Esta pasta (${folder.nome}) ainda não possui cartas arquivadas. Escreva uma carta na escrivaninha acima para guardá-la aqui.`,
-                      data_formatada: "Arquivo Pessoal",
-                      selo_carta: "ARQUIVO",
-                    } as JournalEntry,
-                  ]
-            ).map((letter, idx) => {
-              const cardPastelColor =
-                letter.tipo_papel === "marfim"
-                  ? "#fcfbf7"
-                  : letter.tipo_papel === "pergaminho"
-                  ? "#f7f3ea"
-                  : letter.tipo_papel === "kraft"
-                  ? "#efe8da"
-                  : letter.tipo_papel === "branco"
-                  ? "#faf9f5"
-                  : pastelPalette[idx % pastelPalette.length];
+              const pastelPalette = [
+                "#faf6ee", // Creme marfim pastel
+                "#f3efe6", // Pergaminho suave
+                "#ebf1ec", // Sálvia pastel suave
+                "#f6ece8", // Rosa blush vintage pastel
+                "#eaf1f5", // Azul névoa suave pastel
+                "#efe8da", // Linho cru clássico
+              ];
 
-              return {
-                title: letter.titulo || "Correspondência",
-                description: letter.conteudo,
-                date: letter.data_formatada,
-                seal: letter.selo_carta,
-                bgColor: cardPastelColor,
-                paperColor: cardPastelColor,
-              };
-            });
+              const folderItems = (
+                cartasDaPasta.length > 0
+                  ? cartasDaPasta.slice(0, 6)
+                  : [
+                      {
+                        id: `placeholder-${folder.id}`,
+                        titulo: "Pasta Vazia",
+                        conteudo: `Esta pasta (${folder.nome}) ainda não possui cartas arquivadas. Escreva uma carta na escrivaninha acima para guardá-la aqui.`,
+                        data_formatada: "Arquivo Pessoal",
+                        selo_carta: "ARQUIVO",
+                      } as JournalEntry,
+                    ]
+              ).map((letter, idx) => {
+                const cardPastelColor =
+                  letter.tipo_papel === "marfim"
+                    ? "#fcfbf7"
+                    : letter.tipo_papel === "pergaminho"
+                    ? "#f7f3ea"
+                    : letter.tipo_papel === "kraft"
+                    ? "#efe8da"
+                    : letter.tipo_papel === "branco"
+                    ? "#faf9f5"
+                    : pastelPalette[idx % pastelPalette.length];
 
-            return (
-              <div key={folder.id} className="letter-folder-3d-item">
-                <Folder
-                  label={folder.nome.toUpperCase()}
-                  tabPosition="right"
-                  mode="flap"
-                  variant="solid"
-                  color={folder.cor || "#5a3820"}
-                  paperColor="#fcfbf7"
-                  theme="dark"
-                  size={1.35}
-                  items={folderItems}
-                  onItemClick={(_item: any, index: number) => {
-                    const carta = cartasDaPasta[index];
-                    if (carta) {
-                      setReadingLetter(carta);
-                    }
+                return {
+                  title: letter.titulo || "Correspondência",
+                  description: letter.conteudo,
+                  date: letter.data_formatada,
+                  seal: letter.selo_carta,
+                  bgColor: cardPastelColor,
+                  paperColor: cardPastelColor,
+                };
+              });
+
+              const isOpen = openFolderId === folder.id;
+
+              return (
+                <div
+                  key={folder.id}
+                  className={`letter-folder-3d-item ${isOpen ? "is-open" : "is-closed"}`}
+                  style={{
+                    zIndex: isOpen ? 85 : 10,
                   }}
-                />
-                <div className="letter-folder-caption">
-                  <span className="letter-folder-caption-name">{folder.nome}</span>
-                  <span className="letter-folder-caption-count">
-                    {cartasDaPasta.length} {cartasDaPasta.length === 1 ? "carta arquivada" : "cartas arquivadas"}
-                  </span>
+                >
+                  <Folder
+                    label={folder.nome.toUpperCase()}
+                    tabPosition="right"
+                    mode="flap"
+                    variant="solid"
+                    color={folder.cor || "#5a3820"}
+                    paperColor="#fcfbf7"
+                    theme="dark"
+                    size={1.35}
+                    items={folderItems}
+                    open={isOpen}
+                    onOpenChange={(nextOpen: boolean) => {
+                      setOpenFolderId(nextOpen ? folder.id : null);
+                    }}
+                    onItemDrag={(info: any) => handleItemDrag(info)}
+                    onItemDragEnd={(info: any) => handleItemDragEnd(info, cartasDaPasta)}
+                    onItemDragCancel={() => setIsTrashHovered(false)}
+                    onItemClick={(_item: any, index: number) => {
+                      const carta = cartasDaPasta[index];
+                      if (carta && !carta.id.startsWith("placeholder-")) {
+                        setReadingLetter(carta);
+                      }
+                    }}
+                  />
+                  <div className="letter-folder-caption">
+                    <span className="letter-folder-caption-name">{folder.nome}</span>
+                    <span className="letter-folder-caption-count">
+                      {cartasDaPasta.length} {cartasDaPasta.length === 1 ? "carta arquivada" : "cartas arquivadas"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        )}
+
+          {/* Nova Lixeira Postal Metálica Vintage 3D com Tampa Interativa */}
+          <PostalTrashCan
+            innerRef={trashCanRef}
+            isOpen={isTrashHovered}
+            count={trashLetters.length}
+            onClick={() => setIsTrashModalOpen(true)}
+          />
         </div>
       </section>
 
@@ -506,6 +685,107 @@ export default function PersonalJournalShelf() {
                 </button>
               </div>
             </motion.article>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================ */}
+      {/* 5. MODAL DA LIXEIRA POSTAL (RECUPERAR CARTAS DESCARTADAS)    */}
+      {/* ============================================================ */}
+      <AnimatePresence>
+        {isTrashModalOpen && (
+          <div
+            className="entry-modal-backdrop"
+            onClick={() => setIsTrashModalOpen(false)}
+          >
+            <motion.div
+              className="postal-trash-modal"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 15 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="postal-trash-modal-header">
+                <div>
+                  <span className="entry-modal-kicker">ARQUIVO DE DESCARTES</span>
+                  <h2 style={{ fontFamily: "var(--serif-title, var(--serif))", margin: "4px 0", fontSize: "22px", color: "#2b231a" }}>
+                    Lixeira Postal
+                  </h2>
+                  <p className="postal-trash-modal-sub">
+                    As cartas descartadas nunca somem permanentemente. Você pode restaurá-las para a sua pasta a qualquer momento.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={() => setIsTrashModalOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="postal-trash-modal-body">
+                {trashLetters.length === 0 ? (
+                  <div className="postal-trash-empty">
+                    <div style={{ width: "100px", height: "125px", pointerEvents: "none", marginBottom: "8px" }}>
+                      <PostalTrashCan isOpen={false} count={0} onClick={() => {}} />
+                    </div>
+                    <p className="postal-trash-empty-title">A lixeira postal está vazia</p>
+                    <p className="postal-trash-empty-desc">
+                      Puxe e arraste qualquer carta de uma pasta até a lata de lixo metálica para descartá-la aqui.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="postal-trash-letters-grid">
+                    {trashLetters.map((carta) => (
+                      <div key={carta.id} className="postal-trash-letter-card">
+                        <div className="postal-trash-card-top">
+                          <span className="postal-trash-card-date">{carta.data_formatada || "Data arquivada"}</span>
+                          <span className="postal-trash-card-seal">{carta.selo_carta || "DESCARTADA"}</span>
+                        </div>
+                        <h4 className="postal-trash-card-title">{carta.titulo || "Sem título"}</h4>
+                        <p className="postal-trash-card-snippet">{carta.conteudo}</p>
+                        <div className="postal-trash-card-actions">
+                          <button
+                            type="button"
+                            className="postal-restore-btn"
+                            onClick={() => restaurarCarta(carta)}
+                            title="Recuperar e colocar de volta na sua pasta de origem"
+                          >
+                            ↺ Restaurar
+                          </button>
+                          <button
+                            type="button"
+                            className="postal-read-btn"
+                            onClick={() => {
+                              setIsTrashModalOpen(false);
+                              setReadingLetter(carta);
+                            }}
+                            title="Ler carta completa"
+                          >
+                            Ler
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="postal-trash-modal-footer">
+                <span className="postal-trash-footer-info">
+                  {trashLetters.length} {trashLetters.length === 1 ? "carta preservada na lixeira" : "cartas preservadas na lixeira"}
+                </span>
+                <button
+                  type="button"
+                  className="entry-modal-close"
+                  onClick={() => setIsTrashModalOpen(false)}
+                >
+                  Fechar lixeira
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

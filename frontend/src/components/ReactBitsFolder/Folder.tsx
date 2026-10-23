@@ -828,6 +828,9 @@ export interface FolderProps {
   onOpenChange?: (open: boolean) => void;
   onItemClick?: (item: any, index: number) => void;
   onItemDrop?: (item: any, index: number, inside: boolean) => void;
+  onItemDrag?: (info: { index: number; clientX: number; clientY: number; item: any }) => void;
+  onItemDragEnd?: (info: { index: number; clientX: number; clientY: number; item: any; inside: boolean }) => boolean | void;
+  onItemDragCancel?: () => void;
   draggable?: boolean;
   zoomOnClick?: boolean;
   peek?: boolean;
@@ -859,6 +862,9 @@ const Folder: React.FC<FolderProps> = ({
   onOpenChange,
   onItemClick,
   onItemDrop,
+  onItemDrag,
+  onItemDragEnd,
+  onItemDragCancel,
   draggable = true,
   zoomOnClick = true,
   peek = true,
@@ -951,6 +957,9 @@ const Folder: React.FC<FolderProps> = ({
     closeOnOutsideClick,
     onItemClick,
     onItemDrop,
+    onItemDrag,
+    onItemDragEnd,
+    onItemDragCancel,
     tilt: clamp(tilt, 0, 1.5),
     bounce: clamp(bounce, 0, 1),
     speed: clamp(speed, 0.2, 3),
@@ -1310,16 +1319,17 @@ const Folder: React.FC<FolderProps> = ({
           item.layer = 'focus';
         } else if (drag && drag.index === index) {
           const [vx] = velocityOf(drag.samples);
+          const targetScale = drag.overTrash ? drag.scale * 0.48 : drag.scale * 1.05;
           target = {
             x: state.deskX + drag.grabX,
             y: state.deskY + drag.grabY,
             z: 0,
-            r: clamp(vx * 0.012, -14, 14),
+            r: drag.overTrash ? -4 : clamp(vx * 0.012, -14, 14),
             ry: 0,
-            s: drag.scale * 1.05
+            s: targetScale
           };
-          omega = TAU * 5;
-          damping = 0.78;
+          omega = TAU * 6;
+          damping = 0.75;
           lift = 1.4;
           if (!item.elevated && !inPocket(item)) item.elevated = true;
           item.layer = item.elevated ? 'drag' : 'inside';
@@ -1620,15 +1630,35 @@ const Folder: React.FC<FolderProps> = ({
       root.dataset.dragging = '';
     };
 
-    const drop = (drag, cancelled) => {
+    const drop = (drag, cancelled, clientX, clientY) => {
       const s = settingsRef.current;
       const item = state.items[drag.index];
       state.receiving = false;
       delete root.dataset.dragging;
       if (!item) return;
+
+      const isInside = overFolder(state.deskX, state.deskY);
+      const handled = s.onItemDragEnd?.({
+        index: drag.index,
+        clientX: clientX ?? drag.clientX,
+        clientY: clientY ?? drag.clientY,
+        item: s.entries[drag.index],
+        inside: isInside
+      });
+
+      if (handled) {
+        item.place = 'inside';
+        item.elevated = false;
+        item.s.value = 0.001;
+        item.alpha.value = 0;
+        syncOutside();
+        wake();
+        return;
+      }
+
       const time = performance.now() / 1000;
       const [vx, vy] = cancelled ? [0, 0] : velocityOf(drag.samples);
-      if (overFolder(state.deskX, state.deskY)) {
+      if (isInside) {
         const entering = item.place === 'out' || item.elevated;
         item.place = 'inside';
         if (entering && !reduce) {
@@ -1675,7 +1705,16 @@ const Folder: React.FC<FolderProps> = ({
           const threshold = event.pointerType === 'touch' ? 8 : 4;
           if (Math.hypot(event.clientX - drag.clientX, event.clientY - drag.clientY) > threshold) startDrag(drag);
         }
-        if (drag.active) updateReceiving();
+        if (drag.active) {
+          updateReceiving();
+          const overTrash = s.onItemDrag?.({
+            index: drag.index,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            item: s.entries[drag.index]
+          });
+          drag.overTrash = Boolean(overTrash);
+        }
         wake();
       }
       if (event.pointerType === 'touch') return;
@@ -1747,7 +1786,11 @@ const Folder: React.FC<FolderProps> = ({
       const drag = state.drag;
       if (drag && event.pointerId === drag.id) {
         state.drag = null;
-        if (drag.active) drop(drag, event.type === 'pointercancel');
+        if (drag.active) {
+          drop(drag, event.type === 'pointercancel', event.clientX, event.clientY);
+        } else {
+          s.onItemDragCancel?.();
+        }
       }
       wake();
     };
