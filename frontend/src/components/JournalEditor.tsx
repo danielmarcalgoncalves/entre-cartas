@@ -129,11 +129,35 @@ function playPaperSound() {
   } catch {}
 }
 
+function EyeIcon({ className = "", filled = false }: { className?: string; filled?: boolean }) {
+  return (
+    <svg
+      className={className}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r={filled ? "3.2" : "3"} fill={filled ? "currentColor" : "none"} />
+      {filled && <circle cx="13.2" cy="10.8" r="0.9" fill="#0d0b09" />}
+    </svg>
+  );
+}
+
 export default function JournalEditor() {
   const { user, isPro } = useAuth();
 
   // Abas de Alternância: 'caderno' | 'carta'
   const [activeTab, setActiveTab] = useState<"caderno" | "carta">("caderno");
+
+  // Modo Foco (exclusivo para o Caderno: tela escura, apenas folha e menu)
+  const [modoFoco, setModoFoco] = useState(false);
 
   // Estado dos Cadernos e Páginas (Apenas cadernos criados pelo usuário)
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
@@ -219,8 +243,20 @@ export default function JournalEditor() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Inicialização dos Cadernos e Pastas a partir do LocalStorage (Apenas criados pelo usuário)
+  // Sair do Modo Foco ao pressionar a tecla Escape
   useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && modoFoco) {
+        setModoFoco(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modoFoco]);
+
+
+  // Inicialização e Sincronização dos Cadernos e Pastas a partir do LocalStorage
+  const carregarCadernosEPastas = () => {
     // 1. Cadernos do Usuário
     try {
       const stored = window.localStorage.getItem(NOTEBOOKS_STORAGE_KEY);
@@ -247,8 +283,14 @@ export default function JournalEditor() {
             }
           } else {
             setActiveNotebookId("");
+            setTitulo("");
+            setConteudo("");
+            setFavoritado(false);
           }
         }
+      } else {
+        setNotebooks([]);
+        setActiveNotebookId("");
       }
     } catch {}
 
@@ -274,8 +316,21 @@ export default function JournalEditor() {
             setActiveLetterFolderId("");
           }
         }
+      } else {
+        setLetterFolders([]);
+        setActiveLetterFolderId("");
       }
     } catch {}
+  };
+
+  useEffect(() => {
+    carregarCadernosEPastas();
+    window.addEventListener(JOURNAL_UPDATED_EVENT, carregarCadernosEPastas);
+    window.addEventListener("storage", carregarCadernosEPastas);
+    return () => {
+      window.removeEventListener(JOURNAL_UPDATED_EVENT, carregarCadernosEPastas);
+      window.removeEventListener("storage", carregarCadernosEPastas);
+    };
   }, []);
 
   // Escutar evento global de "EDITAR" vindo da estante de leitura
@@ -964,8 +1019,135 @@ export default function JournalEditor() {
     return found ? found.styleFamily : "'Caveat', cursive";
   };
 
+  // Menu de Personalização de Papel, Tinta e Tipografia (Reutilizável no Modo Normal e Modo Foco)
+  const renderCustomizationMenu = (isInFocus = false) => (
+    <div className={`vintage-menu-wrapper ${isInFocus ? "is-focus-mode" : ""}`} ref={menuRef}>
+      <button
+        type="button"
+        className={`vintage-menu-btn ${isInFocus ? "is-focus-mode" : ""}`}
+        onClick={() => setCustomMenuOpen(!customMenuOpen)}
+        aria-expanded={customMenuOpen}
+        title="Personalizar folha, tinta e caligrafia"
+      >
+        <span>Menu</span>
+        <span className="menu-caret">▾</span>
+      </button>
+
+      {/* PAINEL FLUTUANTE DE PERSONALIZAÇÃO VISUAL */}
+      <AnimatePresence>
+        {customMenuOpen && (
+          <motion.div
+            className={`floating-customization-menu ${isInFocus ? "is-focus-mode" : ""}`}
+            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.95 }}
+            transition={{ duration: 0.16 }}
+          >
+            {/* 1. Cor de Fundo da Folha */}
+            <div className="menu-group">
+              <span className="menu-group-title">Fundo da Folha</span>
+              <div className="paper-swatches">
+                {PAPER_OPTIONS.map((paper) => (
+                  <button
+                    key={paper.id}
+                    type="button"
+                    className={`paper-swatch ${sheetBgId === paper.id ? "active" : ""}`}
+                    style={{ backgroundColor: paper.color }}
+                    onClick={() => {
+                      setSheetBgId(paper.id);
+                      setSheetBgColor(paper.color);
+                    }}
+                    title={paper.name}
+                  >
+                    {sheetBgId === paper.id ? "✓" : ""}
+                  </button>
+                ))}
+              </div>
+              <small className="swatch-name">
+                {PAPER_OPTIONS.find((p) => p.id === sheetBgId)?.name}
+              </small>
+            </div>
+
+            {/* 2. Cor da Tinta / Letra */}
+            <div className="menu-group">
+              <span className="menu-group-title">Cor da Tinta</span>
+              <div className="ink-swatches">
+                {INK_OPTIONS.map((ink) => (
+                  <button
+                    key={ink.id}
+                    type="button"
+                    className={`ink-swatch ${inkColorId === ink.id ? "active" : ""}`}
+                    style={{ backgroundColor: ink.color }}
+                    onClick={() => {
+                      setInkColorId(ink.id);
+                      setInkColor(ink.color);
+                    }}
+                    title={ink.name}
+                  >
+                    {inkColorId === ink.id ? "✓" : ""}
+                  </button>
+                ))}
+              </div>
+              <small className="swatch-name">
+                {INK_OPTIONS.find((i) => i.id === inkColorId)?.name}
+              </small>
+            </div>
+
+            {/* 3. Família da Fonte */}
+            <div className="menu-group">
+              <span className="menu-group-title">Caligrafia & Tipografia</span>
+              <div className="font-options-list">
+                {FONT_OPTIONS.map((font) => (
+                  <button
+                    key={font.id}
+                    type="button"
+                    className={`font-choice-btn ${fontFamilyId === font.id ? "active" : ""}`}
+                    style={{ fontFamily: font.styleFamily }}
+                    onClick={() => setFontFamilyId(font.id)}
+                  >
+                    <span>{font.name}</span>
+                    {fontFamilyId === font.id && <span className="font-check">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
   return (
-    <section className="writing-desk-wrap" id="mesa-de-escrita" aria-label="Mesa de Escrita e Correspondência">
+    <section
+      className={`writing-desk-wrap ${modoFoco ? "is-focus-mode" : ""}`}
+      id="mesa-de-escrita"
+      aria-label="Mesa de Escrita e Correspondência"
+    >
+      {/* ============================================================ */}
+      {/* BARRA SUPERIOR DO MODO FOCO (TELA ESCURA, SOMENTE PAPEL E MENU) */}
+      {/* ============================================================ */}
+      {modoFoco && (
+        <div className="focus-mode-topbar">
+          <button
+            type="button"
+            className="focus-mode-eye-btn is-active"
+            onClick={() => {
+              setModoFoco(false);
+              playPaperSound();
+            }}
+            title="Sair do Modo Foco (Esc)"
+            aria-label="Sair do Modo Foco"
+          >
+            <EyeIcon className="focus-mode-eye-icon" filled={true} />
+            <span>Sair do Foco</span>
+          </button>
+
+          <div className="focus-mode-menu-container">
+            {renderCustomizationMenu(true)}
+          </div>
+        </div>
+      )}
+
       <div className={`writing-desk-container ${activeTab === "carta" ? "is-mode-carta" : ""}`}>
         {/* ============================================================ */}
         {/* COLUNA ESQUERDA: CADERNO 3D (OU SELOS) + BOTÃO SALVAR PÁGINA */}
@@ -973,39 +1155,56 @@ export default function JournalEditor() {
         <div className="desk-left-col">
           {activeTab === "caderno" ? (
             /* Modo Caderno: Lombada e Capa em Couro Nobre ou Card Convidativo de Criação */
-            activeNotebook ? (
-              <div
-                className="leather-notebook-card"
+            <div className="caderno-left-stack">
+              {activeNotebook ? (
+                <div
+                  className="leather-notebook-card"
+                  onClick={() => {
+                    setCadernoPromptNotice(null);
+                    setNotebookDrawerOpen(true);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  title="Clique para alternar ou criar novos cadernos"
+                >
+                  <div className="leather-notebook-ribbon" aria-hidden="true" />
+                  <span className="leather-notebook-tag">TOMO DE REGISTRO</span>
+                  <span className="leather-notebook-title">{activeNotebook.nome}</span>
+                  <span className="leather-notebook-author">{user?.nome || "ARQUIVO PESSOAL"}</span>
+                </div>
+              ) : (
+                <div
+                  className="leather-notebook-card is-empty-state"
+                  onClick={() => {
+                    setCadernoPromptNotice(null);
+                    setNotebookDrawerOpen(true);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  title="Clique para criar seu primeiro tomo/caderno"
+                >
+                  <div className="leather-notebook-ribbon" aria-hidden="true" />
+                  <span className="leather-notebook-tag">ESTANTE VAZIA</span>
+                  <span className="leather-notebook-title">+ CRIAR CADERNO</span>
+                  <span className="leather-notebook-author">CLIQUE PARA INICIAR</span>
+                </div>
+              )}
+
+              {/* Botão de Modo Foco abaixo do caderno (com ícone de olho) */}
+              <button
+                type="button"
+                className="focus-mode-trigger-btn"
                 onClick={() => {
-                  setCadernoPromptNotice(null);
-                  setNotebookDrawerOpen(true);
+                  setModoFoco(true);
+                  playPaperSound();
                 }}
-                role="button"
-                tabIndex={0}
-                title="Clique para alternar ou criar novos cadernos"
+                title="Ativar Modo Foco (tela escura, foco total na folha e menu)"
+                aria-label="Ativar Modo Foco"
               >
-                <div className="leather-notebook-ribbon" aria-hidden="true" />
-                <span className="leather-notebook-tag">TOMO DE REGISTRO</span>
-                <span className="leather-notebook-title">{activeNotebook.nome}</span>
-                <span className="leather-notebook-author">{user?.nome || "ARQUIVO PESSOAL"}</span>
-              </div>
-            ) : (
-              <div
-                className="leather-notebook-card is-empty-state"
-                onClick={() => {
-                  setCadernoPromptNotice(null);
-                  setNotebookDrawerOpen(true);
-                }}
-                role="button"
-                tabIndex={0}
-                title="Clique para criar seu primeiro tomo/caderno"
-              >
-                <div className="leather-notebook-ribbon" aria-hidden="true" />
-                <span className="leather-notebook-tag">ESTANTE VAZIA</span>
-                <span className="leather-notebook-title">+ CRIAR CADERNO</span>
-                <span className="leather-notebook-author">CLIQUE PARA INICIAR</span>
-              </div>
-            )
+                <EyeIcon className="focus-mode-eye-icon" />
+                <span>MODO FOCO</span>
+              </button>
+            </div>
           ) : (
             /* Modo Carta: Suporte de Pasta Postal de Destino + Selos */
             <div className="carta-left-column-inner">
@@ -1119,6 +1318,7 @@ export default function JournalEditor() {
               className={`notebook-tab notebook-tab--carta ${activeTab === "carta" ? "active" : ""}`}
               onClick={() => {
                 setActiveTab("carta");
+                setModoFoco(false);
                 playPaperSound();
               }}
             >
@@ -1293,100 +1493,8 @@ export default function JournalEditor() {
         {/* ============================================================ */}
         <div className="desk-right-col">
           <div className="desk-right-tools">
-            {/* Botão Superior Direito Menu ▾ */}
-            <div className="vintage-menu-wrapper" ref={menuRef}>
-              <button
-                type="button"
-                className="vintage-menu-btn"
-                onClick={() => setCustomMenuOpen(!customMenuOpen)}
-                aria-expanded={customMenuOpen}
-              >
-                <span>Menu</span>
-                <span className="menu-caret">▾</span>
-              </button>
-
-              {/* PAINEL FLUTUANTE DE PERSONALIZAÇÃO VISUAL */}
-              <AnimatePresence>
-                {customMenuOpen && (
-                  <motion.div
-                    className="floating-customization-menu"
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    transition={{ duration: 0.16 }}
-                  >
-                    {/* 1. Cor de Fundo da Folha */}
-                    <div className="menu-group">
-                      <span className="menu-group-title">Fundo da Folha</span>
-                      <div className="paper-swatches">
-                        {PAPER_OPTIONS.map((paper) => (
-                          <button
-                            key={paper.id}
-                            type="button"
-                            className={`paper-swatch ${sheetBgId === paper.id ? "active" : ""}`}
-                            style={{ backgroundColor: paper.color }}
-                            onClick={() => {
-                              setSheetBgId(paper.id);
-                              setSheetBgColor(paper.color);
-                            }}
-                            title={paper.name}
-                          >
-                            {sheetBgId === paper.id ? "✓" : ""}
-                          </button>
-                        ))}
-                      </div>
-                      <small className="swatch-name">
-                        {PAPER_OPTIONS.find((p) => p.id === sheetBgId)?.name}
-                      </small>
-                    </div>
-
-                    {/* 2. Cor da Tinta / Letra */}
-                    <div className="menu-group">
-                      <span className="menu-group-title">Cor da Tinta</span>
-                      <div className="ink-swatches">
-                        {INK_OPTIONS.map((ink) => (
-                          <button
-                            key={ink.id}
-                            type="button"
-                            className={`ink-swatch ${inkColorId === ink.id ? "active" : ""}`}
-                            style={{ backgroundColor: ink.color }}
-                            onClick={() => {
-                              setInkColorId(ink.id);
-                              setInkColor(ink.color);
-                            }}
-                            title={ink.name}
-                          >
-                            {inkColorId === ink.id ? "✓" : ""}
-                          </button>
-                        ))}
-                      </div>
-                      <small className="swatch-name">
-                        {INK_OPTIONS.find((i) => i.id === inkColorId)?.name}
-                      </small>
-                    </div>
-
-                    {/* 3. Família da Fonte */}
-                    <div className="menu-group">
-                      <span className="menu-group-title">Caligrafia & Tipografia</span>
-                      <div className="font-options-list">
-                        {FONT_OPTIONS.map((font) => (
-                          <button
-                            key={font.id}
-                            type="button"
-                            className={`font-choice-btn ${fontFamilyId === font.id ? "active" : ""}`}
-                            style={{ fontFamily: font.styleFamily }}
-                            onClick={() => setFontFamilyId(font.id)}
-                          >
-                            <span>{font.name}</span>
-                            {fontFamilyId === font.id && <span className="font-check">✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            {/* Botão Superior Direito Menu ▾ (quando não está no modo foco) */}
+            {!modoFoco && renderCustomizationMenu(false)}
 
             {/* Botão de Puxar Inspiração (sem emoji) */}
             <button

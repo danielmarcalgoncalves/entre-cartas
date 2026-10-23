@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
   LETTER_FOLDERS_STORAGE_KEY,
   type JournalEntry,
@@ -38,6 +39,7 @@ export default function PersonalJournalShelf() {
   // Leitura Imersiva Noturna de Caderno
   const [readingNotebook, setReadingNotebook] = useState<Notebook | null>(null);
   const [readingPageIndex, setReadingPageIndex] = useState<number>(0);
+  const [isDeleteNotebookModalOpen, setIsDeleteNotebookModalOpen] = useState(false);
 
   // Leitura de Carta Aberta
   const [readingLetter, setReadingLetter] = useState<JournalEntry | null>(null);
@@ -271,6 +273,40 @@ export default function PersonalJournalShelf() {
       })
     );
 
+    setReadingNotebook(null);
+  };
+
+  // Exclusão Permanente do Caderno Selecionado
+  const confirmarExclusaoCaderno = () => {
+    if (!readingNotebook) return;
+    const idParaExcluir = readingNotebook.id;
+
+    // 1. Atualiza lista de cadernos no LocalStorage
+    try {
+      const storedNb = window.localStorage.getItem(NOTEBOOKS_STORAGE_KEY);
+      if (storedNb) {
+        const parsed = JSON.parse(storedNb);
+        if (Array.isArray(parsed)) {
+          const restantes = parsed.filter((n: Notebook) => n.id !== idParaExcluir);
+          window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(restantes));
+          setNotebooks(restantes.filter((n: Notebook) => n.id !== "default-caderno" && n.id !== "caderno-noturno"));
+        }
+      }
+    } catch {}
+
+    // 2. Se o caderno ativo for este, limpa o ID ativo
+    try {
+      const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
+      if (activeId === idParaExcluir) {
+        window.localStorage.removeItem(ACTIVE_NOTEBOOK_ID_KEY);
+      }
+    } catch {}
+
+    // 3. Dispara evento global de atualização
+    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+
+    // 4. Fecha modal de confirmação e fecha leitura
+    setIsDeleteNotebookModalOpen(false);
     setReadingNotebook(null);
   };
 
@@ -556,6 +592,16 @@ export default function PersonalJournalShelf() {
                   <span>✎ EDITAR</span>
                 </button>
 
+                {/* Botão de Excluir Caderno */}
+                <button
+                  type="button"
+                  className="dark-reading-delete-btn"
+                  onClick={() => setIsDeleteNotebookModalOpen(true)}
+                  title="Excluir este caderno permanentemente"
+                >
+                  <span>🗑 EXCLUIR</span>
+                </button>
+
                 <button
                   type="button"
                   className="dark-reading-close-btn"
@@ -783,6 +829,71 @@ export default function PersonalJournalShelf() {
                   onClick={() => setIsTrashModalOpen(false)}
                 >
                   Fechar lixeira
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================ */}
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DEFINITIVA DO CADERNO       */}
+      {/* ============================================================ */}
+      <AnimatePresence>
+        {isDeleteNotebookModalOpen && readingNotebook && (
+          <div
+            className="delete-notebook-modal-backdrop"
+            onClick={() => setIsDeleteNotebookModalOpen(false)}
+          >
+            <motion.div
+              className="delete-notebook-modal-sheet"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="delete-modal-warning-header">
+                <span className="delete-modal-icon" aria-hidden="true">⚠️</span>
+                <h3 className="delete-modal-title">Excluir Caderno Definitivamente</h3>
+              </div>
+
+              <div className="delete-modal-body">
+                <p className="delete-modal-notice-text">
+                  Você está prestes a excluir o caderno <strong>“{readingNotebook.nome}”</strong> e todas as suas{" "}
+                  <strong>
+                    {readingNotebook.paginas.length}{" "}
+                    {readingNotebook.paginas.length === 1 ? "página escrita" : "páginas escritas"}
+                  </strong>.
+                </p>
+
+                <div className="delete-modal-danger-box">
+                  <strong>AVISO DE EXCLUSÃO PERMANENTE:</strong>
+                  <p>
+                    Este caderno e todas as suas memórias serão apagados permanentemente do sistema. Esta ação não poderá ser desfeita.
+                  </p>
+                </div>
+
+                <p className="delete-modal-question">
+                  Tem certeza de que deseja excluir este caderno?
+                </p>
+              </div>
+
+              <div className="delete-modal-actions">
+                <button
+                  type="button"
+                  className="delete-modal-cancel-btn"
+                  onClick={() => setIsDeleteNotebookModalOpen(false)}
+                >
+                  Não, Manter Caderno
+                </button>
+
+                <button
+                  type="button"
+                  className="delete-modal-confirm-btn"
+                  onClick={confirmarExclusaoCaderno}
+                >
+                  Sim, Excluir Definitivamente
                 </button>
               </div>
             </motion.div>
