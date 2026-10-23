@@ -136,23 +136,23 @@ export default function ClubeProPage() {
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "28px", marginBottom: "48px" }}>
-          {/* Card Plano Leitor (Free) */}
+          {/* Card Plano Normal (Free) */}
           <div className="letter-object" style={{ padding: "32px 28px" }}>
-            <span className="object-kind">Plano Leitor · Gratuito</span>
+            <span className="object-kind">Plano Normal · Gratuito</span>
             <h3 className="object-title" style={{ fontSize: "32px", marginTop: "8px" }}>
               R$ 0,00 <span style={{ fontSize: "14px", color: "#776e5f" }}>/ mês</span>
             </h3>
             <p className="page-intro" style={{ margin: "12px 0 24px", minHeight: "44px" }}>
-              Ideal para quem gosta de descobrir correspondências esquecidas e guardar seus primeiros afetos.
+              Seu refúgio de escrita diária, com diário pessoal e cartas de reflexão essenciais.
             </p>
 
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Acesso a todo o acervo público</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Até 5 cartas guardadas na caixa</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Até 3 pastas de memórias</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Carimbo básico (LIDA / GUARDADA)</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Acervo ilimitado</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Download em alta resolução</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ <strong>Até 3 cadernos</strong> de escrita</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ <strong>Até 10 cartas</strong> escritas e seladas</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Prompts de inspiração do acervo ilimitados</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Paginação contínua e auto-save local</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Até 10 cadernos (Exclusivo Premium)</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Até 30 cartas (Exclusivo Premium)</li>
             </ul>
 
             <button type="button" disabled className="stamp-button" style={{ width: "100%", opacity: 0.8 }}>
@@ -173,7 +173,7 @@ export default function ClubeProPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span className="object-kind" style={{ color: "#8b1e1e", fontWeight: 700 }}>
-                ★ Clube do Remetente Pro
+                ★ Clube do Remetente Premium
               </span>
               <span className="stamp-mark" style={{ minWidth: "auto", padding: "2px 8px" }}>
                 RECOMENDADO
@@ -184,16 +184,16 @@ export default function ClubeProPage() {
               R$ 14,90 <span style={{ fontSize: "14px", color: "#776e5f" }}>/ mês</span>
             </h3>
             <p className="page-intro" style={{ margin: "12px 0 24px", minHeight: "44px" }}>
-              Menos que o valor de um café na livraria. Desbloqueie todas as gavetas e apoie o acervo independente.
+              Para autores e mentes criativas que precisam de múltiplos volumes e liberdade de escrita.
             </p>
 
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: "10px" }}>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Cartas guardadas ilimitadas</strong></li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Pastas de memórias sem limite</strong></li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Carimbos exclusivos (FAVORITA, ETERNA, RARA)</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Envio ilimitado de cartas anônimas</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Tipografias nobres e lacres de cera personalizados</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Selo exclusivo Pro no perfil do remetente</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Até 10 cadernos</strong> de escrita temáticos</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Até 30 cartas</strong> escritas e arquivadas</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Todos os papéis nobres e tintas de arquivo</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Carimbo exclusivo FAVORITADO ♥</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Selo exclusivo de Autor Premium no perfil</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Apoio à manutenção do refúgio livre de anúncios</li>
             </ul>
 
             <button

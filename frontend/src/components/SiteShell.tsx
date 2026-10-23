@@ -8,11 +8,11 @@ import { useAuth } from "@/hooks/useAuth";
 import AuthModal from "@/components/AuthModal";
 
 const navItems = [
-  { href: "/", label: "✍️ Meu Jornal" },
-  { href: "/discover", label: "✨ Inspirações" },
+  { href: "/", label: "Meu Diário" },
+  { href: "/discover", label: "Inspirações" },
   { href: "/favorites", label: "Favoritas" },
   { href: "/collections", label: "Pastas" },
-  { href: "/clube-pro", label: "Clube Pro ★" },
+  { href: "/clube-pro", label: "Clube Pro" },
 ];
 
 export default function SiteShell({ children }: { children: ReactNode }) {
@@ -56,7 +56,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span className="stamp-mark" style={{ minWidth: "auto", padding: "3px 8px", fontSize: "7px", transform: "rotate(-3deg)" }}>
-                  {isPro ? "👑 PRO" : "LEITOR"}
+                  {isPro ? "PRO" : "LEITOR"}
                 </span>
                 <span style={{ fontSize: "11px", color: "#5b5348", maxWidth: "90px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {user.nome.split(" ")[0]}

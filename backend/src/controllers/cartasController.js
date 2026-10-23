@@ -180,22 +180,33 @@ async function criarCarta(req, res) {
       return res.status(400).json({ error: 'O conteúdo da carta deve ter pelo menos 20 caracteres.' });
     }
 
-    // Regra de cota para usuários do plano gratuito: até 2 cartas/mês
-    if (usuarioId && papelUsuario === 'usuario') {
-      const [contagemMes] = await pool.query(
-        `SELECT COUNT(*) as total FROM cartas 
-         WHERE usuario_id = ? AND criado_em >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+    // Regra de negócio de cotas de cartas escritas:
+    // - Usuário Normal: máximo de 10 cartas
+    // - Usuário Premium: máximo de 30 cartas
+    if (usuarioId) {
+      const isPremium = papelUsuario === 'premium' || papelUsuario === 'admin';
+      const limiteCartas = isPremium ? 30 : 10;
+
+      const [contagemCartas] = await pool.query(
+        `SELECT COUNT(*) as total FROM cartas WHERE usuario_id = ?`,
         [usuarioId]
       );
-      if (contagemMes[0].total >= 2) {
+      const totalEscritas = contagemCartas[0] ? contagemCartas[0].total : 0;
+
+      if (totalEscritas >= limiteCartas) {
         sendLog('BLOQUEIO_LIMITE_CARTAS_403', req, {
-          motivo: 'Limite mensal de 2 cartas atingido para Plano Leitor',
-          usuario_id: usuarioId
+          motivo: `Limite de ${limiteCartas} cartas atingido para ${isPremium ? 'Plano Premium' : 'Plano Normal'}`,
+          usuario_id: usuarioId,
+          totalEscritas,
+          limiteCartas
         });
         return res.status(403).json({
-          error: 'Limite de 2 cartas por mês atingido no Plano Leitor. Assine o Clube do Remetente Pro para envios ilimitados!',
+          error: isPremium
+            ? `Você atingiu o limite de ${limiteCartas} cartas do Plano Premium.`
+            : `Você atingiu o limite de ${limiteCartas} cartas do Plano Normal. Assine o Clube Premium para ter até 30 cartas!`,
           isLimitReached: true,
-          upgradeToPremium: true
+          limite: limiteCartas,
+          upgradeToPremium: !isPremium
         });
       }
     }
