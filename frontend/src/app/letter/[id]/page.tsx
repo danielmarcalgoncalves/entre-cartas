@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import LetterViewer from "@/components/LetterViewer";
-import { getLetter, letters } from "@/data/letters";
+import { LetterDetailPage } from "@/components/letter-detail-page";
+import { getLetter, letters } from "@/lib/letters";
 
 type LetterPageProps = { params: Promise<{ id: string }> };
 
@@ -14,12 +14,12 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: LetterPageProps): Promise<Metadata> {
   const { id } = await params;
   const letter = getLetter(id);
-  return letter ? { title: letter.title, description: letter.excerpt } : { title: "Carta não encontrada" };
+  return letter ? { title: `${letter.title} — Entre Cartas`, description: letter.excerpt } : { title: "Carta não encontrada" };
 }
 
 export default async function LetterPage({ params }: LetterPageProps) {
   const { id } = await params;
   const letter = getLetter(id);
   if (!letter) notFound();
-  return <LetterViewer letter={letter} />;
+  return <LetterDetailPage id={id} />;
 }

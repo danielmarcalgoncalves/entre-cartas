@@ -1,0 +1,199 @@
+================================================================================
+          💌 ENTRE CARTAS — PLANO DE MUDANÇA: JORNAL DIGITAL & SCRAPBOOK
+================================================================================
+Projeto: Entre Cartas (ISW055 - Introdução à Computação em Nuvem)
+Professor: @siriani (Fatec Pompeia)
+Autor: Daniel Marçal Gonçalves
+Branch de Trabalho: nova-tela
+Data: 22 de Outubro de 2026
+================================================================================
+
+1. VISÃO GERAL E OBJETIVO DA TRANSIÇÃO (PIVOT)
+--------------------------------------------------------------------------------
+• SITUAÇÃO ANTERIOR:
+  O sistema funcionava como um catálogo primariamente passivo de cartas prontas,
+  onde o usuário apenas lia cartas antigas de terceiros e aplicava carimbos, com
+  pouca utilidade prática e baixo engajamento diário.
+
+• NOVO OBJETIVO CENTRAL:
+  O "Entre Cartas" torna-se um JORNAL DIGITAL PESSOAL (Diário Íntimo & Scrapbook)
+  com estética acolhedora ("cozy"), vintage e visual inspirado no Pinterest.
+  O usuário ganha um santuário silencioso e desacelerado para escrever sobre o
+  seu dia, desabafos e reflexões, salvando todas as suas páginas no seu acervo
+  pessoal seguro.
+
+• NOVO PAPEL DAS CARTAS EXISTENTES (DATASET):
+  As cartas históricas e anônimas já cadastradas continuam existindo, mas agora
+  com a função ativa de "MURAL DE INSPIRAÇÃO / PROMPTS DE ESCRITA":
+  quando o usuário abre o diário e sofre de bloqueio criativo, ele pode puxar
+  uma carta do acervo como gatilho temático para a sua reflexão de hoje.
+
+
+================================================================================
+2. PILARES DA EXPERIÊNCIA DO USUÁRIO (UX / UI AESTHETICS)
+--------------------------------------------------------------------------------
+• Estética Skeuomórfica e Confortável:
+  - Texturas de papel envelhecido, linho, pautado antigo e margens rasgadas.
+  - Tipografia de máquina de escrever / caligrafia suave.
+  - Anexos visuais no estilo foto Polaroid presa com fita adesiva (washi tape).
+  - Carimbos de data, lacre de cera ao selar a página do dia e sons táteis sutis.
+
+• Fluxo Diário de Uso:
+  1. O usuário acessa a página inicial e vê seu "Jornal de Hoje".
+  2. Pode escolher a textura da folha e o humor/sentimento do dia.
+  3. Pode clicar em "✨ Preciso de Inspiração" para ler uma carta anônima do acervo
+     como sugestão de reflexão.
+  4. Pode anexar uma foto Polaroid (ex: foto do café, da janela, de uma memória).
+  5. Sela a página, que é arquivada em seu fichário de memórias pessoal.
+  6. Visualiza sua linha do tempo/calendário de páginas escritas (dias de escrita).
+
+
+================================================================================
+3. ARQUITETURA DE ARMAZENAMENTO LEVE (COMO NÃO PESAR A APLICAÇÃO)
+--------------------------------------------------------------------------------
+Para permitir escrita contínua, páginas ilimitadas e anexos fotográficos sem
+comprometer o desempenho do servidor e do banco de dados, adota-se a separação
+estrita de responsabilidades:
+
+A. TEXTOS E METADADOS -> MariaDB (Banco Relacional)
+   - Por que é leve: 1 página de texto com 500 palavras ocupa apenas ~2 KB.
+     Mesmo com 1.000 páginas escritas por um usuário, o total é de apenas ~2 MB.
+   - Otimização:
+     * Índices relacionais compostos: (usuario_id, data_registro)
+     * Consultas paginadas por mês ou limites curtos (LIMIT 10 OFFSET 0).
+     * O frontend nunca baixa o histórico inteiro de uma só vez.
+
+B. FOTOS, POLAROIDS E ANEXOS -> MinIO (Object Storage S3)
+   - Regra absoluta: NUNCA armazenar imagens em Base64 ou BLOB no MariaDB.
+   - O arquivo de imagem é comprimido para WebP e enviado diretamente ao MinIO.
+   - No MariaDB é salva apenas a string de URL leve (ex: "/fotos/polaroid_abc.webp").
+   - O navegador carrega as fotos de forma assíncrona (lazy loading).
+
+C. RASCUNHO EM TEMPO REAL -> LocalStorage (Navegador do Cliente)
+   - Enquanto o usuário digita no editor, o texto é salvo no LocalStorage local.
+   - Zero tráfego de rede e zero consultas no banco enquanto a pessoa escreve.
+   - Ao clicar em "Guardar Página", aí sim uma única requisição POST é disparada.
+
+D. OFENSIVAS (STREAKS) E AUDITORIA -> Redis Streams / In-Memory
+   - Registro de eventos como "PAGINA_JORNAL_ESCRITA".
+   - Contagem ágil de dias consecutivos de escrita sem onerar a CPU do banco.
+
+
+================================================================================
+4. MODELAGEM DE DADOS (BANCO DE DADOS MARIADB)
+--------------------------------------------------------------------------------
+Evolução da tabela `cartas` ou introdução da tabela especializada `jornal_paginas`:
+
+TABELA: `jornal_paginas` (ou extensão de `cartas`)
+--------------------------------------------------------------------------------
+- id                    INT AUTO_INCREMENT PRIMARY KEY
+- usuario_id            INT NOT NULL (FK para usuarios.id)
+- caderno_id            INT NULL (FK para pastas_memorias.id)
+- titulo                VARCHAR(255) NOT NULL (ex: "Chuva de fim de tarde")
+- conteudo              MEDIUMTEXT NOT NULL (conteúdo da reflexão/diário)
+- sentimento_humor      VARCHAR(50) DEFAULT 'reflexivo' (calmo, grato, saudade, etc.)
+- tipo_papel            VARCHAR(50) DEFAULT 'envelhecido' (pautado, linho, kraft)
+- polaroid_url          VARCHAR(500) NULL (link da foto no MinIO)
+- polaroid_legenda      VARCHAR(150) NULL (pequena anotação na borda branca)
+- carta_inspiracao_id   INT NULL (FK para cartas.id se usou um prompt do acervo)
+- data_registro         DATE NOT NULL (data da página)
+- privacidade           ENUM('privado', 'anonimo_publico') DEFAULT 'privado'
+- criado_em             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- atualizado_em         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+Índices:
+- INDEX idx_usuario_data (usuario_id, data_registro DESC)
+- INDEX idx_privacidade (privacidade)
+
+
+================================================================================
+5. ENDPOINTS DA API BACKEND (EXPRESS)
+--------------------------------------------------------------------------------
+Rotas dedicadas ao Jornal (/api/jornal):
+
+1. GET    /api/jornal/hoje
+   - Retorna a página do dia atual (se já existir para o usuário logado).
+
+2. POST   /api/jornal
+   - Cria ou atualiza a página do diário do dia.
+   - Registra evento sensorial no Redis Streams.
+
+3. GET    /api/jornal/historico
+   - Lista as páginas do usuário com filtros por mês/ano e paginação.
+
+4. GET    /api/jornal/paginas/:id
+   - Carrega uma página específica com suas notas e Polaroid associada.
+
+5. POST   /api/jornal/upload-polaroid
+   - Recebe a imagem (multipart/form-data), otimiza e salva no bucket MinIO.
+   - Retorna a URL pública para ser anexada à página.
+
+6. GET    /api/jornal/inspiracao
+   - Sorteia uma carta poética do acervo para servir de mote de escrita.
+
+7. DELETE /api/jornal/paginas/:id
+   - Remove uma página do arquivo pessoal do usuário.
+
+
+================================================================================
+6. TELAS E COMPONENTES NO FRONTEND (NEXT.JS)
+--------------------------------------------------------------------------------
+1. Tela Principal (Home / Editor do Jornal):
+   - Visão central de um caderno aberto ou folha de papel vintage sobre a escrivaninha.
+   - Cabeçalho com data por extenso (estilo datilografado).
+   - Seletor de humor/sentimento (ícones sutis de carimbo).
+   - Botão flutuante "✨ Puxar Inspiração" (abre modal com carta do acervo e prompt).
+   - Espaço para "Colar Polaroid" (upload rápido com prévia tátil).
+   - Botão "Guardar Página" com animação de carimbo de cera.
+
+2. Meu Arquivo / Estante de Memórias:
+   - Visão de fichário/álbum com todas as páginas já escritas pelo usuário.
+   - Filtro por calendário (folhear por dias, meses ou humores).
+   - Miniaturas estilo scrapbook (recortes com fotos e trechos de texto).
+
+3. Gaveta de Cartas (Mural de Inspiração):
+   - Antigo catálogo de cartas reposicionado como galeria de cartas abertas.
+   - O usuário pode navegar pelas cartas da comunidade e clicar em:
+     "✍️ Escrever no meu jornal a partir desta carta".
+
+
+================================================================================
+7. REGRAS DE NEGÓCIO E PLANO PRO (STRIPE & RBAC)
+--------------------------------------------------------------------------------
+• Plano Leitor (Gratuito):
+  - 1 Caderno de Jornal padrão.
+  - Até 15 páginas escritas por mês.
+  - Papel clássico (envelhecido padrão).
+  - Até 3 fotos Polaroids anexadas por mês.
+
+• Clube do Remetente Pro (R$ 14,90/mês via Stripe):
+  - Cadernos e volumes temáticos ilimitados (ex: "Viagens", "Sonhos", "Desabafos").
+  - Páginas e escritas diárias ilimitadas.
+  - Todos os papéis raros (linho japonês, pautado antigo, pergaminho botânico).
+  - Upload ilimitado de fotos Polaroids no MinIO.
+  - Exportação do diário encadernado em PDF diagramado para impressão.
+
+
+================================================================================
+8. ROTEIRO DE EXECUÇÃO TÉCNICA (FASES)
+--------------------------------------------------------------------------------
+Fase 1: Preparação do Banco e Rotas de API
+  [ ] Adicionar tabela/colunas para páginas do diário no MariaDB (initDb).
+  [ ] Implementar rotas e controller (/api/jornal) para salvar e listar páginas.
+  [ ] Integrar endpoint de upload de fotos de polaroid com o MinIO.
+
+Fase 2: Interface do Editor Cozy (Frontend)
+  [ ] Criar tela principal com folha de diário interativa e acolhedora.
+  [ ] Implementar auto-save local (LocalStorage) contra perda de rascunhos.
+  [ ] Componente Polaroid interativo com upload de imagem.
+  [ ] Botão e modal de "Inspiração do Dia" puxando cartas do dataset.
+
+Fase 3: Estante de Memórias (Perfil / Arquivo do Usuário)
+  [ ] Tela de histórico das páginas com paginação e busca por data.
+  [ ] Modo de leitura em tela cheia com estética de scrapbook.
+
+Fase 4: Validação, Testes e Documentação
+  [ ] Testar fluxo completo no Docker local (http://localhost:3000).
+  [ ] Validar que dados de texto no MariaDB e fotos no MinIO funcionam perfeitamente.
+  [ ] Atualizar README e documentação acadêmica da disciplina.
+================================================================================

@@ -8,10 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import AuthModal from "@/components/AuthModal";
 
 const navItems = [
-  { href: "/", label: "Início" },
-  { href: "/discover", label: "Descobrir" },
+  { href: "/", label: "✍️ Meu Jornal" },
+  { href: "/discover", label: "✨ Inspirações" },
   { href: "/favorites", label: "Favoritas" },
-  { href: "/collections", label: "Coleções" },
+  { href: "/collections", label: "Pastas" },
   { href: "/clube-pro", label: "Clube Pro ★" },
 ];
 
@@ -23,7 +23,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   return (
     <div className="site-wrap">
       <div className="top-note">
-        Um arquivo de cartas, sentimentos e coisas que merecem ficar
+        Jornal digital acolhedor para escrever seu dia e guardar sentimentos
         {isPro && <span style={{ marginLeft: "12px", color: "#e8c569" }}>✦ Remetente Pro</span>}
       </div>
       <header className="site-header">

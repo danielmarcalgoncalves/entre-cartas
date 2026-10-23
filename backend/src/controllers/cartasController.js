@@ -456,6 +456,28 @@ async function adicionarNotaCarta(req, res) {
   }
 }
 
+// 9. Listar páginas/cartas criadas pelo usuário autenticado (Meu Diário)
+async function listarMinhasCartas(req, res) {
+  try {
+    const usuarioId = req.usuarioId;
+    const [rows] = await pool.query(
+      `SELECT * FROM cartas WHERE usuario_id = ? ORDER BY criado_em DESC`,
+      [usuarioId]
+    );
+
+    return res.json({
+      total: rows.length,
+      cartas: rows.map(c => ({
+        ...c,
+        trecho: c.conteudo.length > 200 ? c.conteudo.substring(0, 200) + '...' : c.conteudo
+      }))
+    });
+  } catch (error) {
+    console.error('[Cartas Controller] Erro ao listar cartas do usuário:', error);
+    return res.status(500).json({ error: 'Erro ao carregar suas páginas de diário.' });
+  }
+}
+
 module.exports = {
   listarCartas,
   obterCartaPorId,
@@ -463,6 +485,8 @@ module.exports = {
   carimbarCarta,
   descarimbarCarta,
   listarCartasGuardadas,
+  listarMinhasCartas,
   obterCategorias,
   adicionarNotaCarta
 };
+

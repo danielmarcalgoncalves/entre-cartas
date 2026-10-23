@@ -85,6 +85,7 @@ export const api = {
         method: 'DELETE',
       }),
     guardadas: () => apiRequest('/cartas/guardadas'),
+    minhas: () => apiRequest('/cartas/minhas'),
     categorias: () => apiRequest('/cartas/categorias'),
     enviar: (dados: any) =>
       apiRequest('/cartas', {

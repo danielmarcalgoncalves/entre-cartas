@@ -1,72 +1,119 @@
-import Image from "next/image";
 import Link from "next/link";
-import CategoryLabel from "@/components/CategoryLabel";
-import LetterCard from "@/components/LetterCard";
-import RandomLetterButton from "@/components/RandomLetterButton";
-import ScrapbookSection from "@/components/ScrapbookSection";
-import { NewspaperSnippet, Polaroid, Sticker } from "@/components/Objects";
-import { categories, letters } from "@/data/letters";
-
-const heroImage = "/hero-collage.webp";
+import JournalEditor from "@/components/JournalEditor";
+import PersonalJournalShelf from "@/components/PersonalJournalShelf";
+import {
+  CategoryLabel,
+  Folder,
+  LetterCard,
+  ScrapbookSection,
+  Sticker,
+  TornPaper,
+} from "@/components/paper-kit";
+import { categories, letters } from "@/lib/letters";
+import { folders } from "@/lib/folders";
 
 export default function HomePage() {
+  const featuredLetters = letters.slice(0, 3);
+
   return (
-    <>
-      <section className="hero-wrap" aria-labelledby="home-title">
-        <div className="hero-scene">
-          <Image src={heroImage} alt="Uma colagem de cartas antigas, fotografia e flores prensadas" fill priority unoptimized className="hero-image" sizes="100vw" />
-          <div className="hero-paper-copy">
-            <p className="hero-overline">Cartas encontradas · memórias guardadas</p>
-            <h1 className="hero-title" id="home-title" aria-label="Cartas para todos os sentimentos">Cartas para <span style={{ display: "block" }}>todos os sentimentos</span></h1>
-            <p className="hero-subtitle">Explore milhares de cartas reais, anônimas e inesquecíveis.</p>
-            <RandomLetterButton />
-          </div>
-          <p className="hero-side-note">abre devagar.<br />algumas palavras<br />ainda estão secando.</p>
-        </div>
-        <div className="hero-caption">
-          <span>Arquivo nº 001 · correspondências sem endereço</span>
-          <span className="postmark">guardado com carinho</span>
-        </div>
+    <div className="home-journal-experience">
+      {/* 1. Cabeçalho Poético do Diário Pessoal */}
+      <section className="journal-intro" aria-labelledby="home-hero-title">
+        <span className="section-kicker">SEU SANTUÁRIO DE ESCRITA & MEMÓRIAS</span>
+        <h1 id="home-hero-title">
+          Um refúgio para <em>o seu dia.</em>
+        </h1>
+        <p>
+          Escreva sobre o que você sente, guarde cartas no seu arquivo e encontre
+          inspiração em memórias de outros tempos.
+        </p>
       </section>
 
-      <div className="page-shell">
-        <ScrapbookSection eyebrow="Escolha um caminho" title="Por onde começa a saudade?" href="/discover" linkLabel="Todas as cartas">
-          <div className="category-strip">
-            {categories.slice(0, 6).map((category, index) => <CategoryLabel key={category.id} categoryId={category.id} linked rotation={[-1.8, 1.2, -.8, 1.7, -.6, 1][index]} />)}
-          </div>
-        </ScrapbookSection>
+      {/* 2. O Editor do Jornal Digital (Foco Principal do Produto) */}
+      <JournalEditor />
 
-        <ScrapbookSection eyebrow="Recém-encontradas" title="Algumas cartas da caixa" href="/discover" linkLabel="Abrir o arquivo">
-          <div className="letter-grid">
-            {letters.slice(0, 3).map((letter) => <LetterCard key={letter.id} letter={letter} />)}
-          </div>
-        </ScrapbookSection>
+      {/* 3. Estante de Páginas Escritas pelo Usuário (Meu Diário) */}
+      <PersonalJournalShelf />
 
-        <section className="section-block">
-          <div className="scrapbook-quote">
-            <div className="quote-paper">
-              <span className="tape" aria-hidden="true" />
-              <blockquote>“Talvez a gente escreva para descobrir que ainda existe alguém do outro lado.”</blockquote>
-              <p className="quote-attribution">Um bilhete sem assinatura · encontrado entre as páginas</p>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", gap: 18 }}>
-              <Polaroid caption="um lugar que já foi casa" />
-              <div style={{ maxWidth: 180 }}>
-                <NewspaperSnippet title="Pequenos achados">Há palavras que atravessam anos dentro de uma gaveta e ainda chegam quentinhas.</NewspaperSnippet>
-                <div style={{ marginTop: 19, textAlign: "center" }}><Sticker>feito de histórias reais</Sticker></div>
-              </div>
-            </div>
+      {/* 4. Categorias e Caminhos do Sentir */}
+      <section className="category-strip" aria-labelledby="category-title">
+        <div className="category-strip__heading">
+          <div>
+            <span className="section-kicker">MURAL DE INSPIRAÇÃO</span>
+            <h2 id="category-title">Por onde começa o seu sentir?</h2>
           </div>
-        </section>
+          <Link href="/discover" className="text-link">
+            Ver todas as cartas ↗
+          </Link>
+        </div>
+        <div className="category-strip__labels">
+          {categories.map((category, index) => (
+            <Link
+              key={category.id}
+              href={`/discover?categoria=${category.id}`}
+              className={`category-petal category-petal--${index + 1}`}
+            >
+              <span className="category-petal__mark" aria-hidden="true">
+                {["✳", "☾", "〰", "✉", "✧", "❋"][index % 6]}
+              </span>
+              <CategoryLabel categoryId={category.id} />
+              <small>{category.note}</small>
+            </Link>
+          ))}
+        </div>
+        <TornPaper className="category-strip__bottom-note">
+          leia uma carta para se inspirar antes de escrever
+        </TornPaper>
+      </section>
 
-        <section className="section-block" style={{ paddingBottom: 8 }}>
-          <div className="archive-divider">uma carta pode encontrar você</div>
-          <div style={{ marginTop: 26, textAlign: "center" }}>
-            <p className="hand-note" style={{ margin: "0 0 12px" }}>talvez a próxima seja a que você precisava ler.</p>
-            <Link href="/discover" className="text-link">Percorrer todas as cartas ↗</Link>
-          </div>
-        </section>
-      </div>
-    </>
+      {/* 5. Mural de Inspiração: Cartas Prontas do Acervo */}
+      <ScrapbookSection
+        eyebrow="RECORTES DO ARQUIVO"
+        title="Cartas para inspirar o seu dia"
+        href="/discover"
+        linkLabel="Explorar acervo completo"
+      >
+        <div className="letter-shelf">
+          {featuredLetters.map((letter) => (
+            <LetterCard key={letter.id} letter={letter} />
+          ))}
+        </div>
+      </ScrapbookSection>
+
+      {/* 6. Pastas e Caixas Físicas de Memórias */}
+      <ScrapbookSection
+        eyebrow="CAIXAS E PASTAS"
+        title="O que você quiser guardar"
+        href="/collections"
+        linkLabel="Abrir minha caixa"
+      >
+        <div className="folder-shelf">
+          {folders.map((folder, index) => (
+            <Folder
+              key={folder.id}
+              label={folder.label}
+              note={folder.note}
+              color={folder.color}
+              count={1}
+              href={`/collections#${folder.id}`}
+              className={`folder--tilt-${index + 1}`}
+            />
+          ))}
+        </div>
+        <p className="folder-shelf__caption">
+          <Sticker>✶</Sticker> Suas cartas favoritas e memórias do diário ficam
+          guardadas no seu arquivo.
+        </p>
+      </ScrapbookSection>
+
+      {/* 7. Nota Final Poética */}
+      <section className="closing-note" aria-label="Uma nota para o leitor">
+        <span className="closing-note__ornament" aria-hidden="true">❧</span>
+        <p>Algumas palavras nunca perdem o endereço de volta.</p>
+        <span className="closing-note__sign">
+          — Entre Cartas <span aria-hidden="true">✦</span>
+        </span>
+      </section>
+    </div>
   );
 }

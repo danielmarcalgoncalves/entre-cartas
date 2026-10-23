@@ -1,0 +1,8 @@
+{
+  "routes": [
+    { "path": "/", "title": "Entre Cartas — Início" },
+    { "path": "/arquivo", "title": "Arquivo de cartas — Entre Cartas" },
+    { "path": "/cartas/:id", "title": "Carta — Entre Cartas" },
+    { "path": "/colecoes", "title": "Coleções — Entre Cartas" }
+  ]
+}
