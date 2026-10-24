@@ -21,38 +21,38 @@ export function LetterDetailPage({ id }: { id: string }) {
     return (
       <main className="site-main not-found-paper">
         <span aria-hidden="true">✉</span>
-        <h1>Esta carta ainda não chegou.</h1>
-        <Link href="/discover">Voltar para o arquivo ↗</Link>
+        <h1>This letter has not yet arrived.</h1>
+        <Link href="/discover">Return to archive ↗</Link>
       </main>
     );
   }
 
   const handleSave = () => {
     toggleSaved(letter.id);
-    setNotice(saved ? "A carta voltou para a mesa." : "Um carimbo vermelho marcou esta carta como arquivada.");
+    setNotice(saved ? "The letter returned to the desk." : "A red stamp marked this letter as archived.");
   };
 
   return (
     <main className="site-main detail-page">
       <div className="page-ribbon">
-        <Link href="/">INÍCIO</Link>
+        <Link href="/">HOME</Link>
         <span> / </span>
-        <Link href="/discover">O ARQUIVO</Link>
+        <Link href="/discover">THE ARCHIVE</Link>
         <span> / </span>
-        <span>{category?.name.toLocaleUpperCase("pt-BR")}</span>
+        <span>{category?.name.toLocaleUpperCase("en-US")}</span>
       </div>
 
       <div className="detail-back">
-        <Link href="/discover">← Voltar às outras cartas</Link>
+        <Link href="/discover">← Back to other letters</Link>
         <span className="reading-time">{letter.readingTime}</span>
       </div>
 
       <section className="scrapbook-detail" aria-labelledby="letter-title">
-        <aside className="detail-margin detail-margin--left" aria-label="Notas no scrapbook">
+        <aside className="detail-margin detail-margin--left" aria-label="Scrapbook margin notes">
           <span className="margin-star">✳</span>
-          <p>uma coisa<br />de cada vez</p>
+          <p>one thing<br />at a time</p>
           <span className="margin-line" />
-          <span className="margin-date">ARQUIVO<br />Nº {letter.id.slice(0, 2).toUpperCase()}</span>
+          <span className="margin-date">ARCHIVE<br />NO. {letter.id.slice(0, 2).toUpperCase()}</span>
         </aside>
 
         <motion.article
@@ -63,7 +63,7 @@ export function LetterDetailPage({ id }: { id: string }) {
         >
           <Tape className="letter-sheet__tape" />
           <div className="letter-sheet__topline">
-            <span>ENTRE CARTAS · CORRESPONDÊNCIA SEM ENDEREÇO</span>
+            <span>BETWEEN LETTERS · UNADDRESSED CORRESPONDENCE</span>
             <span>✦</span>
           </div>
 
@@ -74,7 +74,7 @@ export function LetterDetailPage({ id }: { id: string }) {
 
           <h1 id="letter-title">{letter.title}</h1>
 
-          <p className="letter-sheet__greeting">Querida pessoa,</p>
+          <p className="letter-sheet__greeting">Dear soul,</p>
 
           <div className="letter-content">
             {letter.content.map((paragraph, index) => (
@@ -82,7 +82,7 @@ export function LetterDetailPage({ id }: { id: string }) {
             ))}
           </div>
 
-          <p className="letter-sheet__farewell">Com carinho,</p>
+          <p className="letter-sheet__farewell">With affection,</p>
           <p className="letter-sheet__signature">{letter.sender}</p>
           <span className="letter-sheet__folio">— 01 —</span>
 
@@ -94,36 +94,36 @@ export function LetterDetailPage({ id }: { id: string }) {
                 animate={{ scale: 1, rotate: 7, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
               >
-                ARQUIVADA<br />
-                <small>NO SEU ARQUIVO</small>
+                ARCHIVED<br />
+                <small>IN YOUR ARCHIVE</small>
               </motion.span>
             )}
           </AnimatePresence>
         </motion.article>
 
-        <aside className="detail-margin detail-margin--right" aria-label="Lembrete do arquivo">
-          <Sticker className="detail-sticker">guarde<br />o que fica</Sticker>
+        <aside className="detail-margin detail-margin--right" aria-label="Archive reminder">
+          <Sticker className="detail-sticker">keep<br />what lasts</Sticker>
           <Polaroid
             className="detail-polaroid"
             src="/images/manuscrito-pixabay.jpg"
-            alt="Página antiga de manuscrito preservado"
-            caption="recorte guardado"
+            alt="Old manuscript page preserved in time"
+            caption="kept clipping"
           />
           <Stamp className="detail-postmark">
-            ✧<small>SEM DATA<br />DE VALIDADE</small>
+            ✧<small>NO EXPIRATION<br />DATE</small>
           </Stamp>
-          <span className="hand-note">à mão, sempre</span>
+          <span className="hand-note">by hand, always</span>
         </aside>
       </section>
 
-      <section className="detail-actions" aria-label="Ações da carta">
+      <section className="detail-actions" aria-label="Letter actions">
         <button
           className={`primary-cta ${saved ? "primary-cta--filed" : ""}`}
           type="button"
           onClick={handleSave}
           aria-pressed={saved}
         >
-          <span>{saved ? "Retirar do arquivo" : "Carimbar como favorita"}</span>
+          <span>{saved ? "Remove from archive" : "Stamp as favorite"}</span>
           <span className="cta-arrow" aria-hidden="true">✳</span>
         </button>
 
@@ -132,19 +132,19 @@ export function LetterDetailPage({ id }: { id: string }) {
           className="primary-cta"
           style={{ background: "#223a70", boxShadow: "0 3px 0 #142447, 0 8px 18px rgba(34,58,112,.2)" }}
         >
-          <span>Escrever no meu diário a partir desta carta</span>
+          <span>Write in my journal from this letter</span>
           <span className="cta-arrow" aria-hidden="true">↗</span>
         </Link>
 
         <label className="folder-picker">
-          Mover para a pasta
+          Move to folder
           <select
-            aria-label="Escolher pasta para esta carta"
+            aria-label="Choose folder for this letter"
             value={folderById[letter.id] ?? folders[0].id}
             onChange={(event) => {
               moveToFolder(letter.id, event.target.value);
               setFilingFolder(event.target.value);
-              setNotice("A carta foi acomodada na sua pasta.");
+              setNotice("The letter was filed in your folder.");
             }}
           >
             {folders.map((folder) => (
@@ -175,7 +175,7 @@ export function LetterDetailPage({ id }: { id: string }) {
             key={filingTarget.id}
             className="filing-journey"
             role="status"
-            aria-label={`Carta guardada na pasta ${filingTarget.label}`}
+            aria-label={`Letter filed into folder ${filingTarget.label}`}
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
@@ -200,13 +200,13 @@ export function LetterDetailPage({ id }: { id: string }) {
 
       <div className="detail-source-note">
         {letter.sender}
-        <span aria-hidden="true"> · </span> acervo do Entre Cartas
+        <span aria-hidden="true"> · </span> Between Letters archive
       </div>
 
       <Paper className="detail-next-note">
-        <span>Próxima dobra?</span>
+        <span>Next fold?</span>
         <Link href="/discover">
-          Encontrar outra carta <span aria-hidden="true">↗</span>
+          Find another letter <span aria-hidden="true">↗</span>
         </Link>
       </Paper>
     </main>

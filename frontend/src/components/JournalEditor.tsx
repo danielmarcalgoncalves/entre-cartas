@@ -15,9 +15,9 @@ export const ACTIVE_LETTER_FOLDER_ID_KEY = "entre-cartas:active-letter-folder-id
 const SAVED_ENTRIES_KEY = "entre-cartas:journal:entries";
 const PINNED_THEME_STORAGE_KEY = "entre-cartas:pinned-theme";
 
-// Limite exato de linhas visíveis por folha (23 linhas pautadas no textarea + 1 para cabeçalho = 24 linhas)
+// Exact line count visible per sheet (23 ruled lines in textarea + 1 for header = 24 lines)
 const MAX_LINES_PER_PAGE = 23;
-// Limite máximo de caracteres físicos que cabem sem transbordar o box da página
+// Maximum character count fitting physically without overflowing the box
 const MAX_CHARS_PER_PAGE = 1200;
 
 export interface LetterFolder {
@@ -72,44 +72,44 @@ export interface PostalSeal {
   postmark: string;
 }
 
-// Selos postais sóbrios de arquivo (tons de vinho, sépia e azul-noite)
+// Sober archival postal seals
 const SEAL_OPTIONS: PostalSeal[] = [
-  { id: "amor", label: "Amor", code: "I. AM", color: "#8B1E1E", postmark: "CORREIO AFETIVO" },
-  { id: "saudade", label: "Saudade", code: "II. SD", color: "#1C2A39", postmark: "REMETENTE DISTANTE" },
-  { id: "desabafo", label: "Desabafo", code: "III. DB", color: "#4A3E31", postmark: "CONFISSÃO LIVRE" },
-  { id: "nunca-enviada", label: "Não Enviada", code: "IV. NE", color: "#2B3A2E", postmark: "SEM ENDEREÇO" },
-  { id: "silencio", label: "Silêncio", code: "V. SL", color: "#3D3935", postmark: "TEMPO SILENCIOSO" },
-  { id: "historica", label: "Histórica", code: "VI. HS", color: "#6A5432", postmark: "ARQUIVO PERMANENTE" },
+  { id: "amor", label: "Love", code: "I. LV", color: "#8B1E1E", postmark: "AFFECTIVE MAIL" },
+  { id: "saudade", label: "Longing", code: "II. LG", color: "#1C2A39", postmark: "DISTANT SENDER" },
+  { id: "desabafo", label: "Confession", code: "III. CF", color: "#4A3E31", postmark: "FREE CONFESSION" },
+  { id: "nunca-enviada", label: "Unsent", code: "IV. US", color: "#2B3A2E", postmark: "UNADDRESSED" },
+  { id: "silencio", label: "Silence", code: "V. SL", color: "#3D3935", postmark: "SILENT TIME" },
+  { id: "historica", label: "Historical", code: "VI. HS", color: "#6A5432", postmark: "PERMANENT ARCHIVE" },
 ];
 
 const PAPER_OPTIONS = [
-  { id: "marfim", name: "Algodão & Marfim", color: "#FCFBF7" },
-  { id: "pergaminho", name: "Pergaminho Suave", color: "#F7F3EA" },
-  { id: "kraft", name: "Linho Cru Nobre", color: "#EFE8DA" },
-  { id: "branco", name: "Papel de Carta Clássico", color: "#FAF9F5" },
+  { id: "marfim", name: "Cotton & Ivory", color: "#FCFBF7" },
+  { id: "pergaminho", name: "Mellow Parchment", color: "#F7F3EA" },
+  { id: "kraft", name: "Noble Raw Linen", color: "#EFE8DA" },
+  { id: "branco", name: "Classic Letter Paper", color: "#FAF9F5" },
 ];
 
 const INK_OPTIONS = [
-  { id: "nanquim", name: "Nanquim Suave", color: "#262626" },
-  { id: "azul-noite", name: "Azul-Noite Profundo", color: "#1C2A39" },
-  { id: "sepia", name: "Sépia de Arquivo", color: "#4A3E31" },
-  { id: "grafite", name: "Grafite Sóbrio", color: "#3A3A3A" },
+  { id: "nanquim", name: "Soft India Ink", color: "#262626" },
+  { id: "azul-noite", name: "Deep Midnight Blue", color: "#1C2A39" },
+  { id: "sepia", name: "Archival Sepia", color: "#4A3E31" },
+  { id: "grafite", name: "Sober Graphite", color: "#3A3A3A" },
 ];
 
 const FONT_OPTIONS = [
-  { id: "caveat", name: "Caligrafia Tinteiro", styleFamily: "'Caveat', cursive" },
-  { id: "literary", name: "Itálico Literário", styleFamily: "var(--literary-italic, 'EB Garamond', Georgia, serif)" },
-  { id: "garamond", name: "Serifada Clássica", styleFamily: "var(--serif, 'EB Garamond', serif)" },
-  { id: "typewriter", name: "Datilografia Histórica", styleFamily: "'Special Elite', monospace" },
+  { id: "caveat", name: "Fountain Pen Script", styleFamily: "'Caveat', cursive" },
+  { id: "literary", name: "Literary Italic", styleFamily: "var(--literary-italic, 'EB Garamond', Georgia, serif)" },
+  { id: "garamond", name: "Classic Serif", styleFamily: "var(--serif, 'EB Garamond', serif)" },
+  { id: "typewriter", name: "Historical Typewriter", styleFamily: "'Special Elite', monospace" },
 ];
 
 const PROMPTS = [
-  "Escreva sobre um detalhe do seu dia que ninguém além de você percebeu.",
-  "Qual foi a última vez que você esperou por algo com o coração na boca?",
-  "Se pudesse deixar um bilhete na janela para o seu 'eu' de cinco anos atrás, o que estaria escrito?",
-  "Descreva o cheiro ou o som de um lugar que já foi casa para você.",
-  "Existe alguma palavra que você engoliu recentemente e que merecia ter sido dita?",
-  "O que você gostaria de esquecer devagar, sem pressa nem mágoa?",
+  "Write about a small detail of your day that nobody noticed but you.",
+  "When was the last time you waited for something with your heart in your mouth?",
+  "If you could leave a note on the windowsill for yourself five years ago, what would it say?",
+  "Describe the scent or sound of a place that once felt like home to you.",
+  "Is there a word you swallowed recently that deserved to be spoken aloud?",
+  "What would you like to forget slowly, without hurry or bitterness?",
 ];
 
 function playPaperSound() {
@@ -153,13 +153,13 @@ function EyeIcon({ className = "", filled = false }: { className?: string; fille
 export default function JournalEditor() {
   const { user, isPro } = useAuth();
 
-  // Abas de Alternância: 'caderno' | 'carta'
+  // Tabs: 'caderno' (Journal) | 'carta' (Letter)
   const [activeTab, setActiveTab] = useState<"caderno" | "carta">("caderno");
 
-  // Modo Foco (exclusivo para o Caderno: tela escura, apenas folha e menu)
+  // Focus Mode
   const [modoFoco, setModoFoco] = useState(false);
 
-  // Estado dos Cadernos e Páginas (Apenas cadernos criados pelo usuário)
+  // Notebooks and Pages
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [activeNotebookId, setActiveNotebookId] = useState<string>("");
   const [currentPageIndex, setCurrentPageIndex] = useState<number>(0);
@@ -167,32 +167,32 @@ export default function JournalEditor() {
   const [newNotebookTitle, setNewNotebookTitle] = useState("");
   const [cadernoPromptNotice, setCadernoPromptNotice] = useState<string | null>(null);
 
-  // Conteúdo ativo (título opcional no topo em negrito)
+  // Active content
   const [titulo, setTitulo] = useState("");
   const [conteudo, setConteudo] = useState("");
   const [dataFormatada, setDataFormatada] = useState("");
   const [favoritado, setFavoritado] = useState(false);
 
-  // Modo Carta: Selo Selecionado
+  // Letter Mode Seal
   const [cartaSelo, setCartaSelo] = useState<PostalSeal>(SEAL_OPTIONS[0]);
 
-  // Modo Carta: Pastas de Correspondência (apenas pastas criadas pelo usuário)
+  // Letter Mode Folders
   const [letterFolders, setLetterFolders] = useState<LetterFolder[]>([]);
   const [activeLetterFolderId, setActiveLetterFolderId] = useState<string>("");
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
   const [newFolderTitle, setNewFolderTitle] = useState("");
   const [folderPromptNotice, setFolderPromptNotice] = useState<string | null>(null);
 
-  // Flag para salvar automaticamente o conteúdo pendente logo após criar o caderno ou a pasta
+  // Pending save after creation
   const [pendingSaveAfterCreation, setPendingSaveAfterCreation] = useState(false);
 
   const activeLetterFolder =
     letterFolders.find((f) => f.id === activeLetterFolderId) || (letterFolders.length > 0 ? letterFolders[0] : null);
 
-  // Tema Salvo/Fixado à direita (abaixo do botão de inspiração)
+  // Pinned theme
   const [temaSalvo, setTemaSalvo] = useState<string>("");
 
-  // Menu de Personalização (Papel, Tinta, Fonte)
+  // Customization Menu
   const [customMenuOpen, setCustomMenuOpen] = useState(false);
   const [sheetBgId, setSheetBgId] = useState("marfim");
   const [sheetBgColor, setSheetBgColor] = useState("#FBF7EF");
@@ -200,19 +200,19 @@ export default function JournalEditor() {
   const [inkColor, setInkColor] = useState("#2B2B2B");
   const [fontFamilyId, setFontFamilyId] = useState("caveat");
 
-  // Inspiração
+  // Inspiration
   const [inspiracaoModal, setInspiracaoModal] = useState(false);
   const [cartaInspiracao, setCartaInspiracao] = useState<Letter | null>(null);
   const [promptTexto, setPromptTexto] = useState("");
 
-  // Feedback & Salvamento
+  // Feedback & Saving
   const [salvando, setSalvando] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
 
   const menuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Data atual formatada por extenso em português
+  // Current date formatted in English
   useEffect(() => {
     const hoje = new Date();
     const opcoes: Intl.DateTimeFormatOptions = {
@@ -221,18 +221,16 @@ export default function JournalEditor() {
       month: "long",
       day: "numeric",
     };
-    const dataExtenso = hoje.toLocaleDateString("pt-BR", opcoes);
-    const dataCapitalizada = dataExtenso.charAt(0).toUpperCase() + dataExtenso.slice(1);
-    setDataFormatada(dataCapitalizada);
+    const dataExtenso = hoje.toLocaleDateString("en-US", opcoes);
+    setDataFormatada(dataExtenso);
 
-    // Carrega tema fixado se existir no localStorage
     try {
       const temaSalvoStorage = window.localStorage.getItem(PINNED_THEME_STORAGE_KEY);
       if (temaSalvoStorage) setTemaSalvo(temaSalvoStorage);
     } catch {}
   }, []);
 
-  // Fechar menu de personalização ao clicar fora
+  // Close customization menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -243,7 +241,7 @@ export default function JournalEditor() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Sair do Modo Foco ao pressionar a tecla Escape
+  // Exit Focus Mode on Escape
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && modoFoco) {
@@ -254,10 +252,8 @@ export default function JournalEditor() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modoFoco]);
 
-
-  // Inicialização e Sincronização dos Cadernos e Pastas a partir do LocalStorage
+  // Initialize notebooks and folders from LocalStorage
   const carregarCadernosEPastas = () => {
-    // 1. Cadernos do Usuário
     try {
       const stored = window.localStorage.getItem(NOTEBOOKS_STORAGE_KEY);
       if (stored) {
@@ -294,7 +290,6 @@ export default function JournalEditor() {
       }
     } catch {}
 
-    // 2. Pastas de Carta do Usuário
     try {
       const storedFolders = window.localStorage.getItem(LETTER_FOLDERS_STORAGE_KEY);
       if (storedFolders) {
@@ -333,7 +328,7 @@ export default function JournalEditor() {
     };
   }, []);
 
-  // Escutar evento global de "EDITAR" vindo da estante de leitura
+  // Listen to EDIT request from reading room
   useEffect(() => {
     const handleEditRequest = (e: any) => {
       const { notebookId, pageIndex } = e.detail || {};
@@ -354,13 +349,11 @@ export default function JournalEditor() {
         }
       }
 
-      // Rola suavemente até a mesa de escrita
       const deskElem = document.getElementById("mesa-de-escrita");
       if (deskElem) {
         deskElem.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
-      // Foca na folha após rolagem
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
@@ -374,14 +367,12 @@ export default function JournalEditor() {
     };
   }, [notebooks]);
 
-  // Caderno ativo (Apenas cadernos criados pelo usuário)
   const activeNotebook: Notebook | null =
     notebooks.find((n) => n.id === activeNotebookId) ||
     (notebooks.length > 0 ? notebooks[0] : null);
 
   const paginasCaderno = activeNotebook?.paginas || [];
 
-  // Ao alternar página no caderno, carrega o conteúdo daquela página
   const carregarPagina = (index: number, nb: Notebook | null = activeNotebook) => {
     if (!nb || !nb.paginas || nb.paginas.length === 0) return;
     const pag = nb.paginas[index];
@@ -394,7 +385,6 @@ export default function JournalEditor() {
     }
   };
 
-  // Atualizar rascunho da página atual no caderno
   const atualizarRascunhoAtual = (novoTexto?: string, novoTitulo?: string, novoFav?: boolean) => {
     if (activeTab !== "caderno" || !activeNotebook) return;
     const textoSalvar = novoTexto !== undefined ? novoTexto : conteudo;
@@ -423,13 +413,11 @@ export default function JournalEditor() {
     } catch {}
   };
 
-  // Avançar para a próxima página ou criar nova página automaticamente quando as linhas acabam
-  // Salva automaticamente a página anterior sem necessidade de clicar em Salvar
   const avancarParaProximaPaginaComTexto = (textoExcedente: string, textoAtualPreenchido?: string) => {
     playPaperSound();
 
     if (!activeNotebook) {
-      setCadernoPromptNotice("Crie um caderno antes para salvar e avançar para a próxima página.");
+      setCadernoPromptNotice("Please create a journal first to save and advance to the next page.");
       setPendingSaveAfterCreation(true);
       setNotebookDrawerOpen(true);
       return;
@@ -439,7 +427,6 @@ export default function JournalEditor() {
     const tituloAtual = titulo;
 
     if (currentPageIndex < paginasCaderno.length - 1) {
-      // Já existe uma próxima página: salva a atual e avança
       const proximoIndex = currentPageIndex + 1;
       const proximaPag = paginasCaderno[proximoIndex];
       const textoFinalProxima = textoExcedente
@@ -449,7 +436,6 @@ export default function JournalEditor() {
       const notebooksAtualizados = notebooks.map((nb) => {
         if (nb.id === activeNotebook.id) {
           const paginas = [...nb.paginas];
-          // 1. Salva automaticamente a página anterior
           if (paginas[currentPageIndex]) {
             paginas[currentPageIndex] = {
               ...paginas[currentPageIndex],
@@ -458,7 +444,6 @@ export default function JournalEditor() {
               favoritado: favoritado,
             };
           }
-          // 2. Prepara a próxima página
           paginas[proximoIndex] = {
             ...paginas[proximoIndex],
             conteudo: textoFinalProxima,
@@ -479,15 +464,14 @@ export default function JournalEditor() {
       } catch {}
 
       window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
-      setMensagemSucesso("Página anterior salva automaticamente.");
+      setMensagemSucesso("Previous page saved automatically.");
       setTimeout(() => setMensagemSucesso(""), 2200);
     } else {
-      // Cria uma nova página em branco automaticamente e continua nela
       const novaPagina: NotebookPage = {
         id: "pag-" + Date.now(),
         titulo: "",
         conteudo: textoExcedente,
-        dataFormatada: dataFormatada || "Hoje",
+        dataFormatada: dataFormatada || "Today",
         favoritado: false,
         criadoEm: new Date().toISOString(),
       };
@@ -495,7 +479,6 @@ export default function JournalEditor() {
       const notebooksAtualizados = notebooks.map((nb) => {
         if (nb.id === activeNotebook.id) {
           const paginas = [...nb.paginas];
-          // 1. Salva automaticamente a página anterior
           if (paginas[currentPageIndex]) {
             paginas[currentPageIndex] = {
               ...paginas[currentPageIndex],
@@ -523,11 +506,10 @@ export default function JournalEditor() {
       } catch {}
 
       window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
-      setMensagemSucesso("Página concluída salva automaticamente.");
+      setMensagemSucesso("Completed page saved automatically.");
       setTimeout(() => setMensagemSucesso(""), 2200);
     }
 
-    // Foca o cursor no textarea da nova folha
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
@@ -536,7 +518,6 @@ export default function JournalEditor() {
     }, 50);
   };
 
-  // Verifica se a folha do caderno atingiu a capacidade máxima física
   const isSheetFull = (text: string, textareaEl?: HTMLTextAreaElement | null): boolean => {
     if (text.length >= MAX_CHARS_PER_PAGE) return true;
     const linhas = text.split("\n");
@@ -547,9 +528,6 @@ export default function JournalEditor() {
     return false;
   };
 
-  // Bloqueio rigoroso ao esgotar a página:
-  // Não permite inserir mais caracteres na folha cheia (apenas apagar com Backspace/Delete).
-  // Ao digitar qualquer novo caractere em folha cheia, avança automaticamente para a próxima página com o caractere.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (activeTab !== "caderno") return;
 
@@ -567,31 +545,24 @@ export default function JournalEditor() {
     ].includes(e.key);
     const isShortcut = e.ctrlKey || e.metaKey || e.altKey;
 
-    // Se estiver apagando ou navegando, permite sempre sem restrição
     if (isDeleteKey || isNavKey || isShortcut) {
       return;
     }
 
-    // Se há texto selecionado que será substituído, permite
     const textarea = textareaRef.current;
     if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
       return;
     }
 
-    // Verifica se a página atual já está no limite máximo de capacidade
     const folhaCheia = isSheetFull(conteudo, textarea);
 
     if (folhaCheia) {
-      // Bloqueia a inserção de mais texto nesta folha cheia
       e.preventDefault();
-
-      // Salva a folha atual e pula automaticamente para a próxima página com o caractere digitado
       const charInserido = e.key === "Enter" ? "\n" : e.key.length === 1 ? e.key : "";
       avancarParaProximaPaginaComTexto(charInserido);
     }
   };
 
-  // Tratamento de colagem (paste) para não permitir transbordamento da folha
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (activeTab !== "caderno") return;
     const pastedText = e.clipboardData.getData("text");
@@ -623,14 +594,12 @@ export default function JournalEditor() {
     }
   };
 
-  // Controle de digitação no caderno com paginação automática e corte rigoroso no limite
   const handleConteudoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const novoTexto = e.target.value;
 
     if (activeTab === "caderno") {
       const linhas = novoTexto.split("\n");
 
-      // Se excedeu o número de linhas da página
       if (linhas.length > MAX_LINES_PER_PAGE) {
         const linhasPaginaAtual = linhas.slice(0, MAX_LINES_PER_PAGE).join("\n");
         const linhasExcedentes = linhas.slice(MAX_LINES_PER_PAGE).join("\n");
@@ -641,7 +610,6 @@ export default function JournalEditor() {
         return;
       }
 
-      // Se excedeu a contagem física máxima de caracteres por página
       if (novoTexto.length > MAX_CHARS_PER_PAGE) {
         const textoPaginaAtual = novoTexto.slice(0, MAX_CHARS_PER_PAGE);
         const textoExcedente = novoTexto.slice(MAX_CHARS_PER_PAGE);
@@ -657,13 +625,11 @@ export default function JournalEditor() {
     atualizarRascunhoAtual(novoTexto);
   };
 
-  // Detecção de transbordamento de texto por scroll durante digitação contínua
   const handleKeyUp = () => {
     if (activeTab !== "caderno") return;
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Se o texto digitado ultrapassou a altura física das linhas da página
     if (textarea.scrollHeight > textarea.clientHeight + 2) {
       const texto = textarea.value;
       const palavras = texto.split(" ");
@@ -678,7 +644,6 @@ export default function JournalEditor() {
     }
   };
 
-  // Navegação ← Página Anterior
   const navegarAnterior = () => {
     if (activeTab === "carta") return;
     if (currentPageIndex > 0) {
@@ -687,7 +652,6 @@ export default function JournalEditor() {
     }
   };
 
-  // Navegação → Próxima Página ou Nova Página em Branco
   const navegarProximo = () => {
     if (activeTab === "carta") return;
     atualizarRascunhoAtual();
@@ -699,7 +663,6 @@ export default function JournalEditor() {
     }
   };
 
-  // Alternar Favorito
   const toggleFavorito = () => {
     playPaperSound();
     const novoStatus = !favoritado;
@@ -707,17 +670,15 @@ export default function JournalEditor() {
     atualizarRascunhoAtual(undefined, undefined, novoStatus);
   };
 
-  // Salvar Página / Arquivar Correspondência
   const salvarPagina = async () => {
     if (!conteudo.trim() && !titulo.trim()) {
-      alert("Escreva pelo menos algumas palavras antes de arquivar.");
+      alert("Please write at least a few words before archiving.");
       return;
     }
 
-    // Validação de Caderno obrigatório
     if (activeTab === "caderno") {
       if (!activeNotebook) {
-        setCadernoPromptNotice("É necessário criar um caderno antes de salvar a sua página.");
+        setCadernoPromptNotice("You must create a journal before saving your page.");
         setPendingSaveAfterCreation(true);
         setNotebookDrawerOpen(true);
         playPaperSound();
@@ -725,10 +686,9 @@ export default function JournalEditor() {
       }
     }
 
-    // Regra de Negócio: Limite de cartas escritas (10 Normal vs 30 Premium) e Pasta obrigatória
     if (activeTab === "carta") {
       if (!activeLetterFolder) {
-        setFolderPromptNotice("É necessário criar uma pasta antes de arquivar a sua carta.");
+        setFolderPromptNotice("You must create a folder before filing your letter.");
         setPendingSaveAfterCreation(true);
         setFolderDrawerOpen(true);
         playPaperSound();
@@ -745,8 +705,8 @@ export default function JournalEditor() {
       if (totalCartasLocais >= limiteCartas) {
         alert(
           isPro
-            ? `Você atingiu o limite máximo de ${limiteCartas} cartas escritas do Plano Premium.`
-            : `Você atingiu o limite de ${limiteCartas} cartas do Plano Normal. Assine o Clube Premium para escrever e arquivar até 30 cartas!`
+            ? `You have reached the maximum limit of ${limiteCartas} written letters on the Premium Plan.`
+            : `You have reached the limit of ${limiteCartas} letters on the Standard Plan. Join Pro Club to write and archive up to 30 letters!`
         );
         return;
       }
@@ -758,15 +718,13 @@ export default function JournalEditor() {
     const tituloFinal =
       titulo.trim() ||
       (activeTab === "caderno"
-        ? `Memória de ${dataFormatada || "Hoje"}`
-        : `Carta: ${cartaSelo.label}`);
+        ? `Memory of ${dataFormatada || "Today"}`
+        : `Letter: ${cartaSelo.label}`);
 
-    // 1. Salva no caderno ativo
     if (activeTab === "caderno" && activeNotebook) {
       atualizarRascunhoAtual(conteudo, tituloFinal, favoritado);
     }
 
-    // 2. Registra na estante geral do diário
     try {
       const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
       const novaEntrada: JournalEntry = {
@@ -774,7 +732,7 @@ export default function JournalEditor() {
         titulo: tituloFinal,
         conteudo: conteudo.trim(),
         humor: activeTab === "caderno" ? "reflexao" : cartaSelo.id,
-        data_formatada: dataFormatada || "Hoje",
+        data_formatada: dataFormatada || "Today",
         criado_em: new Date().toISOString(),
         tipo_papel: sheetBgId,
         favoritado,
@@ -786,12 +744,11 @@ export default function JournalEditor() {
       window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify([novaEntrada, ...existente]));
     } catch {}
 
-    // 3. Se autenticado, envia também para o backend MariaDB
     try {
       await api.cartas.enviar({
         titulo: tituloFinal,
         conteudo: conteudo.trim(),
-        remetente_anonimo: user?.nome ? user.nome : (activeNotebook?.nome || "Correspondente"),
+        remetente_anonimo: user?.nome ? user.nome : (activeNotebook?.nome || "Correspondent"),
         categoria: activeTab === "carta" ? cartaSelo.id : "memorias",
         tipo_papel: sheetBgId,
         data_carta: dataFormatada,
@@ -807,8 +764,8 @@ export default function JournalEditor() {
     setSalvando(false);
     setMensagemSucesso(
       activeTab === "caderno"
-        ? `Página guardada com sucesso no ${activeNotebook?.nome || "caderno"}!`
-        : `Carta arquivada com sucesso na pasta "${activeLetterFolder?.nome || "Correspondências"}"!`
+        ? `Page saved successfully in ${activeNotebook?.nome || "journal"}!`
+        : `Letter archived successfully in "${activeLetterFolder?.nome || "Correspondence"}"!`
     );
 
     setTimeout(() => {
@@ -816,7 +773,6 @@ export default function JournalEditor() {
     }, 3200);
   };
 
-  // Alternar Caderno Ativo via Estante/Drawer
   const selecionarCaderno = (nb: Notebook) => {
     setActiveNotebookId(nb.id);
     setCurrentPageIndex(0);
@@ -836,7 +792,6 @@ export default function JournalEditor() {
     playPaperSound();
   };
 
-  // Criar Novo Caderno — Regra de Negócio: 3 Cadernos (Normal) vs 10 Cadernos (Premium)
   const criarNovoCaderno = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNotebookTitle.trim()) return;
@@ -845,15 +800,15 @@ export default function JournalEditor() {
     if (notebooks.length >= limiteCadernos) {
       alert(
         isPro
-          ? `Você atingiu o limite máximo de ${limiteCadernos} cadernos do Plano Premium.`
-          : `Você atingiu o limite de ${limiteCadernos} cadernos do Plano Normal. Assine o Clube Premium para ter até 10 cadernos!`
+          ? `You have reached the maximum limit of ${limiteCadernos} journals on the Premium Plan.`
+          : `You have reached the limit of ${limiteCadernos} journals on the Standard Plan. Join Pro Club to have up to 10 journals!`
       );
       return;
     }
 
     const ehPendente = pendingSaveAfterCreation && activeTab === "caderno";
     const tituloFinal =
-      titulo.trim() || `Memória de ${dataFormatada || "Hoje"}`;
+      titulo.trim() || `Memory of ${dataFormatada || "Today"}`;
 
     const novo: Notebook = {
       id: "caderno-" + Date.now(),
@@ -864,7 +819,7 @@ export default function JournalEditor() {
           id: "pag-" + Date.now(),
           titulo: ehPendente ? tituloFinal : (titulo.trim() || ""),
           conteudo: ehPendente ? conteudo.trim() : (conteudo.trim() || ""),
-          dataFormatada: dataFormatada || "Hoje",
+          dataFormatada: dataFormatada || "Today",
           favoritado: favoritado,
           criadoEm: new Date().toISOString(),
         },
@@ -878,7 +833,6 @@ export default function JournalEditor() {
       window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, novo.id);
     } catch {}
 
-    // Se estava salvando uma página pendente ao criar este caderno
     if (ehPendente) {
       try {
         const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
@@ -887,7 +841,7 @@ export default function JournalEditor() {
           titulo: tituloFinal,
           conteudo: conteudo.trim(),
           humor: "reflexao",
-          data_formatada: dataFormatada || "Hoje",
+          data_formatada: dataFormatada || "Today",
           criado_em: new Date().toISOString(),
           tipo_papel: sheetBgId,
           favoritado,
@@ -907,7 +861,7 @@ export default function JournalEditor() {
         });
       } catch {}
 
-      setMensagemSucesso(`Caderno "${novo.nome}" criado e página salva com sucesso!`);
+      setMensagemSucesso(`Journal "${novo.nome}" created and page saved successfully!`);
       setTimeout(() => setMensagemSucesso(""), 3500);
       setPendingSaveAfterCreation(false);
       setCadernoPromptNotice(null);
@@ -918,7 +872,6 @@ export default function JournalEditor() {
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
   };
 
-  // Criação de nova pasta de cartas (com limite equivalente ao de cadernos: 3 no Normal e 10 no Pro)
   const criarNovaPasta = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderTitle.trim()) return;
@@ -927,8 +880,8 @@ export default function JournalEditor() {
     if (letterFolders.length >= limitePastas) {
       alert(
         isPro
-          ? `Você atingiu o limite de ${limitePastas} pastas do Plano Premium.`
-          : `Você atingiu o limite de ${limitePastas} pastas do Plano Normal. Assine o Clube Premium para ter até 10 pastas!`
+          ? `You have reached the limit of ${limitePastas} folders on the Premium Plan.`
+          : `You have reached the limit of ${limitePastas} folders on the Standard Plan. Join Pro Club to have up to 10 folders!`
       );
       return;
     }
@@ -948,9 +901,8 @@ export default function JournalEditor() {
       window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, nova.id);
     } catch {}
 
-    // Se estava arquivando uma carta pendente ao criar esta pasta
     if (pendingSaveAfterCreation && activeTab === "carta") {
-      const tituloFinal = titulo.trim() || `Carta: ${cartaSelo.label}`;
+      const tituloFinal = titulo.trim() || `Letter: ${cartaSelo.label}`;
       try {
         const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
         const novaEntrada: JournalEntry = {
@@ -958,7 +910,7 @@ export default function JournalEditor() {
           titulo: tituloFinal,
           conteudo: conteudo.trim(),
           humor: cartaSelo.id,
-          data_formatada: dataFormatada || "Hoje",
+          data_formatada: dataFormatada || "Today",
           criado_em: new Date().toISOString(),
           tipo_papel: sheetBgId,
           favoritado,
@@ -973,14 +925,14 @@ export default function JournalEditor() {
         api.cartas.enviar({
           titulo: tituloFinal,
           conteudo: conteudo.trim(),
-          remetente_anonimo: user?.nome || "Correspondente",
+          remetente_anonimo: user?.nome || "Correspondent",
           categoria: cartaSelo.id,
           tipo_papel: sheetBgId,
           data_carta: dataFormatada,
         });
       } catch {}
 
-      setMensagemSucesso(`Pasta "${nova.nome}" criada e carta arquivada com sucesso!`);
+      setMensagemSucesso(`Folder "${nova.nome}" created and letter archived successfully!`);
       setTimeout(() => setMensagemSucesso(""), 3500);
       setPendingSaveAfterCreation(false);
       setFolderPromptNotice(null);
@@ -992,7 +944,6 @@ export default function JournalEditor() {
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
   };
 
-  // Sorteia carta e prompt de inspiração
   const sortearInspiracao = () => {
     const carta = letters[Math.floor(Math.random() * letters.length)];
     const prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
@@ -1002,7 +953,6 @@ export default function JournalEditor() {
     playPaperSound();
   };
 
-  // Ao clicar em "escrever sobre o tema", salva o tema à direita da tela, logo abaixo do botão
   const aplicarInspiracao = () => {
     if (promptTexto) {
       setTemaSalvo(promptTexto);
@@ -1019,7 +969,6 @@ export default function JournalEditor() {
     return found ? found.styleFamily : "'Caveat', cursive";
   };
 
-  // Menu de Personalização de Papel, Tinta e Tipografia (Reutilizável no Modo Normal e Modo Foco)
   const renderCustomizationMenu = (isInFocus = false) => (
     <div className={`vintage-menu-wrapper ${isInFocus ? "is-focus-mode" : ""}`} ref={menuRef}>
       <button
@@ -1027,13 +976,12 @@ export default function JournalEditor() {
         className={`vintage-menu-btn ${isInFocus ? "is-focus-mode" : ""}`}
         onClick={() => setCustomMenuOpen(!customMenuOpen)}
         aria-expanded={customMenuOpen}
-        title="Personalizar folha, tinta e caligrafia"
+        title="Customize paper, ink, and calligraphy"
       >
         <span>Menu</span>
         <span className="menu-caret">▾</span>
       </button>
 
-      {/* PAINEL FLUTUANTE DE PERSONALIZAÇÃO VISUAL */}
       <AnimatePresence>
         {customMenuOpen && (
           <motion.div
@@ -1043,9 +991,9 @@ export default function JournalEditor() {
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
             transition={{ duration: 0.16 }}
           >
-            {/* 1. Cor de Fundo da Folha */}
+            {/* 1. Paper Background */}
             <div className="menu-group">
-              <span className="menu-group-title">Fundo da Folha</span>
+              <span className="menu-group-title">Sheet Paper</span>
               <div className="paper-swatches">
                 {PAPER_OPTIONS.map((paper) => (
                   <button
@@ -1068,9 +1016,9 @@ export default function JournalEditor() {
               </small>
             </div>
 
-            {/* 2. Cor da Tinta / Letra */}
+            {/* 2. Ink Color */}
             <div className="menu-group">
-              <span className="menu-group-title">Cor da Tinta</span>
+              <span className="menu-group-title">Ink Color</span>
               <div className="ink-swatches">
                 {INK_OPTIONS.map((ink) => (
                   <button
@@ -1093,9 +1041,9 @@ export default function JournalEditor() {
               </small>
             </div>
 
-            {/* 3. Família da Fonte */}
+            {/* 3. Typography & Calligraphy */}
             <div className="menu-group">
-              <span className="menu-group-title">Caligrafia & Tipografia</span>
+              <span className="menu-group-title">Script & Typography</span>
               <div className="font-options-list">
                 {FONT_OPTIONS.map((font) => (
                   <button
@@ -1121,11 +1069,9 @@ export default function JournalEditor() {
     <section
       className={`writing-desk-wrap ${modoFoco ? "is-focus-mode" : ""}`}
       id="mesa-de-escrita"
-      aria-label="Mesa de Escrita e Correspondência"
+      aria-label="Writing Desk and Correspondence"
     >
-      {/* ============================================================ */}
-      {/* BARRA SUPERIOR DO MODO FOCO (TELA ESCURA, SOMENTE PAPEL E MENU) */}
-      {/* ============================================================ */}
+      {/* Top Bar for Focus Mode */}
       {modoFoco && (
         <div className="focus-mode-topbar">
           <button
@@ -1135,11 +1081,11 @@ export default function JournalEditor() {
               setModoFoco(false);
               playPaperSound();
             }}
-            title="Sair do Modo Foco (Esc)"
-            aria-label="Sair do Modo Foco"
+            title="Exit Focus Mode (Esc)"
+            aria-label="Exit Focus Mode"
           >
             <EyeIcon className="focus-mode-eye-icon" filled={true} />
-            <span>Sair do Foco</span>
+            <span>Exit Focus</span>
           </button>
 
           <div className="focus-mode-menu-container">
@@ -1149,12 +1095,9 @@ export default function JournalEditor() {
       )}
 
       <div className={`writing-desk-container ${activeTab === "carta" ? "is-mode-carta" : ""}`}>
-        {/* ============================================================ */}
-        {/* COLUNA ESQUERDA: CADERNO 3D (OU SELOS) + BOTÃO SALVAR PÁGINA */}
-        {/* ============================================================ */}
+        {/* Left Column: Notebook / Seals / Save Button */}
         <div className="desk-left-col">
           {activeTab === "caderno" ? (
-            /* Modo Caderno: Lombada e Capa em Couro Nobre ou Card Convidativo de Criação */
             <div className="caderno-left-stack">
               {activeNotebook ? (
                 <div
@@ -1165,12 +1108,12 @@ export default function JournalEditor() {
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Clique para alternar ou criar novos cadernos"
+                  title="Click to switch or create new journals"
                 >
                   <div className="leather-notebook-ribbon" aria-hidden="true" />
-                  <span className="leather-notebook-tag">TOMO DE REGISTRO</span>
+                  <span className="leather-notebook-tag">RECORD VOLUME</span>
                   <span className="leather-notebook-title">{activeNotebook.nome}</span>
-                  <span className="leather-notebook-author">{user?.nome || "ARQUIVO PESSOAL"}</span>
+                  <span className="leather-notebook-author">{user?.nome || "PERSONAL ARCHIVE"}</span>
                 </div>
               ) : (
                 <div
@@ -1181,16 +1124,15 @@ export default function JournalEditor() {
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Clique para criar seu primeiro tomo/caderno"
+                  title="Click to create your first volume"
                 >
                   <div className="leather-notebook-ribbon" aria-hidden="true" />
-                  <span className="leather-notebook-tag">ESTANTE VAZIA</span>
-                  <span className="leather-notebook-title">+ CRIAR CADERNO</span>
-                  <span className="leather-notebook-author">CLIQUE PARA INICIAR</span>
+                  <span className="leather-notebook-tag">EMPTY SHELF</span>
+                  <span className="leather-notebook-title">+ CREATE JOURNAL</span>
+                  <span className="leather-notebook-author">CLICK TO BEGIN</span>
                 </div>
               )}
 
-              {/* Botão de Modo Foco abaixo do caderno (com ícone de olho) */}
               <button
                 type="button"
                 className="focus-mode-trigger-btn"
@@ -1198,15 +1140,14 @@ export default function JournalEditor() {
                   setModoFoco(true);
                   playPaperSound();
                 }}
-                title="Ativar Modo Foco (tela escura, foco total na folha e menu)"
-                aria-label="Ativar Modo Foco"
+                title="Activate Focus Mode (dark screen, total focus on paper and menu)"
+                aria-label="Activate Focus Mode"
               >
                 <EyeIcon className="focus-mode-eye-icon" />
-                <span>MODO FOCO</span>
+                <span>FOCUS MODE</span>
               </button>
             </div>
           ) : (
-            /* Modo Carta: Suporte de Pasta Postal de Destino + Selos */
             <div className="carta-left-column-inner">
               {activeLetterFolder ? (
                 <div
@@ -1217,18 +1158,18 @@ export default function JournalEditor() {
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Clique para escolher em qual pasta arquivar esta carta ou criar uma nova pasta"
+                  title="Click to choose a folder for this letter or create a new folder"
                 >
                   <div className="postal-folder-selector-top">
-                    <span className="postal-folder-tag">ARQUIVAR NA PASTA</span>
-                    <span className="postal-folder-change-badge">Trocar ▾</span>
+                    <span className="postal-folder-tag">FILE IN FOLDER</span>
+                    <span className="postal-folder-change-badge">Change ▾</span>
                   </div>
                   <div className="postal-folder-title-row">
                     <span className="postal-folder-icon" aria-hidden="true">📁</span>
                     <span className="postal-folder-name">{activeLetterFolder.nome}</span>
                   </div>
                   <div className="postal-folder-quota-line">
-                    {letterFolders.length}/{isPro ? 10 : 3} pastas criadas ({isPro ? "Premium" : "Normal"})
+                    {letterFolders.length}/{isPro ? 10 : 3} folders created ({isPro ? "Premium" : "Standard"})
                   </div>
                 </div>
               ) : (
@@ -1240,26 +1181,26 @@ export default function JournalEditor() {
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Clique para criar sua primeira pasta postal"
+                  title="Click to create your first postal folder"
                 >
                   <div className="postal-folder-selector-top">
-                    <span className="postal-folder-tag">ARQUIVO POSTAL</span>
-                    <span className="postal-folder-change-badge">+ Criar</span>
+                    <span className="postal-folder-tag">POSTAL ARCHIVE</span>
+                    <span className="postal-folder-change-badge">+ Create</span>
                   </div>
                   <div className="postal-folder-title-row">
                     <span className="postal-folder-icon" aria-hidden="true">📁</span>
-                    <span className="postal-folder-name">+ Criar Pasta Postal</span>
+                    <span className="postal-folder-name">+ Create Postal Folder</span>
                   </div>
                   <div className="postal-folder-quota-line">
-                    0/{isPro ? 10 : 3} pastas criadas ({isPro ? "Premium" : "Normal"})
+                    0/{isPro ? 10 : 3} folders created ({isPro ? "Premium" : "Standard"})
                   </div>
                 </div>
               )}
 
               <div className="postal-seals-card">
                 <div className="postal-seals-header">
-                  <span>ARQUIVO POSTAL</span>
-                  <small>Classificação sóbria</small>
+                  <span>POSTAL ARCHIVE</span>
+                  <small>Sober classification</small>
                 </div>
                 <div className="postal-seals-grid">
                   {SEAL_OPTIONS.map((seal) => (
@@ -1272,7 +1213,7 @@ export default function JournalEditor() {
                         setCartaSelo(seal);
                         playPaperSound();
                       }}
-                      title={`Selo de ${seal.label}`}
+                      title={`Seal of ${seal.label}`}
                     >
                       <span className="seal-choice-code">{seal.code}</span>
                       <span className="seal-choice-label">{seal.label}</span>
@@ -1283,25 +1224,21 @@ export default function JournalEditor() {
             </div>
           )}
 
-          {/* Botão Salvar na quina inferior esquerda (dinâmico entre Caderno e Carta) */}
           <div className="desk-left-bottom">
             <button
               type="button"
               className="sober-save-btn"
               onClick={salvarPagina}
               disabled={salvando}
-              title={activeTab === "caderno" ? "Salvar página no caderno" : "Salvar carta na pasta selecionada"}
+              title={activeTab === "caderno" ? "Save page in journal" : "Save letter in selected folder"}
             >
-              {salvando ? "SALVANDO..." : (activeTab === "carta" ? "SALVAR CARTA" : "SALVAR PÁGINA")}
+              {salvando ? "SAVING..." : (activeTab === "carta" ? "SAVE LETTER" : "SAVE JOURNAL PAGE")}
             </button>
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* COLUNA CENTRAL: ABAS DE TOPO + PALCO DA FOLHA COM SETAS ← →  */}
-        {/* ============================================================ */}
+        {/* Center Column: Top Tabs + Ruled / Letter Paper */}
         <div className="desk-center-col">
-          {/* Abas no Topo da Folha */}
           <div className="notebook-tabs-container">
             <button
               type="button"
@@ -1311,7 +1248,7 @@ export default function JournalEditor() {
                 playPaperSound();
               }}
             >
-              Caderno
+              Journal
             </button>
             <button
               type="button"
@@ -1322,25 +1259,22 @@ export default function JournalEditor() {
                 playPaperSound();
               }}
             >
-              Carta
+              Letter
             </button>
           </div>
 
-          {/* Palco com Setas Flutuantes ← e → */}
           <div className="sheet-stage-wrapper">
-            {/* Seta Esquerda ← */}
             <button
               type="button"
               className="sheet-nav-arrow sheet-nav-arrow--left"
               onClick={navegarAnterior}
               disabled={activeTab === "carta" || currentPageIndex === 0}
-              title="Página anterior (←)"
-              aria-label="Página anterior"
+              title="Previous page (←)"
+              aria-label="Previous page"
             >
               ←
             </button>
 
-            {/* Folha Física Central (mais comprida e no tamanho de um caderno real) */}
             <motion.div
               key={activeTab}
               className={`writing-sheet-card ${activeTab === "caderno" ? "mode-caderno" : "mode-carta"}`}
@@ -1354,28 +1288,23 @@ export default function JournalEditor() {
               transition={{ duration: 0.25 }}
             >
               {activeTab === "caderno" ? (
-                /* ======================================= */
-                /* CONTEÚDO NO MODO CADERNO                */
-                /* ======================================= */
                 <div className="caderno-content-inner">
-                  {/* Cabeçalho automático com data por extenso (ocupando exatamente a linha 1) */}
                   <div className="caderno-date-line">
-                    <span>{dataFormatada || "Sexta-feira, 23 de outubro de 2026"}</span>
+                    <span>{dataFormatada || "Friday, October 23, 2026"}</span>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                       {isSheetFull(conteudo, textareaRef.current) && (
                         <span style={{ fontSize: "10px", color: "#8b1e1e", fontWeight: 700, letterSpacing: "0.08em" }}>
-                          FOLHA COMPLETA
+                          PAGE FULL
                         </span>
                       )}
                       {paginasCaderno.length > 1 && (
                         <small className="caderno-page-counter">
-                          página {currentPageIndex + 1} de {paginasCaderno.length}
+                          page {currentPageIndex + 1} of {paginasCaderno.length}
                         </small>
                       )}
                     </div>
                   </div>
 
-                  {/* Campo de Título opcional em negrito (ocupando exatamente a linha 2) */}
                   <input
                     type="text"
                     className="caderno-title-input"
@@ -1384,10 +1313,9 @@ export default function JournalEditor() {
                       setTitulo(e.target.value);
                       atualizarRascunhoAtual(undefined, e.target.value);
                     }}
-                    placeholder="(Título opcional)"
+                    placeholder="(Optional title)"
                   />
 
-                  {/* Textarea onde o texto senta exatamente sobre as linhas da folha */}
                   <textarea
                     ref={textareaRef}
                     className="caderno-textarea-ruled"
@@ -1396,44 +1324,39 @@ export default function JournalEditor() {
                     onKeyDown={handleKeyDown}
                     onPaste={handlePaste}
                     onKeyUp={handleKeyUp}
-                    placeholder="Escreva aqui suas palavras..."
+                    placeholder="Write your words here..."
                     rows={MAX_LINES_PER_PAGE}
                   />
 
-                  {/* Quina Inferior Direita: Ação sutil de carimbo FAVORITAR ♥ */}
                   <div className="caderno-bottom-corner">
                     <motion.button
                       type="button"
                       className={`classic-stamp-favorite ${favoritado ? "is-favorited" : ""}`}
                       onClick={toggleFavorito}
                       whileTap={{ scale: 0.95 }}
-                      title="Marcar como favorita"
+                      title="Stamp as favorite"
                     >
-                      {favoritado ? "FAVORITADO ♥" : "FAVORITAR ♥"}
+                      {favoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
                     </motion.button>
                   </div>
                 </div>
               ) : (
-                /* ======================================= */
-                /* CONTEÚDO NO MODO CARTA                  */
-                /* ======================================= */
                 <div className="carta-content-inner">
-                  {/* Selo Postal de arquivo afixado na quina superior direita com carimbo postal sóbrio */}
                   <div className="affixed-postage-stamp" style={{ "--stamp-color": cartaSelo.color } as any}>
                     <div className="stamp-perforations">
                       <span className="stamp-symbol">{cartaSelo.code}</span>
                       <span className="stamp-text">{cartaSelo.label}</span>
-                      <span className="stamp-denomination">BR • ARQUIVO</span>
+                      <span className="stamp-denomination">US • ARCHIVE</span>
                     </div>
                     <div className="postmark-circle" aria-hidden="true">
-                      <span>ENTRE CARTAS</span>
-                      <small>CORREIO HISTÓRICO</small>
+                      <span>BETWEEN LETTERS</span>
+                      <small>HISTORICAL MAIL</small>
                     </div>
                   </div>
 
                   <div className="carta-top-meta">
                     <span className="carta-date">{dataFormatada}</span>
-                    <span className="carta-sentiment-badge">Classificação: {cartaSelo.label}</span>
+                    <span className="carta-sentiment-badge">Classification: {cartaSelo.label}</span>
                   </div>
 
                   <input
@@ -1441,36 +1364,35 @@ export default function JournalEditor() {
                     className="carta-recipient-input"
                     value={titulo}
                     onChange={(e) => setTitulo(e.target.value)}
-                    placeholder="Para: (ou título solene da correspondência)"
+                    placeholder="To: (or formal title of correspondence)"
                   />
 
                   <textarea
                     className="carta-textarea-unruled"
                     value={conteudo}
                     onChange={(e) => setConteudo(e.target.value)}
-                    placeholder="Escreva a sua carta aqui..."
+                    placeholder="Write your letter here..."
                     rows={12}
                   />
 
                   <div className="carta-footer-meta">
                     <span className="carta-seal-status">
-                      Selo postal: <b>{cartaSelo.label}</b>
+                      Postal seal: <b>{cartaSelo.label}</b>
                     </span>
                     <motion.button
                       type="button"
                       className={`classic-stamp-favorite ${favoritado ? "is-favorited" : ""}`}
                       onClick={toggleFavorito}
                       whileTap={{ scale: 0.95 }}
-                      title="Marcar como favorita"
+                      title="Stamp as favorite"
                     >
-                      {favoritado ? "FAVORITADO ♥" : "FAVORITAR ♥"}
+                      {favoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
                     </motion.button>
                   </div>
                 </div>
               )}
             </motion.div>
 
-            {/* Seta Direita → */}
             <button
               type="button"
               className="sheet-nav-arrow sheet-nav-arrow--right"
@@ -1478,39 +1400,34 @@ export default function JournalEditor() {
               disabled={activeTab === "carta"}
               title={
                 currentPageIndex === paginasCaderno.length - 1
-                  ? "Avançar para uma nova página em branco (→)"
-                  : "Próxima página (→)"
+                  ? "Advance to a new blank page (→)"
+                  : "Next page (→)"
               }
-              aria-label="Próxima página"
+              aria-label="Next page"
             >
               →
             </button>
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* COLUNA DIREITA: MENU ▾, PUXAR INSPIRAÇÃO E TEMA SALVO        */}
-        {/* ============================================================ */}
+        {/* Right Column: Menu, Pull Inspiration, Pinned Theme */}
         <div className="desk-right-col">
           <div className="desk-right-tools">
-            {/* Botão Superior Direito Menu ▾ (quando não está no modo foco) */}
             {!modoFoco && renderCustomizationMenu(false)}
 
-            {/* Botão de Puxar Inspiração (sem emoji) */}
             <button
               type="button"
               className="inspire-trigger-btn"
               onClick={sortearInspiracao}
-              title="Puxar um tema inspirador do acervo"
+              title="Pull an inspiring theme from the archive"
             >
-              <span>Puxar Inspiração</span>
+              <span>Pull Inspiration</span>
             </button>
 
-            {/* Tema Salvo/Fixado logo abaixo do botão (somente a frase) */}
             {temaSalvo && (
               <div className="pinned-theme-box">
                 <div className="pinned-theme-top">
-                  <span className="pinned-theme-label">TEMA DE HOJE</span>
+                  <span className="pinned-theme-label">TODAY&apos;S THEME</span>
                   <button
                     type="button"
                     className="pinned-theme-clear"
@@ -1520,7 +1437,7 @@ export default function JournalEditor() {
                         window.localStorage.removeItem(PINNED_THEME_STORAGE_KEY);
                       } catch {}
                     }}
-                    title="Remover tema"
+                    title="Remove theme"
                   >
                     ✕
                   </button>
@@ -1532,9 +1449,7 @@ export default function JournalEditor() {
         </div>
       </div>
 
-      {/* ============================================================ */}
-      {/* MODAL / GAVETA DE CADERNOS (CLIQUE NA CAPA DO CADERNO)       */}
-      {/* ============================================================ */}
+      {/* Notebook Drawer */}
       <AnimatePresence>
         {notebookDrawerOpen && (
           <div
@@ -1560,25 +1475,24 @@ export default function JournalEditor() {
                   setCadernoPromptNotice(null);
                   setPendingSaveAfterCreation(false);
                 }}
-                title="Fechar"
+                title="Close"
               >
                 ✕
               </button>
-              <h3 className="drawer-title">Estante de Cadernos</h3>
+              <h3 className="drawer-title">Journal Shelf</h3>
               <p className="drawer-subtitle">
-                Selecione um caderno para escrever ou inicie um novo tomo de registro.
+                Select a journal to write in or start a new record volume.
                 <br />
                 <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", letterSpacing: "0.06em", color: "#8a6b2d", fontWeight: 700, textTransform: "uppercase" }}>
-                  Cota: {notebooks.length}/{isPro ? 10 : 3} cadernos ({isPro ? "Plano Premium" : "Plano Normal"})
+                  Quota: {notebooks.length}/{isPro ? 10 : 3} journals ({isPro ? "Premium Plan" : "Standard Plan"})
                 </span>
               </p>
 
-              {/* Alerta quando o usuário tenta salvar sem ter criado um caderno antes */}
               {cadernoPromptNotice && (
                 <div className="drawer-mandatory-alert">
                   <span className="drawer-alert-icon">⚠️</span>
                   <div className="drawer-alert-body">
-                    <strong>Criação Obrigatória:</strong>
+                    <strong>Mandatory Creation:</strong>
                     <span>{cadernoPromptNotice}</span>
                   </div>
                 </div>
@@ -1587,9 +1501,9 @@ export default function JournalEditor() {
               <div className="notebooks-list">
                 {notebooks.length === 0 ? (
                   <div className="drawer-empty-state-hint">
-                    <span className="empty-hint-title">Nenhum caderno criado ainda.</span>
+                    <span className="empty-hint-title">No journals created yet.</span>
                     <p className="empty-hint-text">
-                      Dê um nome ao seu tomo no campo abaixo para criá-lo e arquivar sua página com segurança.
+                      Name your volume below to create it and archive your page safely.
                     </p>
                   </div>
                 ) : (
@@ -1602,10 +1516,10 @@ export default function JournalEditor() {
                       <div>
                         <span className="notebook-item-name">{nb.nome}</span>
                         <div className="notebook-item-count">
-                          {nb.paginas?.length || 1} {(nb.paginas?.length || 1) === 1 ? "página" : "páginas"}
+                          {nb.paginas?.length || 1} {(nb.paginas?.length || 1) === 1 ? "page" : "pages"}
                         </div>
                       </div>
-                      {activeNotebook?.id === nb.id && <span style={{ color: "#8b1e1e", fontWeight: 700 }}>✓ Ativo</span>}
+                      {activeNotebook?.id === nb.id && <span style={{ color: "#8b1e1e", fontWeight: 700 }}>✓ Active</span>}
                     </div>
                   ))
                 )}
@@ -1615,14 +1529,14 @@ export default function JournalEditor() {
                 <input
                   type="text"
                   className="new-notebook-input"
-                  placeholder="Nome do novo caderno (ex: Diário, Memórias)..."
+                  placeholder="Name of new journal (e.g., Diary, Memoirs)..."
                   value={newNotebookTitle}
                   onChange={(e) => setNewNotebookTitle(e.target.value)}
                   maxLength={50}
                   autoFocus
                 />
                 <button type="submit" className="new-notebook-btn">
-                  + Criar Caderno
+                  + Create Journal
                 </button>
               </form>
             </motion.div>
@@ -1630,9 +1544,7 @@ export default function JournalEditor() {
         )}
       </AnimatePresence>
 
-      {/* ============================================================ */}
-      {/* MODAL / GAVETA DE PASTAS DE CARTA (CLIQUE NA PASTA)          */}
-      {/* ============================================================ */}
+      {/* Folder Drawer */}
       <AnimatePresence>
         {folderDrawerOpen && (
           <div
@@ -1658,25 +1570,24 @@ export default function JournalEditor() {
                   setFolderPromptNotice(null);
                   setPendingSaveAfterCreation(false);
                 }}
-                title="Fechar"
+                title="Close"
               >
                 ✕
               </button>
-              <h3 className="drawer-title">Pastas de Correspondências</h3>
+              <h3 className="drawer-title">Correspondence Folders</h3>
               <p className="drawer-subtitle">
-                Selecione em qual pasta arquivar suas cartas ou crie uma nova pasta física.
+                Select which folder to file your letters in or create a new physical folder.
                 <br />
                 <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", letterSpacing: "0.06em", color: "#8a6b2d", fontWeight: 700, textTransform: "uppercase" }}>
-                  Cota: {letterFolders.length}/{isPro ? 10 : 3} pastas ({isPro ? "Plano Premium" : "Plano Normal"})
+                  Quota: {letterFolders.length}/{isPro ? 10 : 3} folders ({isPro ? "Premium Plan" : "Standard Plan"})
                 </span>
               </p>
 
-              {/* Alerta quando o usuário tenta arquivar sem ter criado uma pasta antes */}
               {folderPromptNotice && (
                 <div className="drawer-mandatory-alert">
                   <span className="drawer-alert-icon">⚠️</span>
                   <div className="drawer-alert-body">
-                    <strong>Criação Obrigatória:</strong>
+                    <strong>Mandatory Creation:</strong>
                     <span>{folderPromptNotice}</span>
                   </div>
                 </div>
@@ -1685,9 +1596,9 @@ export default function JournalEditor() {
               <div className="notebooks-list">
                 {letterFolders.length === 0 ? (
                   <div className="drawer-empty-state-hint">
-                    <span className="empty-hint-title">Nenhuma pasta criada ainda.</span>
+                    <span className="empty-hint-title">No folders created yet.</span>
                     <p className="empty-hint-text">
-                      Dê um nome à sua pasta no campo abaixo para criá-la e arquivar sua carta com segurança.
+                      Name your folder below to create it and safely archive your letter.
                     </p>
                   </div>
                 ) : (
@@ -1706,10 +1617,10 @@ export default function JournalEditor() {
                     >
                       <div>
                         <span className="notebook-item-name">📁 {fld.nome}</span>
-                        <div className="notebook-item-count">Pasta física de correspondências</div>
+                        <div className="notebook-item-count">Physical correspondence folder</div>
                       </div>
                       {activeLetterFolder?.id === fld.id && (
-                        <span style={{ color: "#8b1e1e", fontWeight: 700 }}>✓ Selecionada</span>
+                        <span style={{ color: "#8b1e1e", fontWeight: 700 }}>✓ Selected</span>
                       )}
                     </div>
                   ))
@@ -1720,14 +1631,14 @@ export default function JournalEditor() {
                 <input
                   type="text"
                   className="new-notebook-input"
-                  placeholder="Nome da nova pasta (ex: Confissões, Segredos)..."
+                  placeholder="Name of new folder (e.g., Confessions, Secrets)..."
                   value={newFolderTitle}
                   onChange={(e) => setNewFolderTitle(e.target.value)}
                   maxLength={40}
                   autoFocus
                 />
                 <button type="submit" className="new-notebook-btn">
-                  + Criar Pasta
+                  + Create Folder
                 </button>
               </form>
             </motion.div>
@@ -1735,9 +1646,7 @@ export default function JournalEditor() {
         )}
       </AnimatePresence>
 
-      {/* ============================================================ */}
-      {/* MODAL DE INSPIRAÇÃO DE ESCRITA                               */}
-      {/* ============================================================ */}
+      {/* Writing Inspiration Modal */}
       <AnimatePresence>
         {inspiracaoModal && cartaInspiracao && (
           <div className="inspiration-modal-backdrop" onClick={() => setInspiracaoModal(false)}>
@@ -1750,7 +1659,7 @@ export default function JournalEditor() {
             >
               <Tape className="modal-tape" />
               <div className="modal-top">
-                <span className="modal-kicker">INSPIRAÇÃO DO ACERVO</span>
+                <span className="modal-kicker">ARCHIVE INSPIRATION</span>
                 <button
                   type="button"
                   className="modal-close-btn"
@@ -1761,12 +1670,12 @@ export default function JournalEditor() {
               </div>
 
               <div className="inspiration-prompt-box">
-                <small className="prompt-label">PROMPT DE ESCRITA</small>
+                <small className="prompt-label">WRITING PROMPT</small>
                 <p className="prompt-text">“{promptTexto}”</p>
               </div>
 
               <div className="inspiration-letter-excerpt">
-                <span className="excerpt-label">Trecho de “{cartaInspiracao.title}”:</span>
+                <span className="excerpt-label">Excerpt from “{cartaInspiracao.title}”:</span>
                 <blockquote>“{cartaInspiracao.excerpt}”</blockquote>
                 <span className="excerpt-author">— {cartaInspiracao.sender}</span>
               </div>
@@ -1777,7 +1686,7 @@ export default function JournalEditor() {
                   className="btn-shuffle-inspire"
                   onClick={sortearInspiracao}
                 >
-                  Puxar outra carta
+                  Pull another letter
                 </button>
 
                 <button
@@ -1785,7 +1694,7 @@ export default function JournalEditor() {
                   className="primary-cta"
                   onClick={aplicarInspiracao}
                 >
-                  <span>Escrever sobre este tema</span>
+                  <span>Write about this theme</span>
                 </button>
               </div>
             </motion.div>
@@ -1793,7 +1702,7 @@ export default function JournalEditor() {
         )}
       </AnimatePresence>
 
-      {/* Toast Feedback (sem emojis) */}
+      {/* Toast Feedback */}
       <AnimatePresence>
         {mensagemSucesso && (
           <motion.div

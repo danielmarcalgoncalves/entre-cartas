@@ -4,7 +4,7 @@ type EnvelopeProps = { type?: "envelope" | "postcard" | "crumpled"; seal?: boole
 
 export function Envelope({ type = "envelope", seal = true, label }: EnvelopeProps) {
   return (
-    <div className={`envelope-art ${type}`} aria-label={label ?? "Correspondência de papel"} role="img">
+    <div className={`envelope-art ${type}`} aria-label={label ?? "Paper correspondence"} role="img">
       <div className="envelope-face" />
       {seal && <span className="envelope-seal" aria-hidden="true">✦</span>}
     </div>
@@ -15,8 +15,8 @@ export function Stamp({ label, tone = "red" }: { label: string; tone?: "red" | "
   return <span className={`stamp-mark ${tone}`}>{label}</span>;
 }
 
-export function WaxSeal({ mark = "E" }: { mark?: string }) {
-  return <span className="wax-seal" aria-label="Lacre de cera">{mark}</span>;
+export function WaxSeal({ mark = "BL" }: { mark?: string }) {
+  return <span className="wax-seal" aria-label="Wax seal">{mark}</span>;
 }
 
 export function Tape({ className = "" }: { className?: string }) {
@@ -27,10 +27,10 @@ export function Sticker({ children, className = "" }: { children: ReactNode; cla
   return <span className={`sticker ${className}`}>{children}</span>;
 }
 
-export function Polaroid({ caption = "um instante guardado" }: { caption?: string }) {
+export function Polaroid({ caption = "a preserved moment" }: { caption?: string }) {
   return (
     <figure className="polaroid">
-      <div className="polaroid-photo" aria-label="Ilustração decorativa de uma paisagem antiga" role="img">
+      <div className="polaroid-photo" aria-label="Decorative illustration of a serene landscape" role="img">
         <svg viewBox="0 0 180 120" fill="none" aria-hidden="true">
           <rect width="180" height="120" fill="#cfc1a8" />
           <circle cx="130" cy="31" r="17" fill="#e5d7bd" />

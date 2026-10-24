@@ -4,28 +4,28 @@ import PersonalJournalShelf from "@/components/PersonalJournalShelf";
 export default function HomePage() {
   return (
     <div className="home-journal-experience">
-      {/* 1. Cabeçalho Poético do Diário Pessoal */}
+      {/* 1. Poetic Header for Personal Journal */}
       <section className="journal-intro" aria-labelledby="home-hero-title">
         <h1 id="home-hero-title">
-          Um refúgio para <em>o seu dia.</em>
+          A sanctuary for <em>your day.</em>
         </h1>
         <p className="journal-intro-sub">
-          Assente suas palavras em cadernos encadernados ou sele cartas solenes ao abrigo do tempo.
+          Rest your thoughts in hardbound journals or seal thoughtful letters sheltered from time.
         </p>
       </section>
 
-      {/* 2. O Editor do Jornal Digital (Mesa de Escrita Editorial) */}
+      {/* 2. Digital Journal Editor (Editorial Writing Desk) */}
       <JournalEditor />
 
-      {/* 3. Estante Pessoal: Meus Cadernos (Tomos Inteiros), Sala de Leitura Escura e Pasta de Cartas */}
+      {/* 3. Personal Shelf: My Journals, Reading Room, and Letters Archive */}
       <PersonalJournalShelf />
 
-      {/* 4. Nota Final Poética de Gabinete */}
-      <section className="closing-note" aria-label="Uma nota para o autor">
+      {/* 4. Poetic Closing Note */}
+      <section className="closing-note" aria-label="A note for the author">
         <span className="closing-note__ornament" aria-hidden="true">❧</span>
-        <p>Algumas palavras encontram seu verdadeiro lugar no silêncio do papel.</p>
+        <p>Some words find their true home in the silence of paper.</p>
         <span className="closing-note__sign">
-          — Entre Cartas <span aria-hidden="true">✦</span>
+          — Between Letters <span aria-hidden="true">✦</span>
         </span>
       </section>
     </div>

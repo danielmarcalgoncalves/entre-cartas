@@ -7,16 +7,16 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Entre Cartas — Jornal Digital & Arquivo de Sentimentos",
-    template: "%s · Entre Cartas",
+    default: "Between Letters — Digital Journal & Archive of Sentiments",
+    template: "%s · Between Letters",
   },
   description:
-    "Um refúgio vintage e acolhedor para escrever seu diário pessoal e colecionar memórias reais.",
+    "A vintage, intimate sanctuary for personal journaling and keeping genuine memories.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="en">
       <body>
         <AuthProvider>
           <ArchiveProvider>

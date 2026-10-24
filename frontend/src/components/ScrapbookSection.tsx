@@ -10,7 +10,7 @@ type ScrapbookSectionProps = {
   className?: string;
 };
 
-export default function ScrapbookSection({ eyebrow, title, children, href, linkLabel = "Ver o arquivo", className = "" }: ScrapbookSectionProps) {
+export default function ScrapbookSection({ eyebrow, title, children, href, linkLabel = "View archive", className = "" }: ScrapbookSectionProps) {
   return (
     <section className={`section-block ${className}`}>
       <div className="section-heading">

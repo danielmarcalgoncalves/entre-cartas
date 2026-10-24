@@ -15,11 +15,11 @@ export default function DiscoverPage() {
   return (
     <div className="page-shell">
       <header className="page-heading">
-        <span className="eyebrow">Arquivo aberto · encontre seu caminho</span>
-        <h1 className="display-title">Descobrir cartas</h1>
-        <p className="page-intro">Cada envelope guarda um pedaço de vida. Procure por uma palavra, escolha uma categoria ou abra o que chamar sua atenção.</p>
+        <span className="eyebrow">Open archive · find your path</span>
+        <h1 className="display-title">Discover Letters</h1>
+        <p className="page-intro">Every envelope holds a piece of life. Search for a word, choose a category, or open whatever catches your eye.</p>
       </header>
-      <Suspense fallback={<p className="page-intro">Abrindo o arquivo de correspondências...</p>}>
+      <Suspense fallback={<p className="page-intro">Opening the correspondence archive...</p>}>
         <SearchableShelf />
       </Suspense>
     </div>

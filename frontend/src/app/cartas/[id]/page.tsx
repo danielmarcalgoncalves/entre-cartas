@@ -14,7 +14,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: LetterPageProps): Promise<Metadata> {
   const { id } = await params;
   const letter = getLetter(id);
-  return letter ? { title: `${letter.title} — Entre Cartas`, description: letter.excerpt } : { title: "Carta não encontrada" };
+  return letter ? { title: `${letter.title} — Between Letters`, description: letter.excerpt } : { title: "Letter not found" };
 }
 
 export default async function CartaPage({ params }: LetterPageProps) {

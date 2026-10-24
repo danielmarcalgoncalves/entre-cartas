@@ -14,7 +14,7 @@ export default function RandomLetterButton() {
         router.push(`/letter/${letter.id}`);
       }}
     >
-      Abrir uma carta aleatória <span className="arrow" aria-hidden="true">↗</span>
+      Open a random letter <span className="arrow" aria-hidden="true">↗</span>
     </button>
   );
 }

@@ -10,7 +10,7 @@ export default function LetterViewer({ letter }: { letter: Letter }) {
     <div className="page-shell">
       <div className="letter-layout">
         <article>
-          <Link href="/discover" className="letter-detail-back">← Voltar ao arquivo de cartas</Link>
+          <Link href="/discover" className="letter-detail-back">← Back to letter archive</Link>
           <div className="letter-paper">
             <span className="tape" aria-hidden="true" />
             <header className="letter-meta">
@@ -29,11 +29,11 @@ export default function LetterViewer({ letter }: { letter: Letter }) {
             </div>
           </div>
         </article>
-        <aside className="letter-side" aria-label="Anotações do arquivo">
-          <WaxSeal mark="E" />
-          <Sticker>encontrada entre outras lembranças</Sticker>
+        <aside className="letter-side" aria-label="Archive notes">
+          <WaxSeal mark="BL" />
+          <Sticker>found among other memories</Sticker>
           <span className="stamp-mark blue">{letter.sender}</span>
-          <span className="hand-note">“guardei para você”</span>
+          <span className="hand-note">“kept for you”</span>
         </aside>
       </div>
     </div>

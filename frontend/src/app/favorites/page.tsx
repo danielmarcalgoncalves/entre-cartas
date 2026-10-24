@@ -11,18 +11,18 @@ export default function FavoritesPage() {
   return (
     <div className="page-shell">
       <header className="page-heading">
-        <span className="eyebrow">Carimbo vermelho · palavras que ficam</span>
-        <h1 className="display-title">Cartas favoritas</h1>
-        <p className="page-intro">As cartas que você carimbou ficam reunidas aqui, prontas para serem lidas outra vez.</p>
+        <span className="eyebrow">Red ink stamp · words that endure</span>
+        <h1 className="display-title">Favorite Letters</h1>
+        <p className="page-intro">The letters you have stamped remain gathered here, ready to be read once more.</p>
       </header>
       {saved.length ? (
         <div className="letter-grid">{saved.map((letter) => <LetterCard key={letter.id} letter={letter} />)}</div>
       ) : (
         <div className="not-found-paper">
-          <span className="stamp-mark">FUTURA FAVORITA</span>
-          <h2 className="section-title" style={{ marginTop: 20 }}>Ainda não há carimbos nesta página.</h2>
-          <p className="page-intro" style={{ margin: "12px auto 22px" }}>Quando uma carta tocar você, carimbe-a como favorita. Ela aparecerá nesta pequena prateleira.</p>
-          <Link href="/discover" className="text-link">Encontrar uma carta ↗</Link>
+          <span className="stamp-mark">FUTURE FAVORITE</span>
+          <h2 className="section-title" style={{ marginTop: 20 }}>No stamps on this page yet.</h2>
+          <p className="page-intro" style={{ margin: "12px auto 22px" }}>When a letter touches you, stamp it as a favorite. It will appear on this quiet shelf.</p>
+          <Link href="/discover" className="text-link">Find a letter ↗</Link>
         </div>
       )}
     </div>

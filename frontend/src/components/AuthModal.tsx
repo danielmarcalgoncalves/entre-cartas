@@ -37,23 +37,23 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
         const res = await register(nome, email, senha);
         if (res.requireVerification) {
           setMode("otp");
-          setSuccess("Código de confirmação enviado para o seu e-mail!");
+          setSuccess("Confirmation code sent to your email!");
         } else {
-          setSuccess("Conta criada com sucesso! Faça login.");
+          setSuccess("Account created successfully! Please sign in.");
           setMode("login");
         }
       } else if (mode === "otp") {
         await api.auth.verifyEmail(email, codigoOtp);
-        setSuccess("E-mail confirmado com sucesso! Entrando...");
+        setSuccess("Email confirmed successfully! Signing in...");
         await login(email, senha);
         onClose();
       }
     } catch (err: any) {
       if (err.requireVerification) {
         setMode("otp");
-        setError("Por favor, valide o código de 6 dígitos enviado ao seu e-mail.");
+        setError("Please enter the 6-digit verification code sent to your email.");
       } else {
-        setError(err.message || "Ocorreu um erro. Tente novamente.");
+        setError(err.message || "An error occurred. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -93,10 +93,10 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "18px" }}>
           <div>
             <span className="eyebrow">
-              {mode === "login" ? "Identificação de leitor" : mode === "register" ? "Novo remetente" : "Confirmação de selo"}
+              {mode === "login" ? "Reader Identification" : mode === "register" ? "New Sender" : "Seal Confirmation"}
             </span>
             <h2 className="section-title" style={{ marginTop: "6px", fontSize: "28px" }}>
-              {mode === "login" ? "Entrar na caixa" : mode === "register" ? "Criar meu acervo" : "Validar e-mail"}
+              {mode === "login" ? "Sign in to Archive" : mode === "register" ? "Create My Drawer" : "Verify Email"}
             </h2>
           </div>
           <button
@@ -150,14 +150,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
           {mode === "register" && (
             <div>
               <label className="object-kind" style={{ display: "block", marginBottom: "4px" }}>
-                Seu nome ou pseudônimo
+                Your name or pen name
               </label>
               <input
                 type="text"
                 required
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: Clara ou Leitor Misterioso"
+                placeholder="E.g., Clara or Quiet Reader"
                 style={{
                   width: "100%",
                   padding: "9px 12px",
@@ -175,14 +175,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
             <>
               <div>
                 <label className="object-kind" style={{ display: "block", marginBottom: "4px" }}>
-                  E-mail
+                  Email address
                 </label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
+                  placeholder="you@email.com"
                   style={{
                     width: "100%",
                     padding: "9px 12px",
@@ -197,7 +197,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
 
               <div>
                 <label className="object-kind" style={{ display: "block", marginBottom: "4px" }}>
-                  Senha secreta
+                  Secret password
                 </label>
                 <input
                   type="password"
@@ -222,7 +222,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
           {mode === "otp" && (
             <div>
               <label className="object-kind" style={{ display: "block", marginBottom: "4px" }}>
-                Código de 6 dígitos recebido por e-mail
+                6-digit code received by email
               </label>
               <input
                 type="text"
@@ -252,14 +252,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
             className="primary-cta"
             style={{ width: "100%", marginTop: "10px", minHeight: "44px" }}
           >
-            {loading ? "Processando..." : mode === "login" ? "Entrar" : mode === "register" ? "Criar conta" : "Confirmar e entrar"}
+            {loading ? "Processing..." : mode === "login" ? "Sign In" : mode === "register" ? "Create Account" : "Confirm and Enter"}
           </button>
         </form>
 
         <div style={{ marginTop: "18px", textAlign: "center", borderTop: "1px solid rgba(73, 58, 39, 0.15)", paddingTop: "14px" }}>
           {mode === "login" ? (
             <p className="page-intro" style={{ margin: 0, fontSize: "12px" }}>
-              Ainda não tem uma caixa de memórias?{" "}
+              Don&apos;t have a memory box yet?{" "}
               <button
                 type="button"
                 onClick={() => {
@@ -269,12 +269,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
                 className="text-link"
                 style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "13px" }}
               >
-                Cadastre-se aqui
+                Sign up here
               </button>
             </p>
           ) : (
             <p className="page-intro" style={{ margin: 0, fontSize: "12px" }}>
-              Já possui cadastro?{" "}
+              Already registered?{" "}
               <button
                 type="button"
                 onClick={() => {
@@ -284,7 +284,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = "login" }: Au
                 className="text-link"
                 style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "13px" }}
               >
-                Entrar com minha conta
+                Sign in with my account
               </button>
             </p>
           )}

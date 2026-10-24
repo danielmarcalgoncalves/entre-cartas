@@ -40,7 +40,7 @@ export function Polaroid({ src, alt, caption, className = "" }: { src?: string; 
   return (
     <figure className={`polaroid ${className}`}>
       <div className="polaroid__image">
-        {src ? <img src={src} alt={alt || "Fotografia polaroid"} /> : <div className="polaroid__placeholder"><span>📷</span><small>foto do dia</small></div>}
+        {src ? <img src={src} alt={alt || "Polaroid photograph"} /> : <div className="polaroid__placeholder"><span>📷</span><small>photo of the day</small></div>}
       </div>
       {caption && <figcaption>{caption}</figcaption>}
     </figure>
@@ -67,7 +67,7 @@ export function ScrapbookSection({
   title,
   children,
   href,
-  linkLabel = "Ver o arquivo",
+  linkLabel = "View archive",
 }: {
   eyebrow: string;
   title: string;
@@ -115,7 +115,7 @@ export function Folder({
       <span className="folder__line" />
       <span className="folder__label">{label}</span>
       <span className="folder__note">{note}</span>
-      <span className="folder__count">{count} {count === 1 ? "carta" : "cartas"}</span>
+      <span className="folder__count">{count} {count === 1 ? "letter" : "letters"}</span>
       <span className="folder__corner" aria-hidden="true">✦</span>
     </Link>
   );
@@ -149,7 +149,7 @@ export function LetterCard({ letter, compact = false }: { letter: Letter; compac
                 animate={{ scale: 1, rotate: -11, opacity: 1 }}
                 exit={{ scale: 0.7, opacity: 0 }}
               >
-                <Stamp className="archive-paper-stamp">ARQUIVADA</Stamp>
+                <Stamp className="archive-paper-stamp">ARCHIVED</Stamp>
               </motion.span>
             )}
           </AnimatePresence>
@@ -166,17 +166,17 @@ export function LetterCard({ letter, compact = false }: { letter: Letter; compac
           className={`archive-action ${saved ? "is-archived" : ""}`}
           type="button"
           onClick={() => toggleSaved(letter.id)}
-          aria-label={saved ? `Remover ${letter.title} do arquivo` : `Arquivar ${letter.title}`}
+          aria-label={saved ? `Remove ${letter.title} from archive` : `Archive ${letter.title}`}
           aria-pressed={saved}
         >
           <AnimatePresence mode="wait" initial={false}>
             {saved ? (
               <motion.span key="saved" className="archive-action__label" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Retirar <span aria-hidden="true">↶</span>
+                Remove <span aria-hidden="true">↶</span>
               </motion.span>
             ) : (
               <motion.span key="save" className="archive-action__label" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Guardar <span aria-hidden="true">↗</span>
+                Save <span aria-hidden="true">↗</span>
               </motion.span>
             )}
           </AnimatePresence>

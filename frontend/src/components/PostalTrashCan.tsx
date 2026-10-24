@@ -22,8 +22,8 @@ export default function PostalTrashCan({
       onClick={onClick}
       role="button"
       tabIndex={0}
-      aria-label="Lixeira Postal. Arraste uma carta aqui para descartar. Clique para ver cartas descartadas."
-      title="Lixeira Postal: Arraste uma carta aqui para descartar. Clique para abrir o acervo e restaurar cartas."
+      aria-label="Postal Archive Bin. Drag a letter here to discard. Click to view discarded letters."
+      title="Postal Archive Bin: Drag a letter here to discard. Click to open discarded letters and restore them."
     >
       {/* Sombra de chão vintage no papel */}
       <div className="postal-trash-floor-shadow" />
@@ -181,7 +181,7 @@ export default function PostalTrashCan({
             <circle cx="45" cy="3" r="0.9" fill="#2d2008" />
             <circle cx="3" cy="15" r="0.9" fill="#2d2008" />
             <circle cx="45" cy="15" r="0.9" fill="#2d2008" />
-            {/* Texto editorial na placa */}
+            {/* Editorial text on plaque */}
             <text
               x="24"
               y="8"
@@ -192,7 +192,7 @@ export default function PostalTrashCan({
               fontFamily="serif"
               letterSpacing="0.08em"
             >
-              LIXEIRA POSTAL
+              POSTAL DISCARDS
             </text>
             <text
               x="24"
@@ -203,7 +203,7 @@ export default function PostalTrashCan({
               fontStyle="italic"
               fontFamily="serif"
             >
-              N° 1892 · DESCARTES
+              NO. 1892 · ARCHIVE
             </text>
           </g>
 
@@ -291,14 +291,14 @@ export default function PostalTrashCan({
         {isOpen && <div className="postal-trash-target-glow" />}
       </div>
 
-      {/* Rótulo e indicador de interação */}
+      {/* Label and interaction indicator */}
       <div className="postal-trash-info">
-        <span className="postal-trash-title">LIXEIRA POSTAL</span>
+        <span className="postal-trash-title">POSTAL DISCARDS</span>
         <span className="postal-trash-count">
-          {count} {count === 1 ? "carta guardada" : "cartas guardadas"}
+          {count} {count === 1 ? "letter inside" : "letters inside"}
         </span>
         <span className={`postal-trash-hint ${isOpen ? "is-active" : ""}`}>
-          {isOpen ? "Solte para descartar!" : "Arraste uma carta aqui"}
+          {isOpen ? "Drop to discard!" : "Drag a letter here"}
         </span>
       </div>
     </div>

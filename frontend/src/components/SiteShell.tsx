@@ -8,11 +8,11 @@ import { useAuth } from "@/hooks/useAuth";
 import AuthModal from "@/components/AuthModal";
 
 const navItems = [
-  { href: "/", label: "Meu Diário" },
-  { href: "/discover", label: "Inspirações" },
-  { href: "/favorites", label: "Favoritas" },
-  { href: "/collections", label: "Pastas" },
-  { href: "/clube-pro", label: "Clube Pro" },
+  { href: "/", label: "My Journal" },
+  { href: "/discover", label: "Inspirations" },
+  { href: "/favorites", label: "Favorites" },
+  { href: "/collections", label: "Folders" },
+  { href: "/clube-pro", label: "Pro Club" },
 ];
 
 export default function SiteShell({ children }: { children: ReactNode }) {
@@ -23,20 +23,20 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   return (
     <div className="site-wrap">
       <div className="top-note">
-        Jornal digital acolhedor para escrever seu dia e guardar sentimentos
-        {isPro && <span style={{ marginLeft: "12px", color: "#e8c569" }}>✦ Remetente Pro</span>}
+        An intimate digital journal to write your day and cherish memories
+        {isPro && <span style={{ marginLeft: "12px", color: "#e8c569" }}>✦ Pro Sender</span>}
       </div>
       <header className="site-header">
         <div className="nav-inner">
-          <Link href="/" className="brand" aria-label="Entre Cartas, página inicial">
-            <span className="brand-seal" aria-hidden="true">EC</span>
+          <Link href="/" className="brand" aria-label="Between Letters, home page">
+            <span className="brand-seal" aria-hidden="true">BL</span>
             <span>
-              <span className="brand-title">Entre Cartas</span>
-              <span className="brand-caption">arquivo de sentimentos</span>
+              <span className="brand-title">Between Letters</span>
+              <span className="brand-caption">archive of sentiments</span>
             </span>
           </Link>
 
-          <nav className="nav-links" aria-label="Navegação principal">
+          <nav className="nav-links" aria-label="Main navigation">
             {navItems.map((item) => {
               const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
@@ -49,14 +49,14 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             <form className="header-search" action="/discover" method="get" role="search">
-              <input name="q" aria-label="Buscar cartas" placeholder="buscar no arquivo" />
-              <button type="submit" aria-label="Buscar">⌕</button>
+              <input name="q" aria-label="Search letters" placeholder="search archive..." />
+              <button type="submit" aria-label="Search">⌕</button>
             </form>
 
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span className="stamp-mark" style={{ minWidth: "auto", padding: "3px 8px", fontSize: "7px", transform: "rotate(-3deg)" }}>
-                  {isPro ? "PRO" : "LEITOR"}
+                  {isPro ? "PRO" : "READER"}
                 </span>
                 <span style={{ fontSize: "11px", color: "#5b5348", maxWidth: "90px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {user.nome.split(" ")[0]}
@@ -74,9 +74,9 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                     letterSpacing: "0.08em",
                     padding: "2px 4px",
                   }}
-                  title="Sair da conta"
+                  title="Sign out of account"
                 >
-                  Sair
+                  Sign Out
                 </button>
               </div>
             ) : (
@@ -86,7 +86,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                 className="stamp-button compact"
                 style={{ minWidth: "auto" }}
               >
-                Entrar
+                Sign In
               </button>
             )}
           </div>
@@ -98,12 +98,12 @@ export default function SiteShell({ children }: { children: ReactNode }) {
       <footer className="site-footer">
         <div className="footer-inner">
           <div>
-            <div className="footer-brand">Entre Cartas</div>
-            <div className="footer-note">Para tudo aquilo que ainda encontra palavras.</div>
+            <div className="footer-brand">Between Letters</div>
+            <div className="footer-note">For everything that still finds words.</div>
           </div>
           <div className="footer-meta">
-            Um pequeno arquivo de memórias anônimas.<br />
-            Feito para ler devagar, guardar com cuidado e voltar quando der saudade.<br />
+            A small archive of anonymous memories.<br />
+            Crafted to read slowly, keep tenderly, and return to whenever longing strikes.<br />
             <span style={{ opacity: 0.75, display: "inline-block", marginTop: "4px" }}>
               ISW055 · Fatec Pompeia · Prof. @siriani
             </span>
