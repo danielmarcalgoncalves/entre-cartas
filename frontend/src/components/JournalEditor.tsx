@@ -64,6 +64,46 @@ export interface Notebook {
   paginas: NotebookPage[];
 }
 
+export type NotebookCoverColor = "marrom" | "verde" | "vinho";
+
+export interface NotebookCoverOption {
+  id: NotebookCoverColor;
+  nome: string;
+  imagem: string;
+  corHex: string;
+  etiqueta: string;
+}
+
+export const NOTEBOOK_COVER_OPTIONS: NotebookCoverOption[] = [
+  {
+    id: "marrom",
+    nome: "Marrom",
+    imagem: "/images/cadernos/marrom.png",
+    corHex: "#452e22",
+    etiqueta: "Couro Rústico",
+  },
+  {
+    id: "verde",
+    nome: "Verde",
+    imagem: "/images/cadernos/verde.png",
+    corHex: "#223826",
+    etiqueta: "Musgo Botânico",
+  },
+  {
+    id: "vinho",
+    nome: "Vinho",
+    imagem: "/images/cadernos/vinho.png",
+    corHex: "#441a24",
+    etiqueta: "Borgonha Nobre",
+  },
+];
+
+export const getNotebookCoverImage = (corCapa?: string): string => {
+  if (corCapa === "verde" || corCapa === "#1e3323") return "/images/cadernos/verde.png";
+  if (corCapa === "vinho" || corCapa === "#3b161e") return "/images/cadernos/vinho.png";
+  return "/images/cadernos/marrom.png";
+};
+
 export interface PostalSeal {
   id: string;
   label: string;
@@ -165,13 +205,21 @@ export default function JournalEditor() {
   const [currentPageIndex, setCurrentPageIndex] = useState<number>(0);
   const [notebookDrawerOpen, setNotebookDrawerOpen] = useState(false);
   const [newNotebookTitle, setNewNotebookTitle] = useState("");
+  const [newNotebookCover, setNewNotebookCover] = useState<NotebookCoverColor>("marrom");
   const [cadernoPromptNotice, setCadernoPromptNotice] = useState<string | null>(null);
 
-  // Active content
-  const [titulo, setTitulo] = useState("");
-  const [conteudo, setConteudo] = useState("");
+  // Separated content: Caderno (Journal)
+  const [cadernoTitulo, setCadernoTitulo] = useState("");
+  const [cadernoConteudo, setCadernoConteudo] = useState("");
+  const [cadernoFavoritado, setCadernoFavoritado] = useState(false);
+  const [cadernoPaginas, setCadernoPaginas] = useState<NotebookPage[]>([]);
+
+  // Separated content: Carta (Letter)
+  const [cartaTitulo, setCartaTitulo] = useState("");
+  const [cartaConteudo, setCartaConteudo] = useState("");
+  const [cartaFavoritado, setCartaFavoritado] = useState(false);
+
   const [dataFormatada, setDataFormatada] = useState("");
-  const [favoritado, setFavoritado] = useState(false);
 
   // Letter Mode Seal
   const [cartaSelo, setCartaSelo] = useState<PostalSeal>(SEAL_OPTIONS[0]);
@@ -252,8 +300,15 @@ export default function JournalEditor() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modoFoco]);
 
+  const hasInitialLoadedRef = useRef(false);
+  const activeNotebookIdRef = useRef(activeNotebookId);
+  activeNotebookIdRef.current = activeNotebookId;
+
   // Initialize notebooks and folders from LocalStorage
-  const carregarCadernosEPastas = () => {
+  const carregarCadernosEPastas = (event?: any) => {
+    // Se o evento foi disparado pelo próprio editor, não precisamos recarregar nada
+    if (event?.detail?.source === "editor") return;
+
     try {
       const stored = window.localStorage.getItem(NOTEBOOKS_STORAGE_KEY);
       if (stored) {
@@ -264,24 +319,57 @@ export default function JournalEditor() {
           );
           setNotebooks(userOnlyNotebooks);
 
-          if (userOnlyNotebooks.length > 0) {
-            const savedActiveId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
-            const targetActiveId = userOnlyNotebooks.some((n: Notebook) => n.id === savedActiveId)
-              ? (savedActiveId as string)
-              : userOnlyNotebooks[0].id;
-            setActiveNotebookId(targetActiveId);
+          const currentId = activeNotebookIdRef.current;
+          const notebookAindaExiste = userOnlyNotebooks.some((n: Notebook) => n.id === currentId);
 
-            const active = userOnlyNotebooks.find((n: Notebook) => n.id === targetActiveId) || userOnlyNotebooks[0];
-            if (active && active.paginas && active.paginas[0]) {
-              setTitulo(active.paginas[0].titulo || "");
-              setConteudo(active.paginas[0].conteudo || "");
-              setFavoritado(Boolean(active.paginas[0].favoritado));
+          if (!hasInitialLoadedRef.current || !notebookAindaExiste) {
+            hasInitialLoadedRef.current = true;
+            if (userOnlyNotebooks.length > 0) {
+              const savedActiveId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
+              const targetActiveId = userOnlyNotebooks.some((n: Notebook) => n.id === savedActiveId)
+                ? (savedActiveId as string)
+                : userOnlyNotebooks[0].id;
+              setActiveNotebookId(targetActiveId);
+
+              const active = userOnlyNotebooks.find((n: Notebook) => n.id === targetActiveId) || userOnlyNotebooks[0];
+              const paginasEscritas = (active?.paginas || []).filter(
+                (p: NotebookPage) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
+              );
+              const writtenPages =
+                paginasEscritas.length > 0
+                  ? paginasEscritas
+                  : [
+                      {
+                        id: "pag-" + Date.now(),
+                        titulo: "",
+                        conteudo: "",
+                        dataFormatada: dataFormatada || "Today",
+                        favoritado: false,
+                        criadoEm: new Date().toISOString(),
+                      },
+                    ];
+              setCadernoPaginas(writtenPages);
+              setCurrentPageIndex(0);
+              setCadernoTitulo(writtenPages[0]?.titulo || "");
+              setCadernoConteudo(writtenPages[0]?.conteudo || "");
+              setCadernoFavoritado(Boolean(writtenPages[0]?.favoritado));
+            } else {
+              setActiveNotebookId("");
+              setCadernoPaginas([
+                {
+                  id: "pag-init",
+                  titulo: "",
+                  conteudo: "",
+                  dataFormatada: dataFormatada || "Today",
+                  favoritado: false,
+                  criadoEm: new Date().toISOString(),
+                },
+              ]);
+              setCurrentPageIndex(0);
+              setCadernoTitulo("");
+              setCadernoConteudo("");
+              setCadernoFavoritado(false);
             }
-          } else {
-            setActiveNotebookId("");
-            setTitulo("");
-            setConteudo("");
-            setFavoritado(false);
           }
         }
       } else {
@@ -339,13 +427,26 @@ export default function JournalEditor() {
 
       const targetNb = notebooks.find((n) => n.id === notebookId);
       if (targetNb && targetNb.paginas) {
-        const idx = typeof pageIndex === "number" && targetNb.paginas[pageIndex] ? pageIndex : 0;
+        const paginas = targetNb.paginas.length > 0
+          ? targetNb.paginas
+          : [
+              {
+                id: "pag-" + Date.now(),
+                titulo: "",
+                conteudo: "",
+                dataFormatada: "Today",
+                favoritado: false,
+                criadoEm: new Date().toISOString(),
+              },
+            ];
+        setCadernoPaginas(paginas);
+        const idx = typeof pageIndex === "number" && paginas[pageIndex] ? pageIndex : 0;
         setCurrentPageIndex(idx);
-        const pag = targetNb.paginas[idx];
+        const pag = paginas[idx];
         if (pag) {
-          setTitulo(pag.titulo || "");
-          setConteudo(pag.conteudo || "");
-          setFavoritado(Boolean(pag.favoritado));
+          setCadernoTitulo(pag.titulo || "");
+          setCadernoConteudo(pag.conteudo || "");
+          setCadernoFavoritado(Boolean(pag.favoritado));
         }
       }
 
@@ -371,46 +472,192 @@ export default function JournalEditor() {
     notebooks.find((n) => n.id === activeNotebookId) ||
     (notebooks.length > 0 ? notebooks[0] : null);
 
-  const paginasCaderno = activeNotebook?.paginas || [];
+  const paginasCaderno = cadernoPaginas.length > 0 ? cadernoPaginas : (activeNotebook?.paginas || []);
 
-  const carregarPagina = (index: number, nb: Notebook | null = activeNotebook) => {
-    if (!nb || !nb.paginas || nb.paginas.length === 0) return;
-    const pag = nb.paginas[index];
+  const carregarPagina = (index: number, lista: NotebookPage[] = cadernoPaginas) => {
+    if (!lista || lista.length === 0) return;
+    const pag = lista[index];
     if (pag) {
       setCurrentPageIndex(index);
-      setTitulo(pag.titulo || "");
-      setConteudo(pag.conteudo || "");
-      setFavoritado(Boolean(pag.favoritado));
+      setCadernoTitulo(pag.titulo || "");
+      setCadernoConteudo(pag.conteudo || "");
+      setCadernoFavoritado(Boolean(pag.favoritado));
       playPaperSound();
     }
   };
 
-  const atualizarRascunhoAtual = (novoTexto?: string, novoTitulo?: string, novoFav?: boolean) => {
-    if (activeTab !== "caderno" || !activeNotebook) return;
-    const textoSalvar = novoTexto !== undefined ? novoTexto : conteudo;
-    const tituloSalvar = novoTitulo !== undefined ? novoTitulo : titulo;
-    const favSalvar = novoFav !== undefined ? novoFav : favoritado;
+  // REGRA CRÍTICA: Somente salva no caderno as páginas ESCRITAS!
+  // Caso tenha 1 página escrita e 2 vazias, o contador em tela pode marcar 3 páginas,
+  // porém a única salva no caderno é a que está escrita.
+  const salvarCadernosNoStorage = (paginasAtuais: NotebookPage[]) => {
+    if (!activeNotebook) return;
 
-    const notebooksAtualizados = notebooks.map((nb) => {
+    const paginasEscritas = paginasAtuais.filter(
+      (p) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
+    );
+
+    const atualizados = notebooks.map((nb) => {
       if (nb.id === activeNotebook.id) {
-        const paginas = [...nb.paginas];
-        if (paginas[currentPageIndex]) {
-          paginas[currentPageIndex] = {
-            ...paginas[currentPageIndex],
-            titulo: tituloSalvar,
-            conteudo: textoSalvar,
-            favoritado: favSalvar,
-          };
-        }
-        return { ...nb, paginas };
+        return {
+          ...nb,
+          paginas: paginasEscritas,
+        };
       }
       return nb;
     });
 
-    setNotebooks(notebooksAtualizados);
+    setNotebooks(atualizados);
     try {
-      window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(notebooksAtualizados));
+      window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(atualizados));
     } catch {}
+
+    window.dispatchEvent(
+      new CustomEvent(JOURNAL_UPDATED_EVENT, { detail: { source: "editor" } })
+    );
+  };
+
+  const salvarCadernoAtualNoStorage = () => {
+    if (!activeNotebook) return;
+    const copy = [...cadernoPaginas];
+    if (copy[currentPageIndex]) {
+      copy[currentPageIndex] = {
+        ...copy[currentPageIndex],
+        titulo: cadernoTitulo,
+        conteudo: cadernoConteudo,
+        favoritado: cadernoFavoritado,
+      };
+    }
+    salvarCadernosNoStorage(copy);
+  };
+
+  const atualizarRascunhoCaderno = (novoTexto?: string, novoTitulo?: string, novoFav?: boolean) => {
+    if (!activeNotebook) return;
+    const textoSalvar = novoTexto !== undefined ? novoTexto : cadernoConteudo;
+    const tituloSalvar = novoTitulo !== undefined ? novoTitulo : cadernoTitulo;
+    const favSalvar = novoFav !== undefined ? novoFav : cadernoFavoritado;
+
+    setCadernoPaginas((prev) => {
+      const copy = [...prev];
+      if (copy[currentPageIndex]) {
+        copy[currentPageIndex] = {
+          ...copy[currentPageIndex],
+          titulo: tituloSalvar,
+          conteudo: textoSalvar,
+          favoritado: favSalvar,
+        };
+      }
+      salvarCadernosNoStorage(copy);
+      return copy;
+    });
+  };
+
+  const mudarAba = (novaAba: "caderno" | "carta") => {
+    if (novaAba === activeTab) return;
+    playPaperSound();
+
+    if (activeTab === "caderno") {
+      salvarCadernoAtualNoStorage();
+    }
+
+    setActiveTab(novaAba);
+    if (novaAba === "carta") {
+      setModoFoco(false);
+    }
+  };
+
+  // NOVA REGRA DE AVANÇO (Solicitada pelo usuário):
+  // O usuário pode avançar sempre 3 páginas, independente se está escrita ou não a atual,
+  // sempre conferir que ele consiga avançar somente 3 páginas após uma que esteja escrita.
+  const ultimoIndiceEscrito = (() => {
+    let ultimo = -1;
+    cadernoPaginas.forEach((pag, idx) => {
+      const isCurrent = idx === currentPageIndex;
+      const texto = isCurrent ? cadernoConteudo : (pag.conteudo || "");
+      const titulo = isCurrent ? cadernoTitulo : (pag.titulo || "");
+      if (texto.trim().length > 0 || titulo.trim().length > 0) {
+        if (idx > ultimo) ultimo = idx;
+      }
+    });
+    if (cadernoConteudo.trim().length > 0 || cadernoTitulo.trim().length > 0) {
+      if (currentPageIndex > ultimo) ultimo = currentPageIndex;
+    }
+    return ultimo;
+  })();
+
+  // Se nenhuma página foi escrita ainda, a base é 0 (pode avançar até o índice 3, total de 4 páginas).
+  // Se alguma página foi escrita, pode avançar até 3 páginas à frente da última escrita.
+  const maxAllowedIndex = (ultimoIndiceEscrito >= 0 ? ultimoIndiceEscrito : 0) + 3;
+  const podeAvancarPagina = currentPageIndex < maxAllowedIndex;
+
+  const navegarAnterior = () => {
+    if (activeTab === "carta") return;
+    if (currentPageIndex <= 0) return;
+
+    const paginasAtuais = [...cadernoPaginas];
+    if (paginasAtuais[currentPageIndex]) {
+      paginasAtuais[currentPageIndex] = {
+        ...paginasAtuais[currentPageIndex],
+        titulo: cadernoTitulo,
+        conteudo: cadernoConteudo,
+        favoritado: cadernoFavoritado,
+      };
+    }
+
+    const anteriorIndex = currentPageIndex - 1;
+    setCadernoPaginas(paginasAtuais);
+    setCurrentPageIndex(anteriorIndex);
+    const antPag = paginasAtuais[anteriorIndex];
+    setCadernoTitulo(antPag?.titulo || "");
+    setCadernoConteudo(antPag?.conteudo || "");
+    setCadernoFavoritado(Boolean(antPag?.favoritado));
+    playPaperSound();
+    salvarCadernosNoStorage(paginasAtuais);
+  };
+
+  const navegarProximo = () => {
+    if (activeTab === "carta") return;
+    if (!podeAvancarPagina) return;
+
+    const paginasAtuais = [...cadernoPaginas];
+    if (paginasAtuais[currentPageIndex]) {
+      paginasAtuais[currentPageIndex] = {
+        ...paginasAtuais[currentPageIndex],
+        titulo: cadernoTitulo,
+        conteudo: cadernoConteudo,
+        favoritado: cadernoFavoritado,
+      };
+    }
+
+    const proximoIndex = currentPageIndex + 1;
+
+    if (proximoIndex < paginasAtuais.length) {
+      setCadernoPaginas(paginasAtuais);
+      setCurrentPageIndex(proximoIndex);
+      const proxPag = paginasAtuais[proximoIndex];
+      setCadernoTitulo(proxPag?.titulo || "");
+      setCadernoConteudo(proxPag?.conteudo || "");
+      setCadernoFavoritado(Boolean(proxPag?.favoritado));
+      playPaperSound();
+      salvarCadernosNoStorage(paginasAtuais);
+    } else {
+      const novaPagina: NotebookPage = {
+        id: "pag-" + Date.now(),
+        titulo: "",
+        conteudo: "",
+        dataFormatada: dataFormatada || "Hoje",
+        favoritado: false,
+        criadoEm: new Date().toISOString(),
+      };
+
+      const novasPaginas = [...paginasAtuais, novaPagina];
+      setCadernoPaginas(novasPaginas);
+      setCurrentPageIndex(proximoIndex);
+      setCadernoTitulo("");
+      setCadernoConteudo("");
+      setCadernoFavoritado(false);
+      playPaperSound();
+      salvarCadernosNoStorage(novasPaginas);
+    }
   };
 
   const avancarParaProximaPaginaComTexto = (textoExcedente: string, textoAtualPreenchido?: string) => {
@@ -423,49 +670,38 @@ export default function JournalEditor() {
       return;
     }
 
-    const textoAtual = textoAtualPreenchido !== undefined ? textoAtualPreenchido : conteudo;
-    const tituloAtual = titulo;
+    const textoAtual = textoAtualPreenchido !== undefined ? textoAtualPreenchido : cadernoConteudo;
+    const tituloAtual = cadernoTitulo;
 
-    if (currentPageIndex < paginasCaderno.length - 1) {
+    const paginasAtualizadas = [...cadernoPaginas];
+    if (paginasAtualizadas[currentPageIndex]) {
+      paginasAtualizadas[currentPageIndex] = {
+        ...paginasAtualizadas[currentPageIndex],
+        titulo: tituloAtual,
+        conteudo: textoAtual,
+        favoritado: cadernoFavoritado,
+      };
+    }
+
+    if (currentPageIndex < paginasAtualizadas.length - 1) {
       const proximoIndex = currentPageIndex + 1;
-      const proximaPag = paginasCaderno[proximoIndex];
+      const proximaPag = paginasAtualizadas[proximoIndex];
       const textoFinalProxima = textoExcedente
         ? (proximaPag.conteudo ? textoExcedente + "\n" + proximaPag.conteudo : textoExcedente)
         : proximaPag.conteudo;
 
-      const notebooksAtualizados = notebooks.map((nb) => {
-        if (nb.id === activeNotebook.id) {
-          const paginas = [...nb.paginas];
-          if (paginas[currentPageIndex]) {
-            paginas[currentPageIndex] = {
-              ...paginas[currentPageIndex],
-              titulo: tituloAtual,
-              conteudo: textoAtual,
-              favoritado: favoritado,
-            };
-          }
-          paginas[proximoIndex] = {
-            ...paginas[proximoIndex],
-            conteudo: textoFinalProxima,
-          };
-          return { ...nb, paginas };
-        }
-        return nb;
-      });
+      paginasAtualizadas[proximoIndex] = {
+        ...proximaPag,
+        conteudo: textoFinalProxima,
+      };
 
-      setNotebooks(notebooksAtualizados);
+      setCadernoPaginas(paginasAtualizadas);
       setCurrentPageIndex(proximoIndex);
-      setTitulo(proximaPag.titulo || "");
-      setConteudo(textoFinalProxima);
-      setFavoritado(Boolean(proximaPag.favoritado));
+      setCadernoTitulo(proximaPag.titulo || "");
+      setCadernoConteudo(textoFinalProxima);
+      setCadernoFavoritado(Boolean(proximaPag.favoritado));
 
-      try {
-        window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(notebooksAtualizados));
-      } catch {}
-
-      window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
-      setMensagemSucesso("Previous page saved automatically.");
-      setTimeout(() => setMensagemSucesso(""), 2200);
+      salvarCadernosNoStorage(paginasAtualizadas);
     } else {
       const novaPagina: NotebookPage = {
         id: "pag-" + Date.now(),
@@ -476,38 +712,14 @@ export default function JournalEditor() {
         criadoEm: new Date().toISOString(),
       };
 
-      const notebooksAtualizados = notebooks.map((nb) => {
-        if (nb.id === activeNotebook.id) {
-          const paginas = [...nb.paginas];
-          if (paginas[currentPageIndex]) {
-            paginas[currentPageIndex] = {
-              ...paginas[currentPageIndex],
-              titulo: tituloAtual,
-              conteudo: textoAtual,
-              favoritado: favoritado,
-            };
-          }
-          return {
-            ...nb,
-            paginas: [...paginas, novaPagina],
-          };
-        }
-        return nb;
-      });
+      const novasPaginas = [...paginasAtualizadas, novaPagina];
+      setCadernoPaginas(novasPaginas);
+      setCurrentPageIndex(novasPaginas.length - 1);
+      setCadernoTitulo("");
+      setCadernoConteudo(textoExcedente);
+      setCadernoFavoritado(false);
 
-      setNotebooks(notebooksAtualizados);
-      setCurrentPageIndex(paginasCaderno.length);
-      setTitulo("");
-      setConteudo(textoExcedente);
-      setFavoritado(false);
-
-      try {
-        window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(notebooksAtualizados));
-      } catch {}
-
-      window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
-      setMensagemSucesso("Completed page saved automatically.");
-      setTimeout(() => setMensagemSucesso(""), 2200);
+      salvarCadernosNoStorage(novasPaginas);
     }
 
     setTimeout(() => {
@@ -554,7 +766,7 @@ export default function JournalEditor() {
       return;
     }
 
-    const folhaCheia = isSheetFull(conteudo, textarea);
+    const folhaCheia = isSheetFull(cadernoConteudo, textarea);
 
     if (folhaCheia) {
       e.preventDefault();
@@ -569,9 +781,9 @@ export default function JournalEditor() {
     if (!pastedText) return;
 
     const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? conteudo.length;
-    const end = textarea?.selectionEnd ?? conteudo.length;
-    const textoProjetado = conteudo.slice(0, start) + pastedText + conteudo.slice(end);
+    const start = textarea?.selectionStart ?? cadernoConteudo.length;
+    const end = textarea?.selectionEnd ?? cadernoConteudo.length;
+    const textoProjetado = cadernoConteudo.slice(0, start) + pastedText + cadernoConteudo.slice(end);
 
     const linhas = textoProjetado.split("\n");
     if (linhas.length > MAX_LINES_PER_PAGE || textoProjetado.length > MAX_CHARS_PER_PAGE) {
@@ -588,41 +800,47 @@ export default function JournalEditor() {
         textoExcedente = textoProjetado.slice(MAX_CHARS_PER_PAGE);
       }
 
-      setConteudo(textoQueCabe);
-      atualizarRascunhoAtual(textoQueCabe);
+      setCadernoConteudo(textoQueCabe);
+      atualizarRascunhoCaderno(textoQueCabe);
       avancarParaProximaPaginaComTexto(textoExcedente);
     }
   };
 
-  const handleConteudoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleCadernoTituloChange = (novoTitulo: string) => {
+    setCadernoTitulo(novoTitulo);
+    atualizarRascunhoCaderno(undefined, novoTitulo);
+  };
+
+  const handleCadernoConteudoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const novoTexto = e.target.value;
+    const linhas = novoTexto.split("\n");
 
-    if (activeTab === "caderno") {
-      const linhas = novoTexto.split("\n");
+    if (linhas.length > MAX_LINES_PER_PAGE) {
+      const linhasPaginaAtual = linhas.slice(0, MAX_LINES_PER_PAGE).join("\n");
+      const linhasExcedentes = linhas.slice(MAX_LINES_PER_PAGE).join("\n");
 
-      if (linhas.length > MAX_LINES_PER_PAGE) {
-        const linhasPaginaAtual = linhas.slice(0, MAX_LINES_PER_PAGE).join("\n");
-        const linhasExcedentes = linhas.slice(MAX_LINES_PER_PAGE).join("\n");
-
-        setConteudo(linhasPaginaAtual);
-        atualizarRascunhoAtual(linhasPaginaAtual);
-        avancarParaProximaPaginaComTexto(linhasExcedentes);
-        return;
-      }
-
-      if (novoTexto.length > MAX_CHARS_PER_PAGE) {
-        const textoPaginaAtual = novoTexto.slice(0, MAX_CHARS_PER_PAGE);
-        const textoExcedente = novoTexto.slice(MAX_CHARS_PER_PAGE);
-
-        setConteudo(textoPaginaAtual);
-        atualizarRascunhoAtual(textoPaginaAtual);
-        avancarParaProximaPaginaComTexto(textoExcedente);
-        return;
-      }
+      setCadernoConteudo(linhasPaginaAtual);
+      atualizarRascunhoCaderno(linhasPaginaAtual);
+      avancarParaProximaPaginaComTexto(linhasExcedentes);
+      return;
     }
 
-    setConteudo(novoTexto);
-    atualizarRascunhoAtual(novoTexto);
+    if (novoTexto.length > MAX_CHARS_PER_PAGE) {
+      const textoPaginaAtual = novoTexto.slice(0, MAX_CHARS_PER_PAGE);
+      const textoExcedente = novoTexto.slice(MAX_CHARS_PER_PAGE);
+
+      setCadernoConteudo(textoPaginaAtual);
+      atualizarRascunhoCaderno(textoPaginaAtual);
+      avancarParaProximaPaginaComTexto(textoExcedente);
+      return;
+    }
+
+    setCadernoConteudo(novoTexto);
+    atualizarRascunhoCaderno(novoTexto);
+  };
+
+  const handleCartaConteudoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCartaConteudo(e.target.value);
   };
 
   const handleKeyUp = () => {
@@ -637,58 +855,73 @@ export default function JournalEditor() {
         const ultimaPalavra = palavras.pop() || "";
         const textoQueCabe = palavras.join(" ");
 
-        setConteudo(textoQueCabe);
-        atualizarRascunhoAtual(textoQueCabe);
+        setCadernoConteudo(textoQueCabe);
+        atualizarRascunhoCaderno(textoQueCabe);
         avancarParaProximaPaginaComTexto(ultimaPalavra);
       }
     }
   };
 
-  const navegarAnterior = () => {
-    if (activeTab === "carta") return;
-    if (currentPageIndex > 0) {
-      atualizarRascunhoAtual();
-      carregarPagina(currentPageIndex - 1);
-    }
-  };
-
-  const navegarProximo = () => {
-    if (activeTab === "carta") return;
-    atualizarRascunhoAtual();
-
-    if (currentPageIndex < paginasCaderno.length - 1) {
-      carregarPagina(currentPageIndex + 1);
-    } else {
-      avancarParaProximaPaginaComTexto("");
-    }
-  };
-
-  const toggleFavorito = () => {
+  const toggleFavoritoCaderno = () => {
     playPaperSound();
-    const novoStatus = !favoritado;
-    setFavoritado(novoStatus);
-    atualizarRascunhoAtual(undefined, undefined, novoStatus);
+    const novoStatus = !cadernoFavoritado;
+    setCadernoFavoritado(novoStatus);
+    atualizarRascunhoCaderno(undefined, undefined, novoStatus);
+  };
+
+  const toggleFavoritoCarta = () => {
+    playPaperSound();
+    setCartaFavoritado(!cartaFavoritado);
   };
 
   const salvarPagina = async () => {
-    if (!conteudo.trim() && !titulo.trim()) {
-      alert("Please write at least a few words before archiving.");
-      return;
-    }
-
     if (activeTab === "caderno") {
+      if (!cadernoConteudo.trim() && !cadernoTitulo.trim()) {
+        alert("Por favor, escreva algo na página antes de salvar.");
+        return;
+      }
+
       if (!activeNotebook) {
-        setCadernoPromptNotice("You must create a journal before saving your page.");
+        setCadernoPromptNotice("Você precisa criar um caderno antes de salvar a página.");
         setPendingSaveAfterCreation(true);
         setNotebookDrawerOpen(true);
         playPaperSound();
         return;
       }
+
+      setSalvando(true);
+      playPaperSound();
+
+      const tituloFinal = cadernoTitulo.trim() || `Memória de ${dataFormatada || "Hoje"}`;
+      setCadernoTitulo(tituloFinal);
+
+      const paginasAtualizadas = [...cadernoPaginas];
+      if (paginasAtualizadas[currentPageIndex]) {
+        paginasAtualizadas[currentPageIndex] = {
+          ...paginasAtualizadas[currentPageIndex],
+          titulo: tituloFinal,
+          conteudo: cadernoConteudo.trim(),
+          favoritado: cadernoFavoritado,
+        };
+      }
+      setCadernoPaginas(paginasAtualizadas);
+
+      salvarCadernosNoStorage(paginasAtualizadas);
+
+      setSalvando(false);
+      setMensagemSucesso(`Página salva com sucesso no caderno "${activeNotebook.nome}"!`);
+      setTimeout(() => setMensagemSucesso(""), 3000);
+      return;
     }
 
     if (activeTab === "carta") {
+      if (!cartaConteudo.trim() && !cartaTitulo.trim()) {
+        alert("Por favor, escreva sua carta antes de arquivar.");
+        return;
+      }
+
       if (!activeLetterFolder) {
-        setFolderPromptNotice("You must create a folder before filing your letter.");
+        setFolderPromptNotice("Você precisa criar uma pasta antes de guardar a carta.");
         setPendingSaveAfterCreation(true);
         setFolderDrawerOpen(true);
         playPaperSound();
@@ -705,93 +938,100 @@ export default function JournalEditor() {
       if (totalCartasLocais >= limiteCartas) {
         alert(
           isPro
-            ? `You have reached the maximum limit of ${limiteCartas} written letters on the Premium Plan.`
-            : `You have reached the limit of ${limiteCartas} letters on the Standard Plan. Join Pro Club to write and archive up to 30 letters!`
+            ? `Você atingiu o limite de ${limiteCartas} cartas arquivadas no Plano Premium.`
+            : `Você atingiu o limite de ${limiteCartas} cartas no Plano Normal. Assine o Clube Pro para escrever até 30 cartas!`
         );
         return;
       }
-    }
 
-    setSalvando(true);
-    playPaperSound();
+      setSalvando(true);
+      playPaperSound();
 
-    const tituloFinal =
-      titulo.trim() ||
-      (activeTab === "caderno"
-        ? `Memory of ${dataFormatada || "Today"}`
-        : `Letter: ${cartaSelo.label}`);
+      const tituloFinal = cartaTitulo.trim() || `Carta: ${cartaSelo.label}`;
 
-    if (activeTab === "caderno" && activeNotebook) {
-      atualizarRascunhoAtual(conteudo, tituloFinal, favoritado);
-    }
+      try {
+        const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
+        const novaEntrada: JournalEntry = {
+          id: "entry-" + Date.now(),
+          titulo: tituloFinal,
+          conteudo: cartaConteudo.trim(),
+          humor: cartaSelo.id,
+          data_formatada: dataFormatada || "Hoje",
+          criado_em: new Date().toISOString(),
+          tipo_papel: sheetBgId,
+          favoritado: cartaFavoritado,
+          selo_carta: cartaSelo.label,
+          pasta_id: activeLetterFolder?.id,
+          pasta_nome: activeLetterFolder?.nome,
+        };
+        window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify([novaEntrada, ...existente]));
+      } catch {}
 
-    try {
-      const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
-      const novaEntrada: JournalEntry = {
-        id: "entry-" + Date.now(),
-        titulo: tituloFinal,
-        conteudo: conteudo.trim(),
-        humor: activeTab === "caderno" ? "reflexao" : cartaSelo.id,
-        data_formatada: dataFormatada || "Today",
-        criado_em: new Date().toISOString(),
-        tipo_papel: sheetBgId,
-        favoritado,
-        caderno_origem: activeTab === "caderno" ? activeNotebook?.nome : undefined,
-        selo_carta: activeTab === "carta" ? cartaSelo.label : undefined,
-        pasta_id: activeTab === "carta" ? activeLetterFolder?.id : undefined,
-        pasta_nome: activeTab === "carta" ? activeLetterFolder?.nome : undefined,
-      };
-      window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify([novaEntrada, ...existente]));
-    } catch {}
-
-    try {
-      await api.cartas.enviar({
-        titulo: tituloFinal,
-        conteudo: conteudo.trim(),
-        remetente_anonimo: user?.nome ? user.nome : (activeNotebook?.nome || "Correspondent"),
-        categoria: activeTab === "carta" ? cartaSelo.id : "memorias",
-        tipo_papel: sheetBgId,
-        data_carta: dataFormatada,
-      });
-    } catch (err: any) {
-      if (err?.error && err?.isLimitReached) {
-        alert(err.error);
+      try {
+        await api.cartas.enviar({
+          titulo: tituloFinal,
+          conteudo: cartaConteudo.trim(),
+          remetente_anonimo: user?.nome || "Correspondente",
+          categoria: cartaSelo.id,
+          tipo_papel: sheetBgId,
+          data_carta: dataFormatada,
+        });
+      } catch (err: any) {
+        if (err?.error && err?.isLimitReached) {
+          alert(err.error);
+        }
       }
+
+      window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+
+      setCartaTitulo("");
+      setCartaConteudo("");
+      setCartaFavoritado(false);
+
+      setSalvando(false);
+      setMensagemSucesso(`Carta arquivada com sucesso na pasta "${activeLetterFolder.nome}"!`);
+      setTimeout(() => setMensagemSucesso(""), 3200);
     }
-
-    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
-
-    setSalvando(false);
-    setMensagemSucesso(
-      activeTab === "caderno"
-        ? `Page saved successfully in ${activeNotebook?.nome || "journal"}!`
-        : `Letter archived successfully in "${activeLetterFolder?.nome || "Correspondence"}"!`
-    );
-
-    setTimeout(() => {
-      setMensagemSucesso("");
-    }, 3200);
   };
 
   const selecionarCaderno = (nb: Notebook) => {
+    if (activeNotebook && activeNotebook.id !== nb.id) {
+      salvarCadernoAtualNoStorage();
+    }
+
     setActiveNotebookId(nb.id);
-    setCurrentPageIndex(0);
     try {
       window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, nb.id);
     } catch {}
-    if (nb.paginas && nb.paginas[0]) {
-      setTitulo(nb.paginas[0].titulo || "");
-      setConteudo(nb.paginas[0].conteudo || "");
-      setFavoritado(Boolean(nb.paginas[0].favoritado));
-    } else {
-      setTitulo("");
-      setConteudo("");
-      setFavoritado(false);
-    }
+
+    const paginas = nb.paginas && nb.paginas.length > 0
+      ? nb.paginas
+      : [
+          {
+            id: "pag-" + Date.now(),
+            titulo: "",
+            conteudo: "",
+            dataFormatada: dataFormatada || "Hoje",
+            favoritado: false,
+            criadoEm: new Date().toISOString(),
+          },
+        ];
+
+    setCadernoPaginas(paginas);
+    setCurrentPageIndex(0);
+    setCadernoTitulo(paginas[0]?.titulo || "");
+    setCadernoConteudo(paginas[0]?.conteudo || "");
+    setCadernoFavoritado(Boolean(paginas[0]?.favoritado));
+
     setNotebookDrawerOpen(false);
     playPaperSound();
   };
 
+  // REGRA DE NOVO CADERNO:
+  // Ao já estar em um caderno e criar um novo:
+  // 1. Tudo o que já estava escrito na tela é salvo no caderno antigo.
+  // 2. Quando é criado um caderno novo, a página vem em branco, sem nada escrito,
+  //    de forma em que NADA é salvo no caderno novo!
   const criarNovoCaderno = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNotebookTitle.trim()) return;
@@ -800,76 +1040,81 @@ export default function JournalEditor() {
     if (notebooks.length >= limiteCadernos) {
       alert(
         isPro
-          ? `You have reached the maximum limit of ${limiteCadernos} journals on the Premium Plan.`
-          : `You have reached the limit of ${limiteCadernos} journals on the Standard Plan. Join Pro Club to have up to 10 journals!`
+          ? `Você atingiu o limite de ${limiteCadernos} cadernos do Plano Premium.`
+          : `Você atingiu o limite de ${limiteCadernos} cadernos do Plano Normal. Assine o Clube Pro para ter até 10 cadernos!`
       );
       return;
     }
 
-    const ehPendente = pendingSaveAfterCreation && activeTab === "caderno";
-    const tituloFinal =
-      titulo.trim() || `Memory of ${dataFormatada || "Today"}`;
-
-    const novo: Notebook = {
-      id: "caderno-" + Date.now(),
-      nome: newNotebookTitle.trim(),
-      corCapa: "#2c1d18",
-      paginas: [
-        {
-          id: "pag-" + Date.now(),
-          titulo: ehPendente ? tituloFinal : (titulo.trim() || ""),
-          conteudo: ehPendente ? conteudo.trim() : (conteudo.trim() || ""),
-          dataFormatada: dataFormatada || "Today",
-          favoritado: favoritado,
-          criadoEm: new Date().toISOString(),
-        },
-      ],
-    };
-
-    const atualizados = [...notebooks, novo];
-    setNotebooks(atualizados);
-    try {
-      window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(atualizados));
-      window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, novo.id);
-    } catch {}
-
-    if (ehPendente) {
-      try {
-        const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
-        const novaEntrada: JournalEntry = {
-          id: "entry-" + Date.now(),
-          titulo: tituloFinal,
-          conteudo: conteudo.trim(),
-          humor: "reflexao",
-          data_formatada: dataFormatada || "Today",
-          criado_em: new Date().toISOString(),
-          tipo_papel: sheetBgId,
-          favoritado,
-          caderno_origem: novo.nome,
-        };
-        window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify([novaEntrada, ...existente]));
-      } catch {}
-
-      try {
-        api.cartas.enviar({
-          titulo: tituloFinal,
-          conteudo: conteudo.trim(),
-          remetente_anonimo: user?.nome ? user.nome : novo.nome,
-          categoria: "memorias",
-          tipo_papel: sheetBgId,
-          data_carta: dataFormatada,
-        });
-      } catch {}
-
-      setMensagemSucesso(`Journal "${novo.nome}" created and page saved successfully!`);
-      setTimeout(() => setMensagemSucesso(""), 3500);
-      setPendingSaveAfterCreation(false);
-      setCadernoPromptNotice(null);
+    // 1. Salva tudo o que estava escrito na tela no caderno antigo (apenas páginas escritas)
+    let notebooksAtualizados = [...notebooks];
+    if (activeNotebook) {
+      notebooksAtualizados = notebooksAtualizados.map((nb) => {
+        if (nb.id === activeNotebook.id) {
+          const paginasAtualizadas = [...cadernoPaginas];
+          if (paginasAtualizadas[currentPageIndex]) {
+            paginasAtualizadas[currentPageIndex] = {
+              ...paginasAtualizadas[currentPageIndex],
+              titulo: cadernoTitulo,
+              conteudo: cadernoConteudo,
+              favoritado: cadernoFavoritado,
+            };
+          }
+          const paginasEscritas = paginasAtualizadas.filter(
+            (p) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
+          );
+          return {
+            ...nb,
+            paginas: paginasEscritas,
+          };
+        }
+        return nb;
+      });
     }
 
+    // 2. Cria o novo caderno vazio com a cor de capa escolhida (sem páginas salvas em disco)
+    const novoCaderno: Notebook = {
+      id: "caderno-" + Date.now(),
+      nome: newNotebookTitle.trim(),
+      corCapa: newNotebookCover,
+      paginas: [], // NADA salvo no caderno novo
+    };
+
+    const listaFinal = [...notebooksAtualizados, novoCaderno];
+    setNotebooks(listaFinal);
+
+    try {
+      window.localStorage.setItem(NOTEBOOKS_STORAGE_KEY, JSON.stringify(listaFinal));
+      window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, novoCaderno.id);
+    } catch {}
+
+    // 3. Define o novo caderno como ativo e a tela vem COMPLETAMENTE EM BRANCO
+    setActiveNotebookId(novoCaderno.id);
+    setCurrentPageIndex(0);
+    setCadernoPaginas([
+      {
+        id: "pag-" + Date.now(),
+        titulo: "",
+        conteudo: "",
+        dataFormatada: dataFormatada || "Hoje",
+        favoritado: false,
+        criadoEm: new Date().toISOString(),
+      },
+    ]);
+    setCadernoTitulo("");
+    setCadernoConteudo("");
+    setCadernoFavoritado(false);
+
     setNewNotebookTitle("");
-    selecionarCaderno(novo);
+    setNewNotebookCover("marrom");
+    setNotebookDrawerOpen(false);
+    setCadernoPromptNotice(null);
+    setPendingSaveAfterCreation(false);
+    playPaperSound();
+
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+    setMensagemSucesso(`Caderno "${novoCaderno.nome}" criado com folha em branco!`);
+    setTimeout(() => setMensagemSucesso(""), 3000);
   };
 
   const criarNovaPasta = (e: React.FormEvent) => {
@@ -902,18 +1147,18 @@ export default function JournalEditor() {
     } catch {}
 
     if (pendingSaveAfterCreation && activeTab === "carta") {
-      const tituloFinal = titulo.trim() || `Letter: ${cartaSelo.label}`;
+      const tituloFinal = cartaTitulo.trim() || `Letter: ${cartaSelo.label}`;
       try {
         const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
         const novaEntrada: JournalEntry = {
           id: "entry-" + Date.now(),
           titulo: tituloFinal,
-          conteudo: conteudo.trim(),
+          conteudo: cartaConteudo.trim(),
           humor: cartaSelo.id,
           data_formatada: dataFormatada || "Today",
           criado_em: new Date().toISOString(),
           tipo_papel: sheetBgId,
-          favoritado,
+          favoritado: cartaFavoritado,
           selo_carta: cartaSelo.label,
           pasta_id: nova.id,
           pasta_nome: nova.nome,
@@ -924,7 +1169,7 @@ export default function JournalEditor() {
       try {
         api.cartas.enviar({
           titulo: tituloFinal,
-          conteudo: conteudo.trim(),
+          conteudo: cartaConteudo.trim(),
           remetente_anonimo: user?.nome || "Correspondent",
           categoria: cartaSelo.id,
           tipo_papel: sheetBgId,
@@ -1101,35 +1346,57 @@ export default function JournalEditor() {
             <div className="caderno-left-stack">
               {activeNotebook ? (
                 <div
-                  className="leather-notebook-card"
+                  className="desk-notebook-tome-wrapper"
                   onClick={() => {
                     setCadernoPromptNotice(null);
                     setNotebookDrawerOpen(true);
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Click to switch or create new journals"
+                  title="Clique para alternar ou criar novos cadernos"
                 >
-                  <div className="leather-notebook-ribbon" aria-hidden="true" />
-                  <span className="leather-notebook-tag">RECORD VOLUME</span>
-                  <span className="leather-notebook-title">{activeNotebook.nome}</span>
-                  <span className="leather-notebook-author">{user?.nome || "PERSONAL ARCHIVE"}</span>
+                  <div className="desk-notebook-tome-book">
+                    <img
+                      src={getNotebookCoverImage(activeNotebook.corCapa)}
+                      alt={`Caderno ${activeNotebook.nome}`}
+                      className="desk-notebook-cover-img"
+                      draggable={false}
+                    />
+                    <div className="desk-notebook-overlay-content">
+                      <span className="desk-notebook-tag">RECORD VOLUME</span>
+                      <span className="desk-notebook-title">{activeNotebook.nome}</span>
+                      <span className="desk-notebook-pages">
+                        {cadernoPaginas.filter((p) => p.conteudo?.trim() || p.titulo?.trim()).length}{" "}
+                        {cadernoPaginas.filter((p) => p.conteudo?.trim() || p.titulo?.trim()).length === 1
+                          ? "página escrita"
+                          : "páginas escritas"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="desk-notebook-caption-bar">
+                    <span className="desk-notebook-caption-name">{activeNotebook.nome}</span>
+                    <span className="desk-notebook-caption-action">Trocar volume ▾</span>
+                  </div>
                 </div>
               ) : (
                 <div
-                  className="leather-notebook-card is-empty-state"
+                  className="desk-notebook-tome-wrapper is-empty-state"
                   onClick={() => {
                     setCadernoPromptNotice(null);
                     setNotebookDrawerOpen(true);
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Click to create your first volume"
+                  title="Clique para criar seu primeiro caderno"
                 >
-                  <div className="leather-notebook-ribbon" aria-hidden="true" />
-                  <span className="leather-notebook-tag">EMPTY SHELF</span>
-                  <span className="leather-notebook-title">+ CREATE JOURNAL</span>
-                  <span className="leather-notebook-author">CLICK TO BEGIN</span>
+                  <div className="desk-notebook-empty-tome">
+                    <span style={{ fontSize: "28px" }}>📖</span>
+                    <span className="desk-notebook-empty-tag">EMPTY SHELF</span>
+                    <span className="desk-notebook-empty-title">+ CRIAR CADERNO</span>
+                  </div>
+                  <div className="desk-notebook-caption-bar">
+                    <span className="desk-notebook-caption-action">+ Criar Caderno</span>
+                  </div>
                 </div>
               )}
 
@@ -1243,21 +1510,14 @@ export default function JournalEditor() {
             <button
               type="button"
               className={`notebook-tab notebook-tab--caderno ${activeTab === "caderno" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("caderno");
-                playPaperSound();
-              }}
+              onClick={() => mudarAba("caderno")}
             >
               Journal
             </button>
             <button
               type="button"
               className={`notebook-tab notebook-tab--carta ${activeTab === "carta" ? "active" : ""}`}
-              onClick={() => {
-                setActiveTab("carta");
-                setModoFoco(false);
-                playPaperSound();
-              }}
+              onClick={() => mudarAba("carta")}
             >
               Letter
             </button>
@@ -1269,10 +1529,12 @@ export default function JournalEditor() {
               className="sheet-nav-arrow sheet-nav-arrow--left"
               onClick={navegarAnterior}
               disabled={activeTab === "carta" || currentPageIndex === 0}
-              title="Previous page (←)"
-              aria-label="Previous page"
+              title={activeTab === "carta" ? "Folha única de correspondência" : "Página anterior (←)"}
+              aria-label="Página anterior"
             >
-              ←
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
             </button>
 
             <motion.div
@@ -1290,16 +1552,16 @@ export default function JournalEditor() {
               {activeTab === "caderno" ? (
                 <div className="caderno-content-inner">
                   <div className="caderno-date-line">
-                    <span>{dataFormatada || "Friday, October 23, 2026"}</span>
+                    <span>{dataFormatada || "Sexta-feira"}</span>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      {isSheetFull(conteudo, textareaRef.current) && (
+                      {isSheetFull(cadernoConteudo, textareaRef.current) && (
                         <span style={{ fontSize: "10px", color: "#8b1e1e", fontWeight: 700, letterSpacing: "0.08em" }}>
-                          PAGE FULL
+                          FOLHA CHEIA
                         </span>
                       )}
-                      {paginasCaderno.length > 1 && (
+                      {cadernoPaginas.length > 1 && (
                         <small className="caderno-page-counter">
-                          page {currentPageIndex + 1} of {paginasCaderno.length}
+                          página {currentPageIndex + 1} de {cadernoPaginas.length}
                         </small>
                       )}
                     </div>
@@ -1308,35 +1570,32 @@ export default function JournalEditor() {
                   <input
                     type="text"
                     className="caderno-title-input"
-                    value={titulo}
-                    onChange={(e) => {
-                      setTitulo(e.target.value);
-                      atualizarRascunhoAtual(undefined, e.target.value);
-                    }}
-                    placeholder="(Optional title)"
+                    value={cadernoTitulo}
+                    onChange={(e) => handleCadernoTituloChange(e.target.value)}
+                    placeholder="(Título opcional da memória)"
                   />
 
                   <textarea
                     ref={textareaRef}
                     className="caderno-textarea-ruled"
-                    value={conteudo}
-                    onChange={handleConteudoChange}
+                    value={cadernoConteudo}
+                    onChange={handleCadernoConteudoChange}
                     onKeyDown={handleKeyDown}
                     onPaste={handlePaste}
                     onKeyUp={handleKeyUp}
-                    placeholder="Write your words here..."
+                    placeholder="Escreva seus pensamentos e reflexões aqui..."
                     rows={MAX_LINES_PER_PAGE}
                   />
 
                   <div className="caderno-bottom-corner">
                     <motion.button
                       type="button"
-                      className={`classic-stamp-favorite ${favoritado ? "is-favorited" : ""}`}
-                      onClick={toggleFavorito}
+                      className={`classic-stamp-favorite ${cadernoFavoritado ? "is-favorited" : ""}`}
+                      onClick={toggleFavoritoCaderno}
                       whileTap={{ scale: 0.95 }}
-                      title="Stamp as favorite"
+                      title="Carimbar página como favorita"
                     >
-                      {favoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
+                      {cadernoFavoritado ? "FAVORITADO ♥" : "FAVORITAR ♥"}
                     </motion.button>
                   </div>
                 </div>
@@ -1349,44 +1608,44 @@ export default function JournalEditor() {
                       <span className="stamp-denomination">US • ARCHIVE</span>
                     </div>
                     <div className="postmark-circle" aria-hidden="true">
-                      <span>BETWEEN LETTERS</span>
+                      <span>ENTRE CARTAS</span>
                       <small>HISTORICAL MAIL</small>
                     </div>
                   </div>
 
                   <div className="carta-top-meta">
                     <span className="carta-date">{dataFormatada}</span>
-                    <span className="carta-sentiment-badge">Classification: {cartaSelo.label}</span>
+                    <span className="carta-sentiment-badge">Classificação: {cartaSelo.label}</span>
                   </div>
 
                   <input
                     type="text"
                     className="carta-recipient-input"
-                    value={titulo}
-                    onChange={(e) => setTitulo(e.target.value)}
-                    placeholder="To: (or formal title of correspondence)"
+                    value={cartaTitulo}
+                    onChange={(e) => setCartaTitulo(e.target.value)}
+                    placeholder="Para: (ou título solene da correspondência)"
                   />
 
                   <textarea
                     className="carta-textarea-unruled"
-                    value={conteudo}
-                    onChange={(e) => setConteudo(e.target.value)}
-                    placeholder="Write your letter here..."
+                    value={cartaConteudo}
+                    onChange={handleCartaConteudoChange}
+                    placeholder="Redija sua carta solene aqui..."
                     rows={12}
                   />
 
                   <div className="carta-footer-meta">
                     <span className="carta-seal-status">
-                      Postal seal: <b>{cartaSelo.label}</b>
+                      Selo postal: <b>{cartaSelo.label}</b>
                     </span>
                     <motion.button
                       type="button"
-                      className={`classic-stamp-favorite ${favoritado ? "is-favorited" : ""}`}
-                      onClick={toggleFavorito}
+                      className={`classic-stamp-favorite ${cartaFavoritado ? "is-favorited" : ""}`}
+                      onClick={toggleFavoritoCarta}
                       whileTap={{ scale: 0.95 }}
-                      title="Stamp as favorite"
+                      title="Carimbar carta como favorita"
                     >
-                      {favoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
+                      {cartaFavoritado ? "FAVORITADO ♥" : "FAVORITAR ♥"}
                     </motion.button>
                   </div>
                 </div>
@@ -1397,15 +1656,19 @@ export default function JournalEditor() {
               type="button"
               className="sheet-nav-arrow sheet-nav-arrow--right"
               onClick={navegarProximo}
-              disabled={activeTab === "carta"}
+              disabled={activeTab === "carta" || !podeAvancarPagina}
               title={
-                currentPageIndex === paginasCaderno.length - 1
-                  ? "Advance to a new blank page (→)"
-                  : "Next page (→)"
+                activeTab === "carta"
+                  ? "Folha única de correspondência"
+                  : podeAvancarPagina
+                  ? "Próxima página (→)"
+                  : "Você pode avançar até 3 páginas após uma página escrita. Escreva algo nesta página para avançar mais."
               }
-              aria-label="Next page"
+              aria-label="Próxima página"
             >
-              →
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
         </div>
@@ -1501,42 +1764,92 @@ export default function JournalEditor() {
               <div className="notebooks-list">
                 {notebooks.length === 0 ? (
                   <div className="drawer-empty-state-hint">
-                    <span className="empty-hint-title">No journals created yet.</span>
+                    <span className="empty-hint-title">Nenhum caderno criado ainda.</span>
                     <p className="empty-hint-text">
-                      Name your volume below to create it and archive your page safely.
+                      Dê um nome e escolha a capa do seu primeiro volume abaixo para arquivar suas páginas.
                     </p>
                   </div>
                 ) : (
-                  notebooks.map((nb) => (
-                    <div
-                      key={nb.id}
-                      className={`notebook-item-card ${activeNotebook?.id === nb.id ? "is-active" : ""}`}
-                      onClick={() => selecionarCaderno(nb)}
-                    >
-                      <div>
-                        <span className="notebook-item-name">{nb.nome}</span>
-                        <div className="notebook-item-count">
-                          {nb.paginas?.length || 1} {(nb.paginas?.length || 1) === 1 ? "page" : "pages"}
+                  notebooks.map((nb) => {
+                    const coverImg = getNotebookCoverImage(nb.corCapa);
+                    const totalPags = (nb.paginas || []).filter(
+                      (p) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
+                    ).length;
+                    return (
+                      <div
+                        key={nb.id}
+                        className={`notebook-item-card ${activeNotebook?.id === nb.id ? "is-active" : ""}`}
+                        onClick={() => selecionarCaderno(nb)}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <img
+                            src={coverImg}
+                            alt=""
+                            className="notebook-item-mini-cover"
+                            draggable={false}
+                          />
+                          <div>
+                            <span className="notebook-item-name">{nb.nome}</span>
+                            <div className="notebook-item-count">
+                              {totalPags} {totalPags === 1 ? "página escrita" : "páginas escritas"}
+                            </div>
+                          </div>
                         </div>
+                        {activeNotebook?.id === nb.id && (
+                          <span style={{ color: "#8b1e1e", fontWeight: 700, fontSize: "12px" }}>✓ Ativo</span>
+                        )}
                       </div>
-                      {activeNotebook?.id === nb.id && <span style={{ color: "#8b1e1e", fontWeight: 700 }}>✓ Active</span>}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
               <form onSubmit={criarNovoCaderno} className="new-notebook-form">
+                <label className="new-notebook-label">NOME DO CADERNO</label>
                 <input
                   type="text"
                   className="new-notebook-input"
-                  placeholder="Name of new journal (e.g., Diary, Memoirs)..."
+                  placeholder="Nome do novo volume (ex: Diário Secreto, Memórias)..."
                   value={newNotebookTitle}
                   onChange={(e) => setNewNotebookTitle(e.target.value)}
                   maxLength={50}
                   autoFocus
                 />
-                <button type="submit" className="new-notebook-btn">
-                  + Create Journal
+
+                <label className="new-notebook-label" style={{ marginTop: "14px" }}>
+                  ESCOLHA A COR DA CAPA
+                </label>
+                <div className="notebook-color-picker-grid">
+                  {NOTEBOOK_COVER_OPTIONS.map((opt) => {
+                    const isSelected = newNotebookCover === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`notebook-color-option-card ${isSelected ? "is-selected" : ""}`}
+                        onClick={() => {
+                          setNewNotebookCover(opt.id);
+                          playPaperSound();
+                        }}
+                      >
+                        <div className="notebook-color-thumbnail-wrap">
+                          <img
+                            src={opt.imagem}
+                            alt={opt.nome}
+                            className="notebook-color-thumbnail-img"
+                            draggable={false}
+                          />
+                          {isSelected && <span className="notebook-color-check-badge">✓</span>}
+                        </div>
+                        <span className="notebook-color-opt-name">{opt.nome}</span>
+                        <small className="notebook-color-opt-sub">{opt.etiqueta}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button type="submit" className="new-notebook-btn" style={{ marginTop: "14px" }}>
+                  + Criar Caderno
                 </button>
               </form>
             </motion.div>

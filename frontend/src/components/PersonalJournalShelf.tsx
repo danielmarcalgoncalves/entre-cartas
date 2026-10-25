@@ -8,6 +8,7 @@ import {
   ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
   LETTER_FOLDERS_STORAGE_KEY,
+  getNotebookCoverImage,
   type JournalEntry,
   type LetterFolder,
   type Notebook,
@@ -32,6 +33,7 @@ export default function PersonalJournalShelf() {
   // Trash Station
   const trashCanRef = useRef<HTMLDivElement>(null);
   const [isTrashHovered, setIsTrashHovered] = useState(false);
+  const [isTrashShaking, setIsTrashShaking] = useState(false);
   const [trashLetters, setTrashLetters] = useState<JournalEntry[]>([]);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   const [trashFeedback, setTrashFeedback] = useState<string | null>(null);
@@ -53,9 +55,18 @@ export default function PersonalJournalShelf() {
       if (storedNb) {
         const parsedNb = JSON.parse(storedNb);
         if (Array.isArray(parsedNb)) {
-          const reais = parsedNb.filter(
-            (n: Notebook) => n.id !== "default-caderno" && n.id !== "caderno-noturno"
-          );
+          const reais = parsedNb
+            .filter(
+              (n: Notebook) => n.id !== "default-caderno" && n.id !== "caderno-noturno"
+            )
+            .map((n: Notebook) => ({
+              ...n,
+              paginas: (n.paginas || []).filter(
+                (p: any) =>
+                  (p.conteudo && p.conteudo.trim().length > 0) ||
+                  (p.titulo && p.titulo.trim().length > 0)
+              ),
+            }));
           setNotebooks(reais);
         } else {
           setNotebooks([]);
@@ -78,7 +89,7 @@ export default function PersonalJournalShelf() {
         }
       }
     } catch {}
-    const trashIds = new Set(descartadas.map((d) => d.id));
+    const trashIds = new Set(descartadas.map((d) => String(d.id)));
 
     let cartasLocais: JournalEntry[] = [];
     try {
@@ -89,7 +100,7 @@ export default function PersonalJournalShelf() {
           cartasLocais = parsed.filter(
             (e: any) =>
               (Boolean(e.selo_carta) || e.humor !== "reflexao") &&
-              !trashIds.has(e.id)
+              !trashIds.has(String(e.id))
           );
           setLettersWritten(cartasLocais);
         }
@@ -112,8 +123,8 @@ export default function PersonalJournalShelf() {
           }));
 
           setLettersWritten((atuais) => {
-            const idsAtuais = new Set(atuais.map((e) => e.id));
-            const novas = remotas.filter((r) => !idsAtuais.has(r.id) && !trashIds.has(r.id));
+            const idsAtuais = new Set(atuais.map((e) => String(e.id)));
+            const novas = remotas.filter((r) => !idsAtuais.has(String(r.id)) && !trashIds.has(String(r.id)));
             return [...atuais, ...novas];
           });
         }
@@ -141,56 +152,154 @@ export default function PersonalJournalShelf() {
   };
 
   const descartarCarta = (carta: JournalEntry) => {
-    setLettersWritten((prev) => prev.filter((l) => l.id !== carta.id));
+    // 1. Grava na lixeira de forma síncrona ANTES de qualquer evento para garantir persistência imediata
+    let currentTrash: JournalEntry[] = [];
+    try {
+      const rawTrash = window.localStorage.getItem(TRASH_STORAGE_KEY);
+      if (rawTrash) {
+        const parsedTrash = JSON.parse(rawTrash);
+        if (Array.isArray(parsedTrash)) {
+          currentTrash = parsedTrash;
+        }
+      }
+    } catch {}
+
+    const updatedTrash = [carta, ...currentTrash.filter((t) => String(t.id) !== String(carta.id))];
+    try {
+      window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updatedTrash));
+    } catch {}
+    setTrashLetters(updatedTrash);
+
+    // 2. Remove das cartas arquivadas de forma síncrona
+    try {
+      const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const rest = parsed.filter((p: any) => String(p.id) !== String(carta.id));
+          window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(rest));
+        }
+      }
+    } catch {}
+    setLettersWritten((prev) => prev.filter((l) => String(l.id) !== String(carta.id)));
+
+    // 3. Efeito puramente físico de tremer para indicar ao usuário que foi adicionada
+    setIsTrashShaking(true);
+    setTimeout(() => {
+      setIsTrashShaking(false);
+    }, 750);
+
+    // 4. Notificação suave
+    setTrashFeedback(`"${carta.titulo || "Carta"}" foi adicionada à lixeira.`);
+    setTimeout(() => setTrashFeedback(null), 4000);
+
+    // 5. Notifica todos os ouvintes após os dados já estarem seguros no localStorage
+    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+  };
+
+  const restaurarCarta = (carta: JournalEntry) => {
+    // 1. Remove da lixeira de forma síncrona
+    let currentTrash: JournalEntry[] = [];
+    try {
+      const rawTrash = window.localStorage.getItem(TRASH_STORAGE_KEY);
+      if (rawTrash) {
+        const parsedTrash = JSON.parse(rawTrash);
+        if (Array.isArray(parsedTrash)) {
+          currentTrash = parsedTrash;
+        }
+      }
+    } catch {}
+
+    const updatedTrash = currentTrash.filter((t) => String(t.id) !== String(carta.id));
+    try {
+      window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updatedTrash));
+    } catch {}
+    setTrashLetters(updatedTrash);
+
+    // 2. Retorna para as cartas locais salvas
+    let savedList: JournalEntry[] = [];
+    try {
+      const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) savedList = parsed;
+      }
+    } catch {}
+
+    const updatedSaved = [carta, ...savedList.filter((l: any) => String(l.id) !== String(carta.id))];
+    try {
+      window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(updatedSaved));
+    } catch {}
+    setLettersWritten(updatedSaved);
+
+    setTrashFeedback(`"${carta.titulo || "Carta"}" foi restaurada para a pasta.`);
+    setTimeout(() => setTrashFeedback(null), 4000);
+
+    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+  };
+
+  const excluirCartaPermanentemente = (carta: JournalEntry) => {
+    if (
+      !window.confirm(
+        `Tem certeza que deseja excluir permanentemente a carta "${
+          carta.titulo || "Carta"
+        }"? Esta ação não pode ser desfeita.`
+      )
+    ) {
+      return;
+    }
+
+    let currentTrash: JournalEntry[] = [];
+    try {
+      const rawTrash = window.localStorage.getItem(TRASH_STORAGE_KEY);
+      if (rawTrash) {
+        const parsedTrash = JSON.parse(rawTrash);
+        if (Array.isArray(parsedTrash)) {
+          currentTrash = parsedTrash;
+        }
+      }
+    } catch {}
+
+    const updatedTrash = currentTrash.filter((t) => String(t.id) !== String(carta.id));
+    try {
+      window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updatedTrash));
+    } catch {}
+    setTrashLetters(updatedTrash);
 
     try {
       const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          const rest = parsed.filter((p: any) => p.id !== carta.id);
+          const rest = parsed.filter((p: any) => String(p.id) !== String(carta.id));
           window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(rest));
         }
       }
     } catch {}
 
-    setTrashLetters((prev) => {
-      const updated = [carta, ...prev.filter((t) => t.id !== carta.id)];
-      try {
-        window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
-    setTrashFeedback(`"${carta.titulo || "Letter"}" was moved to the postal trash bin.`);
-    setTimeout(() => setTrashFeedback(null), 4500);
+    setTrashFeedback(`"${carta.titulo || "Carta"}" foi excluída permanentemente.`);
+    setTimeout(() => setTrashFeedback(null), 4000);
 
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
   };
 
-  const restaurarCarta = (carta: JournalEntry) => {
-    setTrashLetters((prev) => {
-      const updated = prev.filter((t) => t.id !== carta.id);
-      try {
-        window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+  const esvaziarLixeiraPermanentemente = () => {
+    if (trashLetters.length === 0) return;
+    if (
+      !window.confirm(
+        `Tem certeza que deseja excluir permanentemente todas as ${trashLetters.length} cartas da lixeira? Esta ação não pode ser desfeita.`
+      )
+    ) {
+      return;
+    }
 
-    setLettersWritten((prev) => {
-      const updated = [carta, ...prev.filter((l) => l.id !== carta.id)];
-      try {
-        const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
-        let list = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(list)) list = [];
-        list = [carta, ...list.filter((l: any) => l.id !== carta.id)];
-        window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(list));
-      } catch {}
-      return updated;
-    });
+    try {
+      window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify([]));
+    } catch {}
+    setTrashLetters([]);
 
-    setTrashFeedback(`"${carta.titulo || "Letter"}" was restored to your folder.`);
-    setTimeout(() => setTrashFeedback(null), 4500);
+    setTrashFeedback("A lixeira foi esvaziada permanentemente.");
+    setTimeout(() => setTrashFeedback(null), 4000);
 
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
   };
@@ -198,7 +307,7 @@ export default function PersonalJournalShelf() {
   const handleItemDrag = (info: { index: number; clientX: number; clientY: number; item: any }) => {
     if (!trashCanRef.current) return false;
     const rect = trashCanRef.current.getBoundingClientRect();
-    const pad = 40;
+    const pad = 50;
     const isOver =
       info.clientX >= rect.left - pad &&
       info.clientX <= rect.right + pad &&
@@ -216,7 +325,7 @@ export default function PersonalJournalShelf() {
     setIsTrashHovered(false);
     if (!trashCanRef.current) return false;
     const rect = trashCanRef.current.getBoundingClientRect();
-    const pad = 40;
+    const pad = 50;
     const isOver =
       info.clientX >= rect.left - pad &&
       info.clientX <= rect.right + pad &&
@@ -345,25 +454,32 @@ export default function PersonalJournalShelf() {
       ) : (
         <div className="shelf-tomes-grid">
           {notebooks.map((nb) => {
-            const totalPaginas = nb.paginas?.length || 1;
+            const totalPaginas = (nb.paginas || []).filter(
+              (p) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
+            ).length;
             const primeiraData = nb.paginas?.[0]?.dataFormatada || "Active record";
+            const coverImg = getNotebookCoverImage(nb.corCapa);
 
             return (
               <motion.article
                 key={nb.id}
                 className="tome-book-item"
-                style={{ backgroundColor: nb.corCapa || "#1e1512" }}
                 onClick={() => abrirCadernoParaLeitura(nb)}
-                whileHover={{ y: -6 }}
+                whileHover={{ y: -6, scale: 1.015 }}
                 transition={{ duration: 0.2 }}
-                title="Click to read this journal"
+                title={`Clique para ler o caderno "${nb.nome}"`}
               >
-                <div className="tome-book-spine-line" aria-hidden="true" />
-                <div className="tome-book-ribbon" aria-hidden="true" />
-
-                <div className="tome-book-top">
-                  <span className="tome-book-tag">RECORD VOLUME</span>
-                  <h3 className="tome-book-title">{nb.nome}</h3>
+                <div className="tome-book-visual-stage">
+                  <img
+                    src={coverImg}
+                    alt={`Caderno ${nb.nome}`}
+                    className="tome-book-cover-photo"
+                    draggable={false}
+                  />
+                  <div className="tome-book-embossed-overlay">
+                    <span className="tome-book-tag">VOLUME</span>
+                    <h3 className="tome-book-title">{nb.nome}</h3>
+                  </div>
                 </div>
 
                 <div className="tome-book-bottom">
@@ -408,12 +524,16 @@ export default function PersonalJournalShelf() {
         <AnimatePresence>
           {trashFeedback && (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.25 }}
               className="postal-trash-toast"
+              role="status"
+              aria-live="polite"
             >
-              <span>{trashFeedback}</span>
+              <span className="postal-trash-toast-icon">🗑️</span>
+              <span className="postal-trash-toast-text">{trashFeedback}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -527,6 +647,7 @@ export default function PersonalJournalShelf() {
           <PostalTrashCan
             innerRef={trashCanRef}
             isOpen={isTrashHovered}
+            isShaking={isTrashShaking}
             count={trashLetters.length}
             onClick={() => setIsTrashModalOpen(true)}
           />
@@ -545,11 +666,19 @@ export default function PersonalJournalShelf() {
             onClick={() => setReadingNotebook(null)}
           >
             <div className="dark-reading-topbar" onClick={(e) => e.stopPropagation()}>
-              <div className="dark-reading-meta">
-                <span className="dark-reading-tome-name">{readingNotebook.nome}</span>
-                <span className="dark-reading-page-indicator">
-                  Reading · Page {readingPageIndex + 1} of {readingNotebook.paginas.length}
-                </span>
+              <div className="dark-reading-meta" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <img
+                  src={getNotebookCoverImage(readingNotebook.corCapa)}
+                  alt=""
+                  style={{ width: "24px", height: "34px", objectFit: "contain", borderRadius: "2px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }}
+                  draggable={false}
+                />
+                <div>
+                  <span className="dark-reading-tome-name">{readingNotebook.nome}</span>
+                  <span className="dark-reading-page-indicator">
+                    Reading · Page {readingPageIndex + 1} of {readingNotebook.paginas.length}
+                  </span>
+                </div>
               </div>
 
               <div className="dark-reading-actions">
@@ -759,9 +888,9 @@ export default function PersonalJournalShelf() {
                             type="button"
                             className="postal-restore-btn"
                             onClick={() => restaurarCarta(carta)}
-                            title="Restore and return to its origin folder"
+                            title="Restaurar e devolver para a pasta de origem"
                           >
-                            ↺ Restore
+                            ↺ Restaurar
                           </button>
                           <button
                             type="button"
@@ -770,9 +899,17 @@ export default function PersonalJournalShelf() {
                               setIsTrashModalOpen(false);
                               setReadingLetter(carta);
                             }}
-                            title="Read complete letter"
+                            title="Ler carta completa"
                           >
-                            Read
+                            Ler
+                          </button>
+                          <button
+                            type="button"
+                            className="postal-delete-perm-btn"
+                            onClick={() => excluirCartaPermanentemente(carta)}
+                            title="Excluir permanentemente da lixeira"
+                          >
+                            🗑 Deletar
                           </button>
                         </div>
                       </div>
@@ -782,15 +919,27 @@ export default function PersonalJournalShelf() {
               </div>
 
               <div className="postal-trash-modal-footer">
-                <span className="postal-trash-footer-info">
-                  {trashLetters.length} {trashLetters.length === 1 ? "letter preserved in trash" : "letters preserved in trash"}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                  <span className="postal-trash-footer-info">
+                    {trashLetters.length} {trashLetters.length === 1 ? "carta preservada na lixeira" : "cartas preservadas na lixeira"}
+                  </span>
+                  {trashLetters.length > 0 && (
+                    <button
+                      type="button"
+                      className="postal-empty-trash-btn"
+                      onClick={esvaziarLixeiraPermanentemente}
+                      title="Excluir todas as cartas permanentemente"
+                    >
+                      🗑 Esvaziar lixeira
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="entry-modal-close"
                   onClick={() => setIsTrashModalOpen(false)}
                 >
-                  Close trash
+                  Fechar lixeira
                 </button>
               </div>
             </motion.div>
