@@ -71,7 +71,7 @@ export function ArchiveProvider({ children }: { children: React.ReactNode }) {
     setFolderById((current) => ({ ...current, [stringId]: current[stringId] ?? DEFAULT_FOLDER }));
     api.cartas.carimbar(stringId, "GUARDADA").catch((err: any) => {
       if (err?.isLimitReached) {
-        alert("Sua caixa atingiu o limite de 5 cartas guardadas do Plano Leitor. Assine o Clube Pro para salvar memórias ilimitadas!");
+        alert("Your box has reached the limit of 5 saved letters on the Standard Plan. Join Pro Club to save unlimited memories!");
       }
     });
   }, [savedIds]);

@@ -8,7 +8,7 @@ import {
   ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
   LETTER_FOLDERS_STORAGE_KEY,
-  getNotebookCoverImage,
+  getNotebookTheme,
   type JournalEntry,
   type LetterFolder,
   type Notebook,
@@ -189,8 +189,8 @@ export default function PersonalJournalShelf() {
       setIsTrashShaking(false);
     }, 750);
 
-    // 4. Notificação suave
-    setTrashFeedback(`"${carta.titulo || "Carta"}" foi adicionada à lixeira.`);
+    // 4. Smooth notification
+    setTrashFeedback(`"${carta.titulo || "Letter"}" was moved to postal discards.`);
     setTimeout(() => setTrashFeedback(null), 4000);
 
     // 5. Notifica todos os ouvintes após os dados já estarem seguros no localStorage
@@ -232,7 +232,7 @@ export default function PersonalJournalShelf() {
     } catch {}
     setLettersWritten(updatedSaved);
 
-    setTrashFeedback(`"${carta.titulo || "Carta"}" foi restaurada para a pasta.`);
+    setTrashFeedback(`"${carta.titulo || "Letter"}" was restored to its folder.`);
     setTimeout(() => setTrashFeedback(null), 4000);
 
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
@@ -241,9 +241,9 @@ export default function PersonalJournalShelf() {
   const excluirCartaPermanentemente = (carta: JournalEntry) => {
     if (
       !window.confirm(
-        `Tem certeza que deseja excluir permanentemente a carta "${
-          carta.titulo || "Carta"
-        }"? Esta ação não pode ser desfeita.`
+        `Are you sure you want to permanently delete "${
+          carta.titulo || "Letter"
+        }"? This action cannot be undone.`
       )
     ) {
       return;
@@ -277,7 +277,7 @@ export default function PersonalJournalShelf() {
       }
     } catch {}
 
-    setTrashFeedback(`"${carta.titulo || "Carta"}" foi excluída permanentemente.`);
+    setTrashFeedback(`"${carta.titulo || "Letter"}" was permanently deleted.`);
     setTimeout(() => setTrashFeedback(null), 4000);
 
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
@@ -287,7 +287,7 @@ export default function PersonalJournalShelf() {
     if (trashLetters.length === 0) return;
     if (
       !window.confirm(
-        `Tem certeza que deseja excluir permanentemente todas as ${trashLetters.length} cartas da lixeira? Esta ação não pode ser desfeita.`
+        `Are you sure you want to permanently delete all ${trashLetters.length} letters from the trash? This action cannot be undone.`
       )
     ) {
       return;
@@ -298,7 +298,7 @@ export default function PersonalJournalShelf() {
     } catch {}
     setTrashLetters([]);
 
-    setTrashFeedback("A lixeira foi esvaziada permanentemente.");
+    setTrashFeedback("Postal discards emptied permanently.");
     setTimeout(() => setTrashFeedback(null), 4000);
 
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
@@ -458,28 +458,28 @@ export default function PersonalJournalShelf() {
               (p) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
             ).length;
             const primeiraData = nb.paginas?.[0]?.dataFormatada || "Active record";
-            const coverImg = getNotebookCoverImage(nb.corCapa);
+            const theme = getNotebookTheme(nb.corCapa);
 
             return (
               <motion.article
                 key={nb.id}
-                className="tome-book-item"
+                className={`tome-book-item tome-book-color--${theme.id}`}
+                style={{ backgroundColor: theme.shelfBg }}
                 onClick={() => abrirCadernoParaLeitura(nb)}
-                whileHover={{ y: -6, scale: 1.015 }}
+                whileHover={{ y: -6 }}
                 transition={{ duration: 0.2 }}
-                title={`Clique para ler o caderno "${nb.nome}"`}
+                title={`Click to read journal "${nb.nome}"`}
               >
-                <div className="tome-book-visual-stage">
-                  <img
-                    src={coverImg}
-                    alt={`Caderno ${nb.nome}`}
-                    className="tome-book-cover-photo"
-                    draggable={false}
-                  />
-                  <div className="tome-book-embossed-overlay">
-                    <span className="tome-book-tag">VOLUME</span>
-                    <h3 className="tome-book-title">{nb.nome}</h3>
-                  </div>
+                <div className="tome-book-spine-line" aria-hidden="true" />
+                <div
+                  className="tome-book-ribbon"
+                  aria-hidden="true"
+                  style={{ backgroundColor: theme.ribbonColor }}
+                />
+
+                <div className="tome-book-top">
+                  <span className="tome-book-tag">RECORD VOLUME</span>
+                  <h3 className="tome-book-title">{nb.nome}</h3>
                 </div>
 
                 <div className="tome-book-bottom">
@@ -666,19 +666,11 @@ export default function PersonalJournalShelf() {
             onClick={() => setReadingNotebook(null)}
           >
             <div className="dark-reading-topbar" onClick={(e) => e.stopPropagation()}>
-              <div className="dark-reading-meta" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <img
-                  src={getNotebookCoverImage(readingNotebook.corCapa)}
-                  alt=""
-                  style={{ width: "24px", height: "34px", objectFit: "contain", borderRadius: "2px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }}
-                  draggable={false}
-                />
-                <div>
-                  <span className="dark-reading-tome-name">{readingNotebook.nome}</span>
-                  <span className="dark-reading-page-indicator">
-                    Reading · Page {readingPageIndex + 1} of {readingNotebook.paginas.length}
-                  </span>
-                </div>
+              <div className="dark-reading-meta">
+                <span className="dark-reading-tome-name">{readingNotebook.nome}</span>
+                <span className="dark-reading-page-indicator">
+                  Reading · Page {readingPageIndex + 1} of {readingNotebook.paginas.length}
+                </span>
               </div>
 
               <div className="dark-reading-actions">
@@ -888,9 +880,9 @@ export default function PersonalJournalShelf() {
                             type="button"
                             className="postal-restore-btn"
                             onClick={() => restaurarCarta(carta)}
-                            title="Restaurar e devolver para a pasta de origem"
+                            title="Restore and return to its origin folder"
                           >
-                            ↺ Restaurar
+                            ↺ Restore
                           </button>
                           <button
                             type="button"
@@ -899,17 +891,17 @@ export default function PersonalJournalShelf() {
                               setIsTrashModalOpen(false);
                               setReadingLetter(carta);
                             }}
-                            title="Ler carta completa"
+                            title="Read complete letter"
                           >
-                            Ler
+                            Read
                           </button>
                           <button
                             type="button"
                             className="postal-delete-perm-btn"
                             onClick={() => excluirCartaPermanentemente(carta)}
-                            title="Excluir permanentemente da lixeira"
+                            title="Permanently delete from trash"
                           >
-                            🗑 Deletar
+                            🗑 Delete
                           </button>
                         </div>
                       </div>
@@ -921,16 +913,16 @@ export default function PersonalJournalShelf() {
               <div className="postal-trash-modal-footer">
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
                   <span className="postal-trash-footer-info">
-                    {trashLetters.length} {trashLetters.length === 1 ? "carta preservada na lixeira" : "cartas preservadas na lixeira"}
+                    {trashLetters.length} {trashLetters.length === 1 ? "letter preserved in trash" : "letters preserved in trash"}
                   </span>
                   {trashLetters.length > 0 && (
                     <button
                       type="button"
                       className="postal-empty-trash-btn"
                       onClick={esvaziarLixeiraPermanentemente}
-                      title="Excluir todas as cartas permanentemente"
+                      title="Permanently delete all letters from trash"
                     >
-                      🗑 Esvaziar lixeira
+                      🗑 Empty trash
                     </button>
                   )}
                 </div>
@@ -939,7 +931,7 @@ export default function PersonalJournalShelf() {
                   className="entry-modal-close"
                   onClick={() => setIsTrashModalOpen(false)}
                 >
-                  Fechar lixeira
+                  Close trash
                 </button>
               </div>
             </motion.div>

@@ -42,7 +42,7 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}):
     if (response.status === 401) {
       clearSession();
     }
-    const errorMsg = data.error || data.message || `Erro na requisição (${response.status})`;
+    const errorMsg = data.error || data.message || `Request failed (${response.status})`;
     const err: any = new Error(errorMsg);
     err.status = response.status;
     err.requireVerification = data.requireVerification;

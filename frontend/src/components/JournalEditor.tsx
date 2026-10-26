@@ -66,42 +66,62 @@ export interface Notebook {
 
 export type NotebookCoverColor = "marrom" | "verde" | "vinho";
 
-export interface NotebookCoverOption {
+export interface NotebookColorOption {
   id: NotebookCoverColor;
   nome: string;
-  imagem: string;
-  corHex: string;
   etiqueta: string;
+  corHex: string;
+  shelfBg: string;
+  shelfSpine1: string;
+  shelfSpine2: string;
+  cardGradient: string;
+  ribbonColor: string;
 }
 
-export const NOTEBOOK_COVER_OPTIONS: NotebookCoverOption[] = [
+export const NOTEBOOK_COLOR_OPTIONS: NotebookColorOption[] = [
   {
     id: "marrom",
-    nome: "Marrom",
-    imagem: "/images/cadernos/marrom.png",
-    corHex: "#452e22",
-    etiqueta: "Couro Rústico",
+    nome: "Brown",
+    etiqueta: "Rustic Leather",
+    corHex: "#3e271d",
+    shelfBg: "#221612",
+    shelfSpine1: "#170e0b",
+    shelfSpine2: "#0f0907",
+    cardGradient: "linear-gradient(135deg, #2c1d18 0%, #1c110d 55%, #120b08 100%)",
+    ribbonColor: "#7a1818",
   },
   {
     id: "verde",
-    nome: "Verde",
-    imagem: "/images/cadernos/verde.png",
-    corHex: "#223826",
-    etiqueta: "Musgo Botânico",
+    nome: "Green",
+    etiqueta: "Botanical Moss",
+    corHex: "#1c3224",
+    shelfBg: "#14241a",
+    shelfSpine1: "#0e1a12",
+    shelfSpine2: "#08100b",
+    cardGradient: "linear-gradient(135deg, #1b2f22 0%, #132219 55%, #0b140f 100%)",
+    ribbonColor: "#8b7332",
   },
   {
     id: "vinho",
-    nome: "Vinho",
-    imagem: "/images/cadernos/vinho.png",
-    corHex: "#441a24",
-    etiqueta: "Borgonha Nobre",
+    nome: "Wine",
+    etiqueta: "Noble Burgundy",
+    corHex: "#451a24",
+    shelfBg: "#291117",
+    shelfSpine1: "#1d0b10",
+    shelfSpine2: "#120609",
+    cardGradient: "linear-gradient(135deg, #3d1722 0%, #290e16 55%, #17070b 100%)",
+    ribbonColor: "#9c8242",
   },
 ];
 
-export const getNotebookCoverImage = (corCapa?: string): string => {
-  if (corCapa === "verde" || corCapa === "#1e3323") return "/images/cadernos/verde.png";
-  if (corCapa === "vinho" || corCapa === "#3b161e") return "/images/cadernos/vinho.png";
-  return "/images/cadernos/marrom.png";
+export const getNotebookTheme = (corCapa?: string): NotebookColorOption => {
+  if (corCapa === "verde" || corCapa === "#223826" || corCapa === "#1e3323" || corCapa === "#1c3224") {
+    return NOTEBOOK_COLOR_OPTIONS[1];
+  }
+  if (corCapa === "vinho" || corCapa === "#441a24" || corCapa === "#3b161e" || corCapa === "#451a24") {
+    return NOTEBOOK_COLOR_OPTIONS[2];
+  }
+  return NOTEBOOK_COLOR_OPTIONS[0];
 };
 
 export interface PostalSeal {
@@ -877,12 +897,12 @@ export default function JournalEditor() {
   const salvarPagina = async () => {
     if (activeTab === "caderno") {
       if (!cadernoConteudo.trim() && !cadernoTitulo.trim()) {
-        alert("Por favor, escreva algo na página antes de salvar.");
+        alert("Please write something on the page before saving.");
         return;
       }
 
       if (!activeNotebook) {
-        setCadernoPromptNotice("Você precisa criar um caderno antes de salvar a página.");
+        setCadernoPromptNotice("You must create a journal before saving this page.");
         setPendingSaveAfterCreation(true);
         setNotebookDrawerOpen(true);
         playPaperSound();
@@ -892,7 +912,7 @@ export default function JournalEditor() {
       setSalvando(true);
       playPaperSound();
 
-      const tituloFinal = cadernoTitulo.trim() || `Memória de ${dataFormatada || "Hoje"}`;
+      const tituloFinal = cadernoTitulo.trim() || `Memory of ${dataFormatada || "Today"}`;
       setCadernoTitulo(tituloFinal);
 
       const paginasAtualizadas = [...cadernoPaginas];
@@ -909,19 +929,19 @@ export default function JournalEditor() {
       salvarCadernosNoStorage(paginasAtualizadas);
 
       setSalvando(false);
-      setMensagemSucesso(`Página salva com sucesso no caderno "${activeNotebook.nome}"!`);
+      setMensagemSucesso(`Page saved successfully in journal "${activeNotebook.nome}"!`);
       setTimeout(() => setMensagemSucesso(""), 3000);
       return;
     }
 
     if (activeTab === "carta") {
       if (!cartaConteudo.trim() && !cartaTitulo.trim()) {
-        alert("Por favor, escreva sua carta antes de arquivar.");
+        alert("Please write your letter before archiving.");
         return;
       }
 
       if (!activeLetterFolder) {
-        setFolderPromptNotice("Você precisa criar uma pasta antes de guardar a carta.");
+        setFolderPromptNotice("You must create a folder before filing this letter.");
         setPendingSaveAfterCreation(true);
         setFolderDrawerOpen(true);
         playPaperSound();
@@ -938,8 +958,8 @@ export default function JournalEditor() {
       if (totalCartasLocais >= limiteCartas) {
         alert(
           isPro
-            ? `Você atingiu o limite de ${limiteCartas} cartas arquivadas no Plano Premium.`
-            : `Você atingiu o limite de ${limiteCartas} cartas no Plano Normal. Assine o Clube Pro para escrever até 30 cartas!`
+            ? `You have reached the limit of ${limiteCartas} archived letters on the Premium Plan.`
+            : `You have reached the limit of ${limiteCartas} letters on the Standard Plan. Join Pro Club to write up to 30 letters!`
         );
         return;
       }
@@ -947,7 +967,7 @@ export default function JournalEditor() {
       setSalvando(true);
       playPaperSound();
 
-      const tituloFinal = cartaTitulo.trim() || `Carta: ${cartaSelo.label}`;
+      const tituloFinal = cartaTitulo.trim() || `Letter: ${cartaSelo.label}`;
 
       try {
         const existente = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
@@ -956,7 +976,7 @@ export default function JournalEditor() {
           titulo: tituloFinal,
           conteudo: cartaConteudo.trim(),
           humor: cartaSelo.id,
-          data_formatada: dataFormatada || "Hoje",
+          data_formatada: dataFormatada || "Today",
           criado_em: new Date().toISOString(),
           tipo_papel: sheetBgId,
           favoritado: cartaFavoritado,
@@ -971,7 +991,7 @@ export default function JournalEditor() {
         await api.cartas.enviar({
           titulo: tituloFinal,
           conteudo: cartaConteudo.trim(),
-          remetente_anonimo: user?.nome || "Correspondente",
+          remetente_anonimo: user?.nome || "Correspondent",
           categoria: cartaSelo.id,
           tipo_papel: sheetBgId,
           data_carta: dataFormatada,
@@ -989,7 +1009,7 @@ export default function JournalEditor() {
       setCartaFavoritado(false);
 
       setSalvando(false);
-      setMensagemSucesso(`Carta arquivada com sucesso na pasta "${activeLetterFolder.nome}"!`);
+      setMensagemSucesso(`Letter archived successfully in folder "${activeLetterFolder.nome}"!`);
       setTimeout(() => setMensagemSucesso(""), 3200);
     }
   };
@@ -1011,7 +1031,7 @@ export default function JournalEditor() {
             id: "pag-" + Date.now(),
             titulo: "",
             conteudo: "",
-            dataFormatada: dataFormatada || "Hoje",
+            dataFormatada: dataFormatada || "Today",
             favoritado: false,
             criadoEm: new Date().toISOString(),
           },
@@ -1040,13 +1060,13 @@ export default function JournalEditor() {
     if (notebooks.length >= limiteCadernos) {
       alert(
         isPro
-          ? `Você atingiu o limite de ${limiteCadernos} cadernos do Plano Premium.`
-          : `Você atingiu o limite de ${limiteCadernos} cadernos do Plano Normal. Assine o Clube Pro para ter até 10 cadernos!`
+          ? `You have reached the limit of ${limiteCadernos} journals on the Premium Plan.`
+          : `You have reached the limit of ${limiteCadernos} journals on the Standard Plan. Join Pro Club to have up to 10 journals!`
       );
       return;
     }
 
-    // 1. Salva tudo o que estava escrito na tela no caderno antigo (apenas páginas escritas)
+    // 1. Save whatever was written on screen to the old journal (written pages only)
     let notebooksAtualizados = [...notebooks];
     if (activeNotebook) {
       notebooksAtualizados = notebooksAtualizados.map((nb) => {
@@ -1072,12 +1092,12 @@ export default function JournalEditor() {
       });
     }
 
-    // 2. Cria o novo caderno vazio com a cor de capa escolhida (sem páginas salvas em disco)
+    // 2. Create the new empty journal with chosen cover color
     const novoCaderno: Notebook = {
       id: "caderno-" + Date.now(),
       nome: newNotebookTitle.trim(),
       corCapa: newNotebookCover,
-      paginas: [], // NADA salvo no caderno novo
+      paginas: [],
     };
 
     const listaFinal = [...notebooksAtualizados, novoCaderno];
@@ -1088,7 +1108,7 @@ export default function JournalEditor() {
       window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, novoCaderno.id);
     } catch {}
 
-    // 3. Define o novo caderno como ativo e a tela vem COMPLETAMENTE EM BRANCO
+    // 3. Set the new journal active with a fresh blank page
     setActiveNotebookId(novoCaderno.id);
     setCurrentPageIndex(0);
     setCadernoPaginas([
@@ -1096,7 +1116,7 @@ export default function JournalEditor() {
         id: "pag-" + Date.now(),
         titulo: "",
         conteudo: "",
-        dataFormatada: dataFormatada || "Hoje",
+        dataFormatada: dataFormatada || "Today",
         favoritado: false,
         criadoEm: new Date().toISOString(),
       },
@@ -1113,7 +1133,7 @@ export default function JournalEditor() {
     playPaperSound();
 
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
-    setMensagemSucesso(`Caderno "${novoCaderno.nome}" criado com folha em branco!`);
+    setMensagemSucesso(`Journal "${novoCaderno.nome}" created with a blank page!`);
     setTimeout(() => setMensagemSucesso(""), 3000);
   };
 
@@ -1345,58 +1365,49 @@ export default function JournalEditor() {
           {activeTab === "caderno" ? (
             <div className="caderno-left-stack">
               {activeNotebook ? (
-                <div
-                  className="desk-notebook-tome-wrapper"
-                  onClick={() => {
-                    setCadernoPromptNotice(null);
-                    setNotebookDrawerOpen(true);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  title="Clique para alternar ou criar novos cadernos"
-                >
-                  <div className="desk-notebook-tome-book">
-                    <img
-                      src={getNotebookCoverImage(activeNotebook.corCapa)}
-                      alt={`Caderno ${activeNotebook.nome}`}
-                      className="desk-notebook-cover-img"
-                      draggable={false}
-                    />
-                    <div className="desk-notebook-overlay-content">
-                      <span className="desk-notebook-tag">RECORD VOLUME</span>
-                      <span className="desk-notebook-title">{activeNotebook.nome}</span>
-                      <span className="desk-notebook-pages">
-                        {cadernoPaginas.filter((p) => p.conteudo?.trim() || p.titulo?.trim()).length}{" "}
-                        {cadernoPaginas.filter((p) => p.conteudo?.trim() || p.titulo?.trim()).length === 1
-                          ? "página escrita"
-                          : "páginas escritas"}
-                      </span>
+                (() => {
+                  const theme = getNotebookTheme(activeNotebook.corCapa);
+                  return (
+                    <div
+                      className={`leather-notebook-card leather-notebook-color--${theme.id}`}
+                      style={{
+                        background: theme.cardGradient,
+                        borderLeftColor: theme.shelfSpine2,
+                      }}
+                      onClick={() => {
+                        setCadernoPromptNotice(null);
+                        setNotebookDrawerOpen(true);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title="Click to switch or create new journals"
+                    >
+                      <div
+                        className="leather-notebook-ribbon"
+                        aria-hidden="true"
+                        style={{ backgroundColor: theme.ribbonColor }}
+                      />
+                      <span className="leather-notebook-tag">RECORD VOLUME</span>
+                      <span className="leather-notebook-title">{activeNotebook.nome}</span>
+                      <span className="leather-notebook-author">{user?.nome || "PERSONAL ARCHIVE"}</span>
                     </div>
-                  </div>
-                  <div className="desk-notebook-caption-bar">
-                    <span className="desk-notebook-caption-name">{activeNotebook.nome}</span>
-                    <span className="desk-notebook-caption-action">Trocar volume ▾</span>
-                  </div>
-                </div>
+                  );
+                })()
               ) : (
                 <div
-                  className="desk-notebook-tome-wrapper is-empty-state"
+                  className="leather-notebook-card is-empty-state"
                   onClick={() => {
                     setCadernoPromptNotice(null);
                     setNotebookDrawerOpen(true);
                   }}
                   role="button"
                   tabIndex={0}
-                  title="Clique para criar seu primeiro caderno"
+                  title="Click to create your first volume"
                 >
-                  <div className="desk-notebook-empty-tome">
-                    <span style={{ fontSize: "28px" }}>📖</span>
-                    <span className="desk-notebook-empty-tag">EMPTY SHELF</span>
-                    <span className="desk-notebook-empty-title">+ CRIAR CADERNO</span>
-                  </div>
-                  <div className="desk-notebook-caption-bar">
-                    <span className="desk-notebook-caption-action">+ Criar Caderno</span>
-                  </div>
+                  <div className="leather-notebook-ribbon" aria-hidden="true" />
+                  <span className="leather-notebook-tag">EMPTY SHELF</span>
+                  <span className="leather-notebook-title">+ CREATE JOURNAL</span>
+                  <span className="leather-notebook-author">CLICK TO BEGIN</span>
                 </div>
               )}
 
@@ -1529,8 +1540,8 @@ export default function JournalEditor() {
               className="sheet-nav-arrow sheet-nav-arrow--left"
               onClick={navegarAnterior}
               disabled={activeTab === "carta" || currentPageIndex === 0}
-              title={activeTab === "carta" ? "Folha única de correspondência" : "Página anterior (←)"}
-              aria-label="Página anterior"
+              title={activeTab === "carta" ? "Single correspondence sheet" : "Previous page (←)"}
+              aria-label="Previous page"
             >
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
@@ -1552,16 +1563,16 @@ export default function JournalEditor() {
               {activeTab === "caderno" ? (
                 <div className="caderno-content-inner">
                   <div className="caderno-date-line">
-                    <span>{dataFormatada || "Sexta-feira"}</span>
+                    <span>{dataFormatada || "Today"}</span>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                       {isSheetFull(cadernoConteudo, textareaRef.current) && (
                         <span style={{ fontSize: "10px", color: "#8b1e1e", fontWeight: 700, letterSpacing: "0.08em" }}>
-                          FOLHA CHEIA
+                          SHEET FULL
                         </span>
                       )}
                       {cadernoPaginas.length > 1 && (
                         <small className="caderno-page-counter">
-                          página {currentPageIndex + 1} de {cadernoPaginas.length}
+                          page {currentPageIndex + 1} of {cadernoPaginas.length}
                         </small>
                       )}
                     </div>
@@ -1572,7 +1583,7 @@ export default function JournalEditor() {
                     className="caderno-title-input"
                     value={cadernoTitulo}
                     onChange={(e) => handleCadernoTituloChange(e.target.value)}
-                    placeholder="(Título opcional da memória)"
+                    placeholder="(Optional title of memory)"
                   />
 
                   <textarea
@@ -1583,7 +1594,7 @@ export default function JournalEditor() {
                     onKeyDown={handleKeyDown}
                     onPaste={handlePaste}
                     onKeyUp={handleKeyUp}
-                    placeholder="Escreva seus pensamentos e reflexões aqui..."
+                    placeholder="Write your words here..."
                     rows={MAX_LINES_PER_PAGE}
                   />
 
@@ -1593,9 +1604,9 @@ export default function JournalEditor() {
                       className={`classic-stamp-favorite ${cadernoFavoritado ? "is-favorited" : ""}`}
                       onClick={toggleFavoritoCaderno}
                       whileTap={{ scale: 0.95 }}
-                      title="Carimbar página como favorita"
+                      title="Stamp page as favorite"
                     >
-                      {cadernoFavoritado ? "FAVORITADO ♥" : "FAVORITAR ♥"}
+                      {cadernoFavoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
                     </motion.button>
                   </div>
                 </div>
@@ -1608,14 +1619,14 @@ export default function JournalEditor() {
                       <span className="stamp-denomination">US • ARCHIVE</span>
                     </div>
                     <div className="postmark-circle" aria-hidden="true">
-                      <span>ENTRE CARTAS</span>
+                      <span>BETWEEN LETTERS</span>
                       <small>HISTORICAL MAIL</small>
                     </div>
                   </div>
 
                   <div className="carta-top-meta">
                     <span className="carta-date">{dataFormatada}</span>
-                    <span className="carta-sentiment-badge">Classificação: {cartaSelo.label}</span>
+                    <span className="carta-sentiment-badge">Classification: {cartaSelo.label}</span>
                   </div>
 
                   <input
@@ -1623,29 +1634,29 @@ export default function JournalEditor() {
                     className="carta-recipient-input"
                     value={cartaTitulo}
                     onChange={(e) => setCartaTitulo(e.target.value)}
-                    placeholder="Para: (ou título solene da correspondência)"
+                    placeholder="To: (or formal title of correspondence)"
                   />
 
                   <textarea
                     className="carta-textarea-unruled"
                     value={cartaConteudo}
                     onChange={handleCartaConteudoChange}
-                    placeholder="Redija sua carta solene aqui..."
+                    placeholder="Write your letter here..."
                     rows={12}
                   />
 
                   <div className="carta-footer-meta">
                     <span className="carta-seal-status">
-                      Selo postal: <b>{cartaSelo.label}</b>
+                      Postal seal: <b>{cartaSelo.label}</b>
                     </span>
                     <motion.button
                       type="button"
                       className={`classic-stamp-favorite ${cartaFavoritado ? "is-favorited" : ""}`}
                       onClick={toggleFavoritoCarta}
                       whileTap={{ scale: 0.95 }}
-                      title="Carimbar carta como favorita"
+                      title="Stamp letter as favorite"
                     >
-                      {cartaFavoritado ? "FAVORITADO ♥" : "FAVORITAR ♥"}
+                      {cartaFavoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
                     </motion.button>
                   </div>
                 </div>
@@ -1659,12 +1670,12 @@ export default function JournalEditor() {
               disabled={activeTab === "carta" || !podeAvancarPagina}
               title={
                 activeTab === "carta"
-                  ? "Folha única de correspondência"
+                  ? "Single correspondence sheet"
                   : podeAvancarPagina
-                  ? "Próxima página (→)"
-                  : "Você pode avançar até 3 páginas após uma página escrita. Escreva algo nesta página para avançar mais."
+                  ? "Next page (→)"
+                  : "You can advance up to 3 blank pages after a written page. Write something on this page to advance further."
               }
-              aria-label="Próxima página"
+              aria-label="Next page"
             >
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
@@ -1764,14 +1775,14 @@ export default function JournalEditor() {
               <div className="notebooks-list">
                 {notebooks.length === 0 ? (
                   <div className="drawer-empty-state-hint">
-                    <span className="empty-hint-title">Nenhum caderno criado ainda.</span>
+                    <span className="empty-hint-title">No journals created yet.</span>
                     <p className="empty-hint-text">
-                      Dê um nome e escolha a capa do seu primeiro volume abaixo para arquivar suas páginas.
+                      Name your volume below to create it and archive your page safely.
                     </p>
                   </div>
                 ) : (
                   notebooks.map((nb) => {
-                    const coverImg = getNotebookCoverImage(nb.corCapa);
+                    const theme = getNotebookTheme(nb.corCapa);
                     const totalPags = (nb.paginas || []).filter(
                       (p) => (p.conteudo && p.conteudo.trim().length > 0) || (p.titulo && p.titulo.trim().length > 0)
                     ).length;
@@ -1781,22 +1792,28 @@ export default function JournalEditor() {
                         className={`notebook-item-card ${activeNotebook?.id === nb.id ? "is-active" : ""}`}
                         onClick={() => selecionarCaderno(nb)}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <img
-                            src={coverImg}
-                            alt=""
-                            className="notebook-item-mini-cover"
-                            draggable={false}
-                          />
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div
+                            className="notebook-item-mini-swatch"
+                            style={{
+                              background: theme.cardGradient,
+                              borderLeft: `3px solid ${theme.shelfSpine2}`,
+                            }}
+                          >
+                            <div
+                              className="mini-swatch-ribbon"
+                              style={{ backgroundColor: theme.ribbonColor }}
+                            />
+                          </div>
                           <div>
                             <span className="notebook-item-name">{nb.nome}</span>
                             <div className="notebook-item-count">
-                              {totalPags} {totalPags === 1 ? "página escrita" : "páginas escritas"}
+                              {totalPags} {totalPags === 1 ? "page written" : "pages written"}
                             </div>
                           </div>
                         </div>
                         {activeNotebook?.id === nb.id && (
-                          <span style={{ color: "#8b1e1e", fontWeight: 700, fontSize: "12px" }}>✓ Ativo</span>
+                          <span style={{ color: "#8b1e1e", fontWeight: 700, fontSize: "12px" }}>✓ Active</span>
                         )}
                       </div>
                     );
@@ -1805,11 +1822,11 @@ export default function JournalEditor() {
               </div>
 
               <form onSubmit={criarNovoCaderno} className="new-notebook-form">
-                <label className="new-notebook-label">NOME DO CADERNO</label>
+                <label className="new-notebook-label">JOURNAL TITLE</label>
                 <input
                   type="text"
                   className="new-notebook-input"
-                  placeholder="Nome do novo volume (ex: Diário Secreto, Memórias)..."
+                  placeholder="Name of new volume (e.g., Secret Diary, Memoirs)..."
                   value={newNotebookTitle}
                   onChange={(e) => setNewNotebookTitle(e.target.value)}
                   maxLength={50}
@@ -1817,10 +1834,10 @@ export default function JournalEditor() {
                 />
 
                 <label className="new-notebook-label" style={{ marginTop: "14px" }}>
-                  ESCOLHA A COR DA CAPA
+                  CHOOSE COVER COLOR
                 </label>
                 <div className="notebook-color-picker-grid">
-                  {NOTEBOOK_COVER_OPTIONS.map((opt) => {
+                  {NOTEBOOK_COLOR_OPTIONS.map((opt) => {
                     const isSelected = newNotebookCover === opt.id;
                     return (
                       <button
@@ -1832,12 +1849,16 @@ export default function JournalEditor() {
                           playPaperSound();
                         }}
                       >
-                        <div className="notebook-color-thumbnail-wrap">
-                          <img
-                            src={opt.imagem}
-                            alt={opt.nome}
-                            className="notebook-color-thumbnail-img"
-                            draggable={false}
+                        <div
+                          className="notebook-color-swatch-box"
+                          style={{
+                            background: opt.cardGradient,
+                            borderLeft: `4px solid ${opt.shelfSpine2}`,
+                          }}
+                        >
+                          <div
+                            className="swatch-ribbon"
+                            style={{ backgroundColor: opt.ribbonColor }}
                           />
                           {isSelected && <span className="notebook-color-check-badge">✓</span>}
                         </div>
@@ -1849,7 +1870,7 @@ export default function JournalEditor() {
                 </div>
 
                 <button type="submit" className="new-notebook-btn" style={{ marginTop: "14px" }}>
-                  + Criar Caderno
+                  + Create Journal
                 </button>
               </form>
             </motion.div>

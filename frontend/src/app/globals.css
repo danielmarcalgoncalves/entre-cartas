@@ -237,157 +237,80 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* Encadernação em Couro Sóbrio / Livro Clássico */
-/* ============================================================ */
-/* DESIGN DO CADERNO NA MESA (AO LADO DA PÁGINA)               */
-/* ============================================================ */
-.desk-notebook-tome-wrapper {
-  position: relative;
-  width: 155px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-  user-select: none;
-}
-
-.desk-notebook-tome-wrapper:hover {
-  transform: translateY(-4px) scale(1.02);
-}
-
-.desk-notebook-tome-book {
-  position: relative;
-  width: 150px;
-  height: 208px;
-  filter: drop-shadow(-4px 8px 16px rgba(18, 10, 6, 0.45)) drop-shadow(2px 6px 14px rgba(0, 0, 0, 0.3));
-  transition: filter 0.25s ease;
-}
-
-.desk-notebook-tome-wrapper:hover .desk-notebook-tome-book {
-  filter: drop-shadow(-6px 12px 22px rgba(18, 10, 6, 0.55)) drop-shadow(3px 8px 18px rgba(0, 0, 0, 0.35));
-}
-
-.desk-notebook-cover-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.desk-notebook-overlay-content {
-  position: absolute;
-  top: 56px;
-  left: 20px;
-  right: 12px;
-  bottom: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
-}
-
-.desk-notebook-tag {
-  font-family: var(--sans, sans-serif);
-  font-size: 7.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(226, 198, 142, 0.85);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  margin-bottom: 4px;
-}
-
-.desk-notebook-title {
-  font-family: var(--serif-title, var(--serif, serif));
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #f7e7c4;
-  text-transform: uppercase;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-width: 110px;
-}
-
-.desk-notebook-pages {
-  margin-top: 8px;
-  font-family: var(--serif, serif);
-  font-size: 9.5px;
-  color: rgba(235, 218, 185, 0.75);
-  font-style: italic;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.desk-notebook-caption-bar {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.desk-notebook-caption-name {
-  font-family: var(--serif, serif);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #3b2c1d;
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.desk-notebook-caption-action {
-  font-family: var(--sans, sans-serif);
-  font-size: 9.5px;
-  color: #8b1e1e;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.desk-notebook-empty-tome {
+.leather-notebook-card {
   width: 145px;
   height: 205px;
-  border: 2px dashed rgba(135, 115, 90, 0.4);
-  border-radius: 6px;
-  background: rgba(253, 250, 244, 0.6);
+  background: linear-gradient(135deg, #241a17 0%, #17100e 55%, #100b09 100%);
+  border-radius: 3px 10px 10px 3px;
+  box-shadow: -3px 6px 18px rgba(20, 10, 6, 0.45), 2px 8px 24px rgba(0, 0, 0, 0.3);
+  position: relative;
+  cursor: pointer;
+  border-left: 6px solid #0d0705;
+  padding: 24px 14px 22px 18px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px;
   text-align: center;
-  transition: all 0.2s ease;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease;
+  user-select: none;
 }
-
-.desk-notebook-tome-wrapper.is-empty-state:hover .desk-notebook-empty-tome {
-  border-color: #8b1e1e;
-  background: rgba(255, 255, 255, 0.9);
+.leather-notebook-card:hover {
+  transform: translateY(-3px);
+  box-shadow: -5px 12px 26px rgba(20, 10, 6, 0.52), 3px 12px 28px rgba(0, 0, 0, 0.4);
 }
-
-.desk-notebook-empty-tag {
+.leather-notebook-card::before {
+  content: "";
+  position: absolute;
+  inset: 8px 8px 8px 12px;
+  border: 1px solid rgba(212, 185, 140, 0.22);
+  border-radius: 2px 6px 6px 2px;
+  pointer-events: none;
+}
+.leather-notebook-tag {
   font-family: var(--sans, sans-serif);
-  font-size: 7.5px;
-  letter-spacing: 0.16em;
-  color: #8a7c6c;
-  font-weight: 700;
+  font-size: 7px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  color: rgba(212, 185, 140, 0.55);
 }
-
-.desk-notebook-empty-title {
-  font-family: var(--serif-title, var(--serif, serif));
+.leather-notebook-title {
+  font-family: var(--serif, Georgia, serif);
+  color: #dfcca8;
   font-size: 11px;
-  font-weight: 700;
-  color: #3b2c1d;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  line-height: 1.45;
+  word-break: break-word;
+}
+.leather-notebook-author {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 9px;
+  color: rgba(212, 185, 140, 0.6);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+.leather-notebook-ribbon {
+  width: 14px;
+  height: 24px;
+  background: #7a1f1f;
+  border-radius: 0 0 2px 2px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  align-self: center;
+  margin-bottom: -12px;
+}
+
+/* Modificadores de cor para o caderno na mesa */
+.leather-notebook-color--marrom {
+  border-left-color: #0d0705;
+}
+.leather-notebook-color--verde {
+  border-left-color: #08100b;
+}
+.leather-notebook-color--vinho {
+  border-left-color: #120609;
 }
 
 /* Suporte Ordenado de Selos Postais de Arquivo (Modo Carta) */
@@ -1291,35 +1214,63 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: 0 0 0 2px rgba(139, 30, 30, 0.2), 0 4px 12px rgba(139, 30, 30, 0.15);
 }
 
-.notebook-color-thumbnail-wrap {
+.notebook-color-swatch-box {
+  width: 50px;
+  height: 64px;
+  border-radius: 2px 6px 6px 2px;
+  box-shadow:
+    -3px 0 0 rgba(0, 0, 0, 0.4),
+    0 4px 10px rgba(0, 0, 0, 0.35),
+    inset 0 0 10px rgba(0, 0, 0, 0.5);
   position: relative;
-  width: 44px;
-  height: 60px;
-  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease;
 }
 
-.notebook-color-thumbnail-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+.notebook-color-option-card:hover .notebook-color-swatch-box {
+  transform: scale(1.04);
+}
+
+.notebook-color-swatch-box::before {
+  content: "";
+  position: absolute;
+  inset: 4px 4px 4px 6px;
+  border: 1px solid rgba(212, 185, 140, 0.28);
+  border-radius: 1px 3px 3px 1px;
+  pointer-events: none;
+}
+
+.swatch-ribbon {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  width: 6px;
+  height: 16px;
+  border-radius: 0 0 1px 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .notebook-color-check-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 16px;
-  height: 16px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #8b1e1e;
+  font-weight: 800;
+  font-size: 11px;
   border-radius: 50%;
-  background: #8b1e1e;
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  z-index: 2;
 }
 
 .notebook-color-opt-name {
@@ -1337,11 +1288,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   margin-top: 2px;
 }
 
-.notebook-item-mini-cover {
-  width: 26px;
-  height: 36px;
-  object-fit: contain;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+.notebook-item-mini-swatch {
+  width: 24px;
+  height: 32px;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: -2px 0 0 rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.notebook-item-mini-swatch::before {
+  content: "";
+  position: absolute;
+  inset: 2px 2px 2px 3px;
+  border: 1px solid rgba(212, 185, 140, 0.25);
+  border-radius: 1px 2px 2px 1px;
+  pointer-events: none;
+}
+
+.mini-swatch-ribbon {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  width: 3px;
+  height: 8px;
+  border-radius: 0 0 1px 1px;
 }
 
 .new-notebook-btn {
@@ -1840,99 +1811,84 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .tome-book-item {
   position: relative;
-  height: 380px;
-  background: linear-gradient(180deg, #2a1f18 0%, #19120e 100%);
-  border-radius: 6px;
-  border: 1px solid rgba(135, 115, 90, 0.35);
-  box-shadow: 0 12px 30px rgba(18, 12, 8, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 18px 18px 16px;
+  height: 340px;
+  background: #1e1512;
+  border-radius: 4px 8px 8px 4px;
+  border: 1px solid rgba(80, 50, 30, 0.4);
+  box-shadow:
+    -6px 0 0 var(--spine-color-1, #140d0a),
+    -12px 0 0 var(--spine-color-2, #0d0806),
+    0 16px 36px rgba(18, 12, 8, 0.28),
+    inset 0 0 24px rgba(0, 0, 0, 0.6);
+  padding: 30px 24px 24px 34px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: center;
   cursor: pointer;
-  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.24s ease;
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease;
   overflow: hidden;
 }
 
 .tome-book-item:hover {
-  transform: translateY(-8px) scale(1.015);
-  border-color: rgba(212, 175, 55, 0.65);
-  box-shadow: 0 22px 48px rgba(18, 12, 8, 0.55), 0 0 25px rgba(212, 175, 55, 0.2);
+  transform: translateY(-6px) scale(1.01);
+  box-shadow:
+    -8px 0 0 var(--spine-color-1, #140d0a),
+    -14px 0 0 var(--spine-color-2, #0d0806),
+    0 22px 46px rgba(18, 12, 8, 0.36),
+    inset 0 0 28px rgba(0, 0, 0, 0.7);
 }
 
-.tome-book-visual-stage {
-  position: relative;
-  width: 180px;
-  height: 250px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  filter: drop-shadow(-4px 8px 18px rgba(0, 0, 0, 0.65));
-  transition: transform 0.24s ease, filter 0.24s ease;
-}
-
-.tome-book-item:hover .tome-book-visual-stage {
-  transform: scale(1.03);
-  filter: drop-shadow(-6px 12px 24px rgba(0, 0, 0, 0.8));
-}
-
-.tome-book-cover-photo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.tome-book-embossed-overlay {
+.tome-book-spine-line {
   position: absolute;
-  top: 66px;
+  top: 0;
+  bottom: 0;
   left: 20px;
-  right: 14px;
-  bottom: 24px;
+  width: 2px;
+  background: rgba(212, 175, 55, 0.28);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.6);
+}
+
+.tome-book-ribbon {
+  position: absolute;
+  top: -4px;
+  right: 28px;
+  width: 14px;
+  height: 48px;
+  background: #7a1818;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  border-radius: 0 0 3px 3px;
+}
+
+.tome-book-top {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
+  gap: 8px;
 }
 
 .tome-book-tag {
-  font-family: var(--sans, sans-serif);
-  font-size: 8px;
+  font-family: var(--serif, serif);
+  font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(226, 198, 142, 0.85);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  margin-bottom: 4px;
+  color: rgba(212, 175, 55, 0.75);
 }
 
 .tome-book-title {
-  font-family: var(--serif-title, var(--serif, serif));
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #f7e7c4;
-  text-transform: uppercase;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-width: 130px;
+  font-family: var(--serif-title, var(--serif));
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #eedcc0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   margin: 0;
 }
 
 .tome-book-bottom {
-  width: 100%;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid rgba(212, 175, 55, 0.2);
-  padding-top: 12px;
-  margin-top: 6px;
+  align-items: flex-end;
+  border-top: 1px solid rgba(212, 175, 55, 0.18);
+  padding-top: 14px;
 }
 
 .tome-book-stats {
@@ -1970,6 +1926,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tome-book-item:hover .tome-book-read-pill {
   background: rgba(212, 175, 55, 0.15);
   border-color: rgba(212, 175, 55, 0.7);
+}
+
+/* Modificadores de cor para os cadernos da estante */
+.tome-book-color--marrom {
+  --spine-color-1: #170e0b;
+  --spine-color-2: #0f0907;
+  border-color: rgba(90, 60, 40, 0.45);
+}
+
+.tome-book-color--verde {
+  --spine-color-1: #0e1a12;
+  --spine-color-2: #08100b;
+  border-color: rgba(40, 75, 50, 0.45);
+}
+
+.tome-book-color--vinho {
+  --spine-color-1: #1d0b10;
+  --spine-color-2: #120609;
+  border-color: rgba(85, 35, 45, 0.45);
 }
 
 /* ============================================================ */

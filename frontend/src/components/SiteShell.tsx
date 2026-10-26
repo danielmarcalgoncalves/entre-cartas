@@ -80,14 +80,13 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setAuthOpen(true)}
+              <Link
+                href="/login"
                 className="stamp-button compact"
-                style={{ minWidth: "auto" }}
+                style={{ minWidth: "auto", textDecoration: "none" }}
               >
                 Sign In
-              </button>
+              </Link>
             )}
           </div>
         </div>

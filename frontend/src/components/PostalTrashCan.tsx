@@ -41,9 +41,9 @@ export default function PostalTrashCan({
   };
 
   const getStatusLabel = (): string => {
-    if (count <= 0) return "Vazia";
-    if (count <= 2) return "Meio cheia";
-    return "Lotada";
+    if (count <= 0) return "Empty";
+    if (count <= 2) return "Partially full";
+    return "Full";
   };
 
   const currentImage = getTrashImage();
@@ -57,13 +57,13 @@ export default function PostalTrashCan({
       onClick={onClick}
       role="button"
       tabIndex={0}
-      aria-label={`Lixeira postal (${getStatusLabel()}). Arraste uma carta aqui para descartar. Clique para ver cartas descartadas.`}
-      title="Lixeira Postal: Arraste uma carta aqui para descartar. Clique para ver e gerenciar cartas."
+      aria-label={`Postal discards (${getStatusLabel()}). Drag a letter here to discard. Click to view discarded letters.`}
+      title="Postal Discards: Drag a letter here to discard. Click to view and manage letters."
     >
-      {/* Sombra de chão vintage no papel */}
+      {/* Vintage floor shadow on paper */}
       <div className="postal-trash-floor-shadow" />
 
-      {/* Visual da lixeira com a foto correspondente à quantidade */}
+      {/* Trash visual matching letter capacity */}
       <div
         className={`postal-trash-can-visual ${isOpen ? "is-open" : ""} ${
           isShaking ? "is-shaking" : ""
@@ -72,29 +72,29 @@ export default function PostalTrashCan({
         <img
           key={currentImage}
           src={currentImage}
-          alt={`Lixeira ${getStatusLabel()} com ${count} ${
-            count === 1 ? "carta" : "cartas"
+          alt={`Postal trash (${getStatusLabel()}) with ${count} ${
+            count === 1 ? "letter" : "letters"
           }`}
           className="postal-trash-photo"
           draggable={false}
         />
 
-        {/* Efeito de atração quando a carta está sendo arrastada por cima */}
+        {/* Target glow effect when dragging over */}
         {isOpen && <div className="postal-trash-target-glow" />}
       </div>
 
-      {/* Informações da lixeira */}
+      {/* Postal trash information */}
       <div className="postal-trash-info">
-        <span className="postal-trash-title">LIXEIRA POSTAL</span>
+        <span className="postal-trash-title">POSTAL DISCARDS</span>
         <span className="postal-trash-count">
           {count === 0
-            ? "0 cartas (Vazia)"
+            ? "0 letters (Empty)"
             : count <= 2
-            ? `${count} ${count === 1 ? "carta" : "cartas"} (Meio cheia)`
-            : `${count} cartas (Lotada)`}
+            ? `${count} ${count === 1 ? "letter" : "letters"} (Partially full)`
+            : `${count} letters (Full)`}
         </span>
         <span className={`postal-trash-hint ${isOpen ? "is-active" : ""}`}>
-          {isOpen ? "Solte para descartar!" : "Arraste uma carta até aqui"}
+          {isOpen ? "Drop to discard!" : "Drag a letter here"}
         </span>
       </div>
     </div>
