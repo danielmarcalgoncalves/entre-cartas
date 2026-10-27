@@ -165,9 +165,9 @@ export default function ClubeProPage() {
             className="letter-object"
             style={{
               padding: "32px 28px",
-              backgroundColor: "#2e251e",
+              backgroundColor: "var(--bg-surface-elevated)",
               border: "2px solid var(--color-pollen, #cfa96f)",
-              boxShadow: "0 18px 44px rgba(0,0,0,0.6), 0 0 1px rgba(207, 169, 111, 0.4)",
+              boxShadow: "var(--shadow-elevated)",
               transform: "rotate(0.5deg)",
             }}
           >

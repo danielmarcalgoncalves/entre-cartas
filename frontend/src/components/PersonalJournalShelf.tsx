@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import {
   ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
@@ -24,6 +25,7 @@ const TRASH_STORAGE_KEY = "entre-cartas:journal:trash";
 
 export default function PersonalJournalShelf() {
   const { user, isPro } = useAuth();
+  const { theme } = useTheme();
 
   // State
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
@@ -617,7 +619,7 @@ export default function PersonalJournalShelf() {
                       variant="solid"
                       color={folderTheme.corHex}
                       paperColor="#fcfbf7"
-                      theme="dark"
+                      theme={theme}
                       size={1.35}
                       items={folderItems}
                       open={isOpen}

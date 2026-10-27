@@ -75,9 +75,9 @@ export default function AuthCard({
           maxWidth: "460px",
           width: "100%",
           padding: "36px 32px",
-          backgroundColor: "#2b221a",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.75)",
-          border: "1px solid rgba(207, 169, 111, 0.35)",
+          backgroundColor: "var(--bg-surface-elevated)",
+          boxShadow: "var(--shadow-elevated)",
+          border: "1px solid var(--border-card)",
           borderRadius: "6px",
         }}
       >
@@ -87,10 +87,10 @@ export default function AuthCard({
           <span className="stamp-mark" style={{ minWidth: "auto", padding: "4px 10px", marginBottom: "10px" }}>
             AUTHENTICATED READER
           </span>
-          <h2 className="section-title" style={{ marginTop: "10px", fontSize: "26px", color: "var(--color-birch-paper)" }}>
+          <h2 className="section-title" style={{ marginTop: "10px", fontSize: "26px", color: "var(--text-primary)" }}>
             Welcome, {user.nome}
           </h2>
-          <p className="page-intro" style={{ margin: "8px auto 0", fontSize: "13px" }}>
+          <p className="page-intro" style={{ margin: "8px auto 0", fontSize: "13px", color: "var(--text-secondary)" }}>
             You are signed in with <strong>{user.email}</strong>.
           </p>
         </div>
@@ -132,9 +132,9 @@ export default function AuthCard({
         maxWidth: "460px",
         width: "100%",
         padding: "36px 32px",
-        backgroundColor: "#2b221a",
-        boxShadow: "0 24px 60px rgba(0, 0, 0, 0.75)",
-        border: "1px solid rgba(207, 169, 111, 0.35)",
+        backgroundColor: "var(--bg-surface-elevated)",
+        boxShadow: "var(--shadow-elevated)",
+        border: "1px solid var(--border-card)",
         borderRadius: "6px",
       }}
     >
@@ -152,7 +152,7 @@ export default function AuthCard({
               ? "New Sender Account"
               : "Seal Confirmation"}
           </span>
-          <h2 className="section-title" style={{ marginTop: "6px", fontSize: "26px" }}>
+          <h2 className="section-title" style={{ marginTop: "6px", fontSize: "26px", color: "var(--text-primary)" }}>
             {mode === "choice"
               ? "Access Your Archive"
               : mode === "login"
@@ -170,7 +170,7 @@ export default function AuthCard({
             style={{
               background: "transparent",
               border: "none",
-              color: "#cfa96f",
+              color: "var(--color-pollen)",
               fontSize: "22px",
               cursor: "pointer",
               fontFamily: "var(--serif)",
@@ -189,9 +189,9 @@ export default function AuthCard({
           style={{
             padding: "10px 14px",
             marginBottom: "16px",
-            backgroundColor: "rgba(121, 59, 43, 0.25)",
-            border: "1px solid rgba(173, 91, 48, 0.5)",
-            color: "#f2bbb0",
+            backgroundColor: "rgba(212, 106, 106, 0.16)",
+            border: "1px solid var(--color-error)",
+            color: "var(--color-error)",
             fontSize: "12px",
             lineHeight: 1.4,
             borderRadius: "3px",
@@ -206,9 +206,9 @@ export default function AuthCard({
           style={{
             padding: "10px 14px",
             marginBottom: "16px",
-            backgroundColor: "rgba(81, 76, 52, 0.35)",
-            border: "1px solid rgba(207, 169, 111, 0.4)",
-            color: "#ece1c9",
+            backgroundColor: "rgba(107, 143, 90, 0.16)",
+            border: "1px solid var(--color-success)",
+            color: "var(--color-success)",
             fontSize: "12px",
             borderRadius: "3px",
           }}
@@ -220,7 +220,7 @@ export default function AuthCard({
       {/* 1. INITIAL SCREEN: THE TWO OPTIONS (CHOICE MODE) */}
       {mode === "choice" && (
         <div>
-          <p className="page-intro" style={{ margin: "0 0 20px", fontSize: "13px", lineHeight: 1.5, color: "#a89d8d" }}>
+          <p className="page-intro" style={{ margin: "0 0 20px", fontSize: "13px", lineHeight: 1.5, color: "var(--text-secondary)" }}>
             Rest your thoughts in hardbound journals and seal thoughtful letters sheltered from time. Select an option below to continue:
           </p>
 
@@ -237,8 +237,8 @@ export default function AuthCard({
                 flexDirection: "column",
                 alignItems: "flex-start",
                 padding: "16px 18px",
-                backgroundColor: "#221912",
-                border: "1.5px solid #ad5b30",
+                backgroundColor: "var(--bg-surface)",
+                border: "1.5px solid var(--border-focus)",
                 borderRadius: "4px",
                 cursor: "pointer",
                 textAlign: "left",
@@ -246,12 +246,12 @@ export default function AuthCard({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-                <span style={{ fontFamily: "var(--serif)", fontSize: "16px", fontWeight: 700, color: "#cfa96f" }}>
+                <span style={{ fontFamily: "var(--serif)", fontSize: "16px", fontWeight: 700, color: "var(--color-red-sands)" }}>
                   I already have an account
                 </span>
-                <span style={{ fontSize: "15px", color: "#ad5b30", fontWeight: 700 }}>→</span>
+                <span style={{ fontSize: "15px", color: "var(--color-red-sands)", fontWeight: 700 }}>→</span>
               </div>
-              <span style={{ fontSize: "12px", color: "#a89d8d", marginTop: "4px", lineHeight: 1.4 }}>
+              <span style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.4 }}>
                 Sign in with your email and password to access your journals and correspondence.
               </span>
             </button>
@@ -268,8 +268,8 @@ export default function AuthCard({
                 flexDirection: "column",
                 alignItems: "flex-start",
                 padding: "16px 18px",
-                backgroundColor: "#1f1711",
-                border: "1px solid rgba(207, 169, 111, 0.28)",
+                backgroundColor: "var(--bg-surface-card)",
+                border: "1px solid var(--border-subtle)",
                 borderRadius: "4px",
                 cursor: "pointer",
                 textAlign: "left",
@@ -277,12 +277,12 @@ export default function AuthCard({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-                <span style={{ fontFamily: "var(--serif)", fontSize: "16px", fontWeight: 700, color: "#ece1c9" }}>
+                <span style={{ fontFamily: "var(--serif)", fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
                   Create an account
                 </span>
-                <span style={{ fontSize: "15px", color: "#cfa96f", fontWeight: 700 }}>→</span>
+                <span style={{ fontSize: "15px", color: "var(--color-pollen)", fontWeight: 700 }}>→</span>
               </div>
-              <span style={{ fontSize: "12px", color: "#9a8d80", marginTop: "4px", lineHeight: 1.4 }}>
+              <span style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px", lineHeight: 1.4 }}>
                 New reader? Open your personal memory box and start writing in quiet privacy.
               </span>
             </button>
@@ -316,7 +316,7 @@ export default function AuthCard({
 
           {mode === "register" && (
             <div>
-              <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "#cfa96f" }}>
+              <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "var(--color-pollen)" }}>
                 Your name or pen name
               </label>
               <input
@@ -328,9 +328,9 @@ export default function AuthCard({
                 style={{
                   width: "100%",
                   padding: "10px 14px",
-                  border: "1px solid rgba(207, 169, 111, 0.35)",
-                  backgroundColor: "#1c150f",
-                  color: "#ece1c9",
+                  border: "1px solid var(--border-subtle)",
+                  backgroundColor: "var(--bg-input)",
+                  color: "var(--text-primary)",
                   fontFamily: "var(--sans)",
                   fontSize: "13px",
                   borderRadius: "3px",
@@ -343,7 +343,7 @@ export default function AuthCard({
           {mode !== "otp" && (
             <>
               <div>
-                <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "#cfa96f" }}>
+                <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "var(--color-pollen)" }}>
                   Email address
                 </label>
                 <input
@@ -355,9 +355,9 @@ export default function AuthCard({
                   style={{
                     width: "100%",
                     padding: "10px 14px",
-                    border: "1px solid rgba(207, 169, 111, 0.35)",
-                    backgroundColor: "#1c150f",
-                    color: "#ece1c9",
+                    border: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-input)",
+                    color: "var(--text-primary)",
                     fontFamily: "var(--sans)",
                     fontSize: "13px",
                     borderRadius: "3px",
@@ -367,7 +367,7 @@ export default function AuthCard({
               </div>
 
               <div>
-                <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "#cfa96f" }}>
+                <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "var(--color-pollen)" }}>
                   Secret password
                 </label>
                 <input
@@ -379,9 +379,9 @@ export default function AuthCard({
                   style={{
                     width: "100%",
                     padding: "10px 14px",
-                    border: "1px solid rgba(207, 169, 111, 0.35)",
-                    backgroundColor: "#1c150f",
-                    color: "#ece1c9",
+                    border: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-input)",
+                    color: "var(--text-primary)",
                     fontFamily: "var(--sans)",
                     fontSize: "13px",
                     borderRadius: "3px",
@@ -394,7 +394,7 @@ export default function AuthCard({
 
           {mode === "otp" && (
             <div>
-              <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "#cfa96f" }}>
+              <label className="object-kind" style={{ display: "block", marginBottom: "4px", color: "var(--color-pollen)" }}>
                 6-digit code received by email
               </label>
               <input
@@ -411,9 +411,9 @@ export default function AuthCard({
                   textAlign: "center",
                   fontSize: "18px",
                   fontWeight: 700,
-                  border: "1px solid rgba(207, 169, 111, 0.45)",
-                  backgroundColor: "#1c150f",
-                  color: "#cfa96f",
+                  border: "1px solid var(--border-card)",
+                  backgroundColor: "var(--bg-input)",
+                  color: "var(--color-red-sands)",
                   borderRadius: "3px",
                   outline: "none",
                 }}

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import AuthModal from "@/components/AuthModal";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const navItems = [
   { href: "/", label: "My Journal" },
@@ -24,7 +25,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     <div className="site-wrap">
       <div className="top-note">
         An intimate digital journal to write your day and cherish memories
-        {isPro && <span style={{ marginLeft: "12px", color: "#e8c569" }}>✦ Pro Sender</span>}
+        {isPro && <span style={{ marginLeft: "12px", color: "var(--color-pollen)" }}>✦ Pro Sender</span>}
       </div>
       <header className="site-header">
         <div className="nav-inner">
@@ -47,11 +48,13 @@ export default function SiteShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <form className="header-search" action="/discover" method="get" role="search">
               <input name="q" aria-label="Search letters" placeholder="search archive..." />
               <button type="submit" aria-label="Search">⌕</button>
             </form>
+
+            <ThemeToggle />
 
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
