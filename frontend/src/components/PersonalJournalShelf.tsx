@@ -427,18 +427,18 @@ export default function PersonalJournalShelf() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", padding: "4px 8px", background: "#f0ebe1", border: "1px solid #dcd4c5", borderRadius: "3px", color: "#3a2c20" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", padding: "4px 8px", background: "rgba(35, 27, 20, 0.75)", border: "1px solid rgba(207, 169, 111, 0.3)", borderRadius: "3px", color: "var(--color-birch-paper, #ece1c9)" }}>
               JOURNALS: {notebooks.length}/{limiteCadernos}
             </span>
-            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", padding: "4px 8px", background: "#f0ebe1", border: "1px solid #dcd4c5", borderRadius: "3px", color: "#3a2c20" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", padding: "4px 8px", background: "rgba(35, 27, 20, 0.75)", border: "1px solid rgba(207, 169, 111, 0.3)", borderRadius: "3px", color: "var(--color-birch-paper, #ece1c9)" }}>
               LETTERS: {lettersWritten.length}/{limiteCartas}
             </span>
-            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", padding: "4px 8px", background: isPro ? "#8b1e1e" : "#4a3e31", color: "#fcfbf7", borderRadius: "3px" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", padding: "4px 8px", background: isPro ? "var(--color-red-sands, #ad5b30)" : "rgba(81, 76, 52, 0.65)", color: "#fcfbf7", borderRadius: "3px" }}>
               {isPro ? "★ PREMIUM" : "STANDARD"}
             </span>
           </div>
           {!isPro && (
-            <Link href="/clube-pro" style={{ fontSize: "11px", color: "#8b1e1e", textDecoration: "underline", fontWeight: 600 }}>
+            <Link href="/clube-pro" style={{ fontSize: "11px", color: "var(--color-pollen, #cfa96f)", textDecoration: "underline", fontWeight: 600 }}>
               Expand to 10 journals and 30 letters with Pro Club ↗
             </Link>
           )}
@@ -727,7 +727,7 @@ export default function PersonalJournalShelf() {
                 <div className="dark-reading-date-badge">
                   <span>{paginaAtual.dataFormatada || "Literary entry"}</span>
                   {paginaAtual.favoritado && (
-                    <span style={{ color: "#8b1e1e", fontWeight: 700, letterSpacing: "0.08em" }}>
+                    <span style={{ color: "var(--color-red-sands, #ad5b30)", fontWeight: 700, letterSpacing: "0.08em" }}>
                       FAVORITED ♥
                     </span>
                   )}
@@ -806,7 +806,7 @@ export default function PersonalJournalShelf() {
               </div>
 
               <div className="entry-modal-footer">
-                <span style={{ fontFamily: "var(--serif, serif)", fontSize: "12px", color: "#8b1e1e", fontWeight: 700 }}>
+                <span style={{ fontFamily: "var(--serif, serif)", fontSize: "12px", color: "var(--color-pollen, #cfa96f)", fontWeight: 700 }}>
                   SEAL: {readingLetter.selo_carta || "CORRESPONDENCE"}
                 </span>
                 <button

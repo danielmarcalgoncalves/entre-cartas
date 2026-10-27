@@ -78,16 +78,16 @@ export default function ClubeProPage() {
           className="paper-panel"
           style={{
             marginBottom: "28px",
-            backgroundColor: "#edf3e6",
-            border: "2px solid #5e6c51",
+            backgroundColor: "rgba(81, 76, 52, 0.4)",
+            border: "1px solid var(--color-pollen, #cfa96f)",
             textAlign: "center",
           }}
         >
-          <span className="stamp-mark olive">SUBSCRIPTION CONFIRMED</span>
-          <h2 className="section-title" style={{ marginTop: "12px", fontSize: "28px" }}>
+          <span className="stamp-mark olive" style={{ color: "#cfa96f", borderColor: "#cfa96f" }}>SUBSCRIPTION CONFIRMED</span>
+          <h2 className="section-title" style={{ marginTop: "12px", fontSize: "28px", color: "var(--color-birch-paper, #ece1c9)" }}>
             Welcome to the Sender Club!
           </h2>
-          <p className="page-intro" style={{ margin: "8px auto 0" }}>
+          <p className="page-intro" style={{ margin: "8px auto 0", color: "#ece1c9" }}>
             Your Pro sender seal has been activated. Your folders and archived letters are now unlimited.
           </p>
         </div>
@@ -98,13 +98,13 @@ export default function ClubeProPage() {
           className="paper-panel"
           style={{
             marginBottom: "28px",
-            backgroundColor: "#fae7e6",
-            border: "1px dashed #8b1e1e",
+            backgroundColor: "rgba(121, 59, 43, 0.35)",
+            border: "1px dashed rgba(173, 91, 48, 0.6)",
             textAlign: "center",
           }}
         >
-          <span className="stamp-mark">PAYMENT NOT COMPLETED</span>
-          <p className="page-intro" style={{ margin: "8px auto 0" }}>
+          <span className="stamp-mark" style={{ color: "#f2bbb0", borderColor: "#ad5b30" }}>PAYMENT NOT COMPLETED</span>
+          <p className="page-intro" style={{ margin: "8px auto 0", color: "#f2bbb0" }}>
             The checkout process was cancelled. No charges were made to your card.
           </p>
         </div>
@@ -165,14 +165,14 @@ export default function ClubeProPage() {
             className="letter-object"
             style={{
               padding: "32px 28px",
-              backgroundColor: "#fcf6ea",
-              border: "2px solid #8b1e1e",
-              boxShadow: "0 14px 28px rgba(61,47,28,0.22)",
+              backgroundColor: "#2e251e",
+              border: "2px solid var(--color-pollen, #cfa96f)",
+              boxShadow: "0 18px 44px rgba(0,0,0,0.6), 0 0 1px rgba(207, 169, 111, 0.4)",
               transform: "rotate(0.5deg)",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="object-kind" style={{ color: "#8b1e1e", fontWeight: 700 }}>
+              <span className="object-kind" style={{ color: "var(--color-pollen, #cfa96f)", fontWeight: 700 }}>
                 ★ Premium Sender Club
               </span>
               <span className="stamp-mark" style={{ minWidth: "auto", padding: "2px 8px" }}>
@@ -180,8 +180,8 @@ export default function ClubeProPage() {
               </span>
             </div>
 
-            <h3 className="object-title" style={{ fontSize: "36px", marginTop: "8px", color: "#8b1e1e" }}>
-              $14.90 <span style={{ fontSize: "14px", color: "#776e5f" }}>/ month</span>
+            <h3 className="object-title" style={{ fontSize: "36px", marginTop: "8px", color: "var(--color-pollen, #cfa96f)" }}>
+              $14.90 <span style={{ fontSize: "14px", color: "var(--color-birch-paper, #ece1c9)", opacity: 0.7 }}>/ month</span>
             </h3>
             <p className="page-intro" style={{ margin: "12px 0 24px", minHeight: "44px" }}>
               For authors and creative minds needing multiple volumes and complete writing freedom.
@@ -201,7 +201,13 @@ export default function ClubeProPage() {
               disabled={loadingCheckout}
               onClick={handleAssinar}
               className="primary-cta"
-              style={{ width: "100%", minHeight: "48px" }}
+              style={{
+                width: "100%",
+                minHeight: "48px",
+                background: "var(--color-red-sands, #ad5b30)",
+                color: "#fcfbf7",
+                border: "1px solid rgba(207, 169, 111, 0.4)",
+              }}
             >
               {loadingCheckout ? "Opening Stripe..." : "Join Pro Club for $14.90 ↗"}
             </button>

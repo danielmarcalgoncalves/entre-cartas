@@ -58,7 +58,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                 <span className="stamp-mark" style={{ minWidth: "auto", padding: "3px 8px", fontSize: "7px", transform: "rotate(-3deg)" }}>
                   {isPro ? "PRO" : "READER"}
                 </span>
-                <span style={{ fontSize: "11px", color: "#5b5348", maxWidth: "90px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "11px", color: "var(--color-birch-paper, #ece1c9)", maxWidth: "90px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {user.nome.split(" ")[0]}
                 </span>
                 <button
@@ -67,7 +67,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                   style={{
                     background: "transparent",
                     border: "none",
-                    color: "#8b1e1e",
+                    color: "var(--color-pollen, #cfa96f)",
                     fontSize: "10px",
                     cursor: "pointer",
                     textTransform: "uppercase",

@@ -1661,7 +1661,7 @@ export default function JournalEditor() {
                     <span>{dataFormatada || "Today"}</span>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                       {isSheetFull(cadernoConteudo, textareaRef.current) && (
-                        <span style={{ fontSize: "10px", color: "#8b1e1e", fontWeight: 700, letterSpacing: "0.08em" }}>
+                        <span style={{ fontSize: "10px", color: "var(--color-red-sands, #ad5b30)", fontWeight: 700, letterSpacing: "0.08em" }}>
                           SHEET FULL
                         </span>
                       )}
@@ -1908,7 +1908,7 @@ export default function JournalEditor() {
                           </div>
                         </div>
                         {activeNotebook?.id === nb.id && (
-                          <span style={{ color: "#8b1e1e", fontWeight: 700, fontSize: "12px" }}>✓ Active</span>
+                          <span style={{ color: "var(--color-pollen, #cfa96f)", fontWeight: 700, fontSize: "12px" }}>✓ Active</span>
                         )}
                       </div>
                     );
@@ -2007,7 +2007,7 @@ export default function JournalEditor() {
               <p className="drawer-subtitle">
                 Select which folder to file your letters in or create a new physical folder.
                 <br />
-                <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", letterSpacing: "0.06em", color: "#8a6b2d", fontWeight: 700, textTransform: "uppercase" }}>
+                <span style={{ display: "inline-block", marginTop: "4px", fontSize: "11px", letterSpacing: "0.06em", color: "var(--color-pollen, #cfa96f)", fontWeight: 700, textTransform: "uppercase" }}>
                   Quota: {letterFolders.length}/{isPro ? 10 : 3} folders ({isPro ? "Premium Plan" : "Standard Plan"})
                 </span>
               </p>
@@ -2074,7 +2074,7 @@ export default function JournalEditor() {
                           </div>
                         </div>
                         {activeLetterFolder?.id === fld.id && (
-                          <span style={{ color: "#8b1e1e", fontWeight: 700, fontSize: "12px" }}>✓ Selected</span>
+                          <span style={{ color: "var(--color-pollen, #cfa96f)", fontWeight: 700, fontSize: "12px" }}>✓ Selected</span>
                         )}
                       </div>
                     );
