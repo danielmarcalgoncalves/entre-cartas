@@ -124,6 +124,72 @@ export const getNotebookTheme = (corCapa?: string): NotebookColorOption => {
   return NOTEBOOK_COLOR_OPTIONS[0];
 };
 
+export interface FolderColorOption {
+  id: string;
+  nome: string;
+  etiqueta: string;
+  corHex: string;
+  cardGradient: string;
+  cardBorder: string;
+  tabCor: string;
+  imagem: string;
+}
+
+export const FOLDER_COLOR_OPTIONS: FolderColorOption[] = [
+  {
+    id: "marrom",
+    nome: "Brown",
+    etiqueta: "Rustic Leather",
+    corHex: "#5a3820",
+    cardGradient: "linear-gradient(135deg, #2d1c14 0%, #1c100a 60%, #120905 100%)",
+    cardBorder: "rgba(180, 140, 100, 0.35)",
+    tabCor: "#7a4e2e",
+    imagem: "/images/pastas/pasta-marrom.svg",
+  },
+  {
+    id: "verde",
+    nome: "Green",
+    etiqueta: "Botanical Moss",
+    corHex: "#1e3827",
+    cardGradient: "linear-gradient(135deg, #182c1f 0%, #0f1d14 60%, #09120c 100%)",
+    cardBorder: "rgba(140, 180, 150, 0.35)",
+    tabCor: "#2e563c",
+    imagem: "/images/pastas/pasta-verde.svg",
+  },
+  {
+    id: "vinho",
+    nome: "Wine",
+    etiqueta: "Noble Burgundy",
+    corHex: "#4a1a24",
+    cardGradient: "linear-gradient(135deg, #2e1117 0%, #1d090e 60%, #130508 100%)",
+    cardBorder: "rgba(190, 130, 145, 0.35)",
+    tabCor: "#6a2634",
+    imagem: "/images/pastas/pasta-vinho.svg",
+  },
+];
+
+export const getFolderTheme = (cor?: string): FolderColorOption => {
+  if (
+    cor === "verde" ||
+    cor === "#1e3827" ||
+    cor === "#1c3224" ||
+    cor === "#163321" ||
+    cor === "#223826"
+  ) {
+    return FOLDER_COLOR_OPTIONS[1];
+  }
+  if (
+    cor === "vinho" ||
+    cor === "#4a1a24" ||
+    cor === "#451a24" ||
+    cor === "#3a0f18" ||
+    cor === "#441a24"
+  ) {
+    return FOLDER_COLOR_OPTIONS[2];
+  }
+  return FOLDER_COLOR_OPTIONS[0];
+};
+
 export interface PostalSeal {
   id: string;
   label: string;
@@ -249,6 +315,7 @@ export default function JournalEditor() {
   const [activeLetterFolderId, setActiveLetterFolderId] = useState<string>("");
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
   const [newFolderTitle, setNewFolderTitle] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState<string>("marrom");
   const [folderPromptNotice, setFolderPromptNotice] = useState<string | null>(null);
 
   // Pending save after creation
@@ -1151,10 +1218,12 @@ export default function JournalEditor() {
       return;
     }
 
+    const chosenTheme = getFolderTheme(newFolderColor);
+
     const nova: LetterFolder = {
       id: "pasta-" + Date.now(),
       nome: newFolderTitle.trim(),
-      cor: "#5a3820",
+      cor: chosenTheme.corHex,
       criadoEm: new Date().toISOString(),
     };
 
@@ -1204,6 +1273,7 @@ export default function JournalEditor() {
     }
 
     setNewFolderTitle("");
+    setNewFolderColor("marrom");
     setFolderDrawerOpen(false);
     playPaperSound();
     window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
@@ -1427,30 +1497,46 @@ export default function JournalEditor() {
             </div>
           ) : (
             <div className="carta-left-column-inner">
-              {activeLetterFolder ? (
-                <div
-                  className="postal-folder-selector-card"
-                  onClick={() => {
-                    setFolderPromptNotice(null);
-                    setFolderDrawerOpen(true);
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  title="Click to choose a folder for this letter or create a new folder"
-                >
-                  <div className="postal-folder-selector-top">
-                    <span className="postal-folder-tag">FILE IN FOLDER</span>
-                    <span className="postal-folder-change-badge">Change ▾</span>
+              {activeLetterFolder ? (() => {
+                const folderTheme = getFolderTheme(activeLetterFolder.cor);
+                return (
+                  <div
+                    className={`postal-folder-selector-card postal-folder-color--${folderTheme.id}`}
+                    onClick={() => {
+                      setFolderPromptNotice(null);
+                      setFolderDrawerOpen(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title="Click to choose a folder for this letter or create a new folder"
+                  >
+                    <div className="postal-folder-selector-top">
+                      <span className="postal-folder-tag">FILE IN FOLDER</span>
+                      <span className="postal-folder-change-badge">Change ▾</span>
+                    </div>
+                    <div className="postal-folder-title-row">
+                      <div className="postal-folder-img-frame" aria-hidden="true">
+                        <img
+                          src={folderTheme.imagem}
+                          alt={activeLetterFolder.nome}
+                          className="postal-folder-svg-img"
+                        />
+                      </div>
+                      <div className="postal-folder-meta">
+                        <span className="postal-folder-name" title={activeLetterFolder.nome}>
+                          {activeLetterFolder.nome}
+                        </span>
+                        <span className="postal-folder-theme-tag">
+                          {folderTheme.nome} · {folderTheme.etiqueta}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="postal-folder-quota-line">
+                      {letterFolders.length}/{isPro ? 10 : 3} folders created ({isPro ? "Premium" : "Standard"})
+                    </div>
                   </div>
-                  <div className="postal-folder-title-row">
-                    <span className="postal-folder-icon" aria-hidden="true">📁</span>
-                    <span className="postal-folder-name">{activeLetterFolder.nome}</span>
-                  </div>
-                  <div className="postal-folder-quota-line">
-                    {letterFolders.length}/{isPro ? 10 : 3} folders created ({isPro ? "Premium" : "Standard"})
-                  </div>
-                </div>
-              ) : (
+                );
+              })() : (
                 <div
                   className="postal-folder-selector-card is-empty-state"
                   onClick={() => {
@@ -1466,8 +1552,17 @@ export default function JournalEditor() {
                     <span className="postal-folder-change-badge">+ Create</span>
                   </div>
                   <div className="postal-folder-title-row">
-                    <span className="postal-folder-icon" aria-hidden="true">📁</span>
-                    <span className="postal-folder-name">+ Create Postal Folder</span>
+                    <div className="postal-folder-img-frame is-empty" aria-hidden="true">
+                      <img
+                        src="/images/pastas/pasta-marrom.svg"
+                        alt="Create folder"
+                        className="postal-folder-svg-img is-ghost"
+                      />
+                    </div>
+                    <div className="postal-folder-meta">
+                      <span className="postal-folder-name">+ Create Postal Folder</span>
+                      <span className="postal-folder-theme-tag">Physical letter folder</span>
+                    </div>
                   </div>
                   <div className="postal-folder-quota-line">
                     0/{isPro ? 10 : 3} folders created ({isPro ? "Premium" : "Standard"})
@@ -1932,36 +2027,63 @@ export default function JournalEditor() {
                   <div className="drawer-empty-state-hint">
                     <span className="empty-hint-title">No folders created yet.</span>
                     <p className="empty-hint-text">
-                      Name your folder below to create it and safely archive your letter.
+                      Name your folder below and choose a color to archive your letters safely.
                     </p>
                   </div>
                 ) : (
-                  letterFolders.map((fld) => (
-                    <div
-                      key={fld.id}
-                      className={`notebook-item-card ${activeLetterFolder?.id === fld.id ? "is-active" : ""}`}
-                      onClick={() => {
-                        setActiveLetterFolderId(fld.id);
-                        try {
-                          window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, fld.id);
-                        } catch {}
-                        setFolderDrawerOpen(false);
-                        playPaperSound();
-                      }}
-                    >
-                      <div>
-                        <span className="notebook-item-name">📁 {fld.nome}</span>
-                        <div className="notebook-item-count">Physical correspondence folder</div>
+                  letterFolders.map((fld) => {
+                    const theme = getFolderTheme(fld.cor);
+                    let countInFolder = 0;
+                    try {
+                      if (typeof window !== "undefined") {
+                        const allEntries: JournalEntry[] = JSON.parse(window.localStorage.getItem(SAVED_ENTRIES_KEY) || "[]");
+                        const defaultId = letterFolders[0]?.id;
+                        countInFolder = allEntries.filter(
+                          (l: JournalEntry) => l.pasta_id === fld.id || (!l.pasta_id && fld.id === defaultId)
+                        ).length;
+                      }
+                    } catch {}
+
+                    return (
+                      <div
+                        key={fld.id}
+                        className={`notebook-item-card ${activeLetterFolder?.id === fld.id ? "is-active" : ""}`}
+                        onClick={() => {
+                          setActiveLetterFolderId(fld.id);
+                          try {
+                            window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, fld.id);
+                          } catch {}
+                          setFolderDrawerOpen(false);
+                          playPaperSound();
+                          window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div className="mini-folder-thumb-box" aria-hidden="true">
+                            <img
+                              src={theme.imagem}
+                              alt={fld.nome}
+                              className="mini-folder-thumb-img"
+                            />
+                          </div>
+                          <div>
+                            <span className="notebook-item-name">{fld.nome}</span>
+                            <div className="notebook-item-count">
+                              {countInFolder} {countInFolder === 1 ? "letter archived" : "letters archived"} · {theme.nome}
+                            </div>
+                          </div>
+                        </div>
+                        {activeLetterFolder?.id === fld.id && (
+                          <span style={{ color: "#8b1e1e", fontWeight: 700, fontSize: "12px" }}>✓ Selected</span>
+                        )}
                       </div>
-                      {activeLetterFolder?.id === fld.id && (
-                        <span style={{ color: "#8b1e1e", fontWeight: 700 }}>✓ Selected</span>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
               <form onSubmit={criarNovaPasta} className="new-notebook-form">
+                <label className="new-notebook-label">FOLDER TITLE</label>
                 <input
                   type="text"
                   className="new-notebook-input"
@@ -1971,7 +2093,45 @@ export default function JournalEditor() {
                   maxLength={40}
                   autoFocus
                 />
-                <button type="submit" className="new-notebook-btn">
+
+                <label className="new-notebook-label" style={{ marginTop: "14px" }}>
+                  CHOOSE FOLDER COLOR
+                </label>
+                <div className="notebook-color-picker-grid">
+                  {FOLDER_COLOR_OPTIONS.map((opt) => {
+                    const isSelected = newFolderColor === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`notebook-color-option-card ${isSelected ? "is-selected" : ""}`}
+                        onClick={() => {
+                          setNewFolderColor(opt.id);
+                          playPaperSound();
+                        }}
+                      >
+                        <div
+                          className="folder-color-swatch-box"
+                          style={{
+                            background: opt.cardGradient,
+                            borderColor: opt.cardBorder,
+                          }}
+                        >
+                          <img
+                            src={opt.imagem}
+                            alt={opt.nome}
+                            className="swatch-folder-img"
+                          />
+                          {isSelected && <span className="notebook-color-check-badge">✓</span>}
+                        </div>
+                        <span className="notebook-color-opt-name">{opt.nome}</span>
+                        <small className="notebook-color-opt-sub">{opt.etiqueta}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button type="submit" className="new-notebook-btn" style={{ marginTop: "14px" }}>
                   + Create Folder
                 </button>
               </form>

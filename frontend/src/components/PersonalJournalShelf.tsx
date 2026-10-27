@@ -9,6 +9,7 @@ import {
   JOURNAL_UPDATED_EVENT,
   LETTER_FOLDERS_STORAGE_KEY,
   getNotebookTheme,
+  getFolderTheme,
   type JournalEntry,
   type LetterFolder,
   type Notebook,
@@ -599,6 +600,7 @@ export default function PersonalJournalShelf() {
                 });
 
                 const isOpen = openFolderId === folder.id;
+                const folderTheme = getFolderTheme(folder.cor);
 
                 return (
                   <div
@@ -613,7 +615,7 @@ export default function PersonalJournalShelf() {
                       tabPosition="right"
                       mode="flap"
                       variant="solid"
-                      color={folder.cor || "#5a3820"}
+                      color={folderTheme.corHex}
                       paperColor="#fcfbf7"
                       theme="dark"
                       size={1.35}

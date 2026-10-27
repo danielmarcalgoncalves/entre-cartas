@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 92" fill="none">
+  <defs>
+    <filter id="folder-shadow-wine" x="-10%" y="-10%" width="125%" height="130%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="rgba(24, 8, 12, 0.42)" />
+    </filter>
+    <filter id="paper-shadow-wine" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0, 0, 0, 0.22)" />
+    </filter>
+    <linearGradient id="body-grad-wine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5c202d" />
+      <stop offset="60%" stop-color="#4a1a24" />
+      <stop offset="100%" stop-color="#280a11" />
+    </linearGradient>
+    <linearGradient id="flap-grad-wine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#692534" />
+      <stop offset="100%" stop-color="#3d121c" />
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#folder-shadow-wine)">
+    <!-- Back Folder with Tab on Top Right -->
+    <path d="M 6 14 C 6 10, 9 7, 13 7 L 58 7 C 62 7, 65 5, 68 2 C 70 0, 72 0, 76 0 L 110 0 C 114 0, 116 2, 117 6 L 117 14 L 117 80 C 117 84, 114 87, 110 87 L 13 87 C 9 87, 6 84, 6 80 Z" fill="url(#body-grad-wine)" stroke="rgba(255,255,255,0.08)" stroke-width="0.75" />
+
+    <!-- Interior shadow -->
+    <rect x="10" y="14" width="103" height="68" rx="2" fill="rgba(0,0,0,0.25)" />
+
+    <!-- Paper Slip 1 (Back, tilted) -->
+    <g transform="rotate(-3 25 18)" filter="url(#paper-shadow-wine)">
+      <rect x="22" y="8" width="70" height="60" rx="2" fill="#f4ede0" stroke="#dfd4be" stroke-width="0.75" />
+      <line x1="28" y1="16" x2="52" y2="16" stroke="#b8a892" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="28" y1="21" x2="84" y2="21" stroke="#cbbeaa" stroke-width="1" stroke-linecap="round" />
+      <line x1="28" y1="25" x2="80" y2="25" stroke="#cbbeaa" stroke-width="1" stroke-linecap="round" />
+      <line x1="28" y1="29" x2="75" y2="29" stroke="#cbbeaa" stroke-width="1" stroke-linecap="round" />
+    </g>
+
+    <!-- Paper Slip 2 (Front, upright) -->
+    <g transform="rotate(1.5 60 20)" filter="url(#paper-shadow-wine)">
+      <rect x="28" y="10" width="74" height="62" rx="2" fill="#fdfcf8" stroke="#e8e0ce" stroke-width="0.75" />
+      <!-- Stamp & Postmark -->
+      <rect x="85" y="14" width="12" height="15" rx="1" fill="#841e2b" stroke="#5a0f19" stroke-width="0.5" />
+      <circle cx="82" cy="22" r="7" fill="none" stroke="#6b4c52" stroke-width="0.75" stroke-dasharray="2,1" opacity="0.7" />
+      <line x1="75" y1="21" x2="79" y2="21" stroke="#6b4c52" stroke-width="0.75" opacity="0.7" />
+      <line x1="75" y1="23" x2="79" y2="23" stroke="#6b4c52" stroke-width="0.75" opacity="0.7" />
+      <!-- Letter text lines -->
+      <line x1="34" y1="18" x2="65" y2="18" stroke="#6b2f3a" stroke-width="1.4" stroke-linecap="round" />
+      <line x1="34" y1="24" x2="76" y2="24" stroke="#a48b91" stroke-width="1" stroke-linecap="round" />
+      <line x1="34" y1="28" x2="72" y2="28" stroke="#a48b91" stroke-width="1" stroke-linecap="round" />
+      <line x1="34" y1="32" x2="78" y2="32" stroke="#a48b91" stroke-width="1" stroke-linecap="round" />
+    </g>
+
+    <!-- Folder Front Cover / Pocket -->
+    <path d="M 6 30 C 6 27, 9 25, 13 25 L 110 25 C 114 25, 117 27, 117 30 L 117 80 C 117 84, 114 87, 110 87 L 13 87 C 9 87, 6 84, 6 80 Z" fill="url(#flap-grad-wine)" stroke="rgba(255,255,255,0.12)" stroke-width="0.75" />
+
+    <!-- Stitched border line on front cover -->
+    <path d="M 11 32 L 112 32 L 112 82 L 11 82 Z" fill="none" stroke="rgba(230, 195, 202, 0.45)" stroke-width="0.8" stroke-dasharray="2.5,2" />
+
+    <!-- Front V-Flap fold line -->
+    <path d="M 6 25 L 61.5 50 L 117 25" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1.5" />
+    <path d="M 6 25 L 61.5 49 L 117 25" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.75" />
+
+    <!-- Brass eyelet / clasp in center -->
+    <circle cx="61.5" cy="50" r="4.5" fill="#d4af37" stroke="#7a5f1a" stroke-width="0.8" />
+    <circle cx="61.5" cy="50" r="2.2" fill="#280a11" />
+    <circle cx="60.5" cy="49" r="1" fill="#fff" opacity="0.6" />
+  </g>
+</svg>
