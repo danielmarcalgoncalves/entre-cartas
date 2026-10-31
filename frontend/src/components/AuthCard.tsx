@@ -97,7 +97,7 @@ export default function AuthCard({
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "24px" }}>
           <Link
-            href="/"
+            href="/journal"
             className="primary-cta"
             style={{
               textAlign: "center",

@@ -1,33 +1,25 @@
-import JournalEditor from "@/components/JournalEditor";
-import PersonalJournalShelf from "@/components/PersonalJournalShelf";
+import type { Metadata } from "next";
+import BetweenLettersLanding from "@/components/landing/BetweenLettersLanding";
+import InteractiveGallery from "@/components/InteractiveGallery";
+import AboutPresentation from "@/components/AboutPresentation";
 
-export default function HomePage() {
+export const metadata: Metadata = {
+  title: "Between Letters — Archive of Sentiments & Digital Journal",
+  description:
+    "An intimate, contemplative haven for slow writing, hardbound leather journals, tactile correspondence, and preserving genuine memories.",
+};
+
+export default function RootEntryPage() {
   return (
-    <div className="home-journal-experience">
-      {/* 1. Poetic Header for Personal Journal */}
-      <section className="journal-intro" aria-labelledby="home-hero-title">
-        <h1 id="home-hero-title">
-          A sanctuary for <em>your day.</em>
-        </h1>
-        <p className="journal-intro-sub">
-          Rest your thoughts in hardbound journals or seal thoughtful letters sheltered from time.
-        </p>
-      </section>
+    <div className="entry-flow-wrap">
+      {/* 1. Cinematic Fullscreen Landing Hero with Scrapbook Notebook */}
+      <BetweenLettersLanding />
 
-      {/* 2. Digital Journal Editor (Editorial Writing Desk) */}
-      <JournalEditor />
+      {/* 2. Tactile interactive editorial gallery of archival ephemera */}
+      <InteractiveGallery />
 
-      {/* 3. Personal Shelf: My Journals, Reading Room, and Letters Archive */}
-      <PersonalJournalShelf />
-
-      {/* 4. Poetic Closing Note */}
-      <section className="closing-note" aria-label="A note for the author">
-        <span className="closing-note__ornament" aria-hidden="true">❧</span>
-        <p>Some words find their true home in the silence of paper.</p>
-        <span className="closing-note__sign">
-          — Between Letters <span aria-hidden="true">✦</span>
-        </span>
-      </section>
+      {/* 3. Narrative presentation with scroll-triggered text highlights and journal entry */}
+      <AboutPresentation />
     </div>
   );
 }

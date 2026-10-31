@@ -9,7 +9,8 @@ import AuthModal from "@/components/AuthModal";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const navItems = [
-  { href: "/", label: "My Journal" },
+  { href: "/", label: "Welcome" },
+  { href: "/journal", label: "My Journal" },
   { href: "/discover", label: "Inspirations" },
   { href: "/favorites", label: "Favorites" },
   { href: "/collections", label: "Folders" },
@@ -20,6 +21,17 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, isPro, logout } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
+
+  const isPresentationPage = pathname === "/";
+
+  if (isPresentationPage) {
+    return (
+      <div className="site-wrap site-wrap--presentation">
+        <main className="site-main-presentation">{children}</main>
+        <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="site-wrap">
