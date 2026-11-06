@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Caveat:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Fredericka+the+Great&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
+
 
 /* ==========================================================================
    BETWEEN LETTERS — VINTAGE SCRAPBOOK LANDING HERO STYLES
@@ -907,4 +908,809 @@
       transform: translateX(-50%) translateY(8px);
     }
   }
+}
+
+/* ==========================================================================
+   NOVA UI — ATMOSPHERE SWITCHER (MEADOW / SUNSET)
+   ========================================================================== */
+
+.hero-atmosphere-switch {
+  position: absolute;
+  top: clamp(14px, 2.6vh, 26px);
+  right: clamp(14px, 3.2vw, 36px);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(22, 28, 20, 0.62);
+  border: 1px solid rgba(228, 205, 168, 0.35);
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(10, 14, 10, 0.45);
+}
+
+.atmosphere-pill {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: #dfd4c0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atmosphere-pill:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.atmosphere-pill--active {
+  background: #d8c29d;
+  color: #1e1f18;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   NOVA UI — SKETCH DRAWING TITLE EFFECT ("BETWEEN LETTERS")
+   ========================================================================== */
+
+.sketch-title-container {
+  position: absolute;
+  top: clamp(14px, 2.2vh, 32px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.sketch-eyebrow-wrap {
+  margin-bottom: 6px;
+}
+
+.sketch-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 14px;
+  background: rgba(28, 33, 24, 0.55);
+  border: 1px dashed rgba(228, 205, 168, 0.4);
+  border-radius: 4px;
+  color: #ebdcb9;
+  font-family: 'Special Elite', 'IM Fell English', monospace;
+  font-size: clamp(9px, 0.72vw, 11px);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(10, 14, 10, 0.35);
+}
+
+.eyebrow-star {
+  color: #d1b679;
+  font-size: 9px;
+}
+
+.sketch-title-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Hand-Drawn Sketch Typography with Pencil Texture & Outline */
+.sketch-title {
+  margin: 0;
+  font-family: 'Cabin Sketch', 'Fredericka the Great', 'IM Fell English', Georgia, serif;
+  font-size: clamp(48px, 6.2vw, 88px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: #f7ede0;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  filter: url('#pencil-sketch-filter') drop-shadow(0 4px 16px rgba(16, 20, 14, 0.75));
+  text-shadow:
+    0 1px 0 #182017,
+    0 2px 0 #182017,
+    0 0 12px rgba(232, 222, 208, 0.3);
+  -webkit-text-stroke: 1.2px rgba(34, 42, 33, 0.95);
+  cursor: default;
+}
+
+/* Stepped Animation: gives letters the subtle live wobble of hand-drawn animation */
+.sketch-letter {
+  display: inline-block;
+  animation: sketchLetterWobble 2.4s steps(3) infinite;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.sketch-space {
+  width: clamp(14px, 1.8vw, 24px);
+}
+
+.sketch-letter:hover {
+  color: #fff;
+  transform: translateY(-3px) scale(1.08) rotate(-1deg);
+  text-shadow: 0 0 16px rgba(255, 235, 195, 0.85);
+}
+
+@keyframes sketchLetterWobble {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(-0.6px, 0.4px) rotate(-0.35deg);
+  }
+  66% {
+    transform: translate(0.5px, -0.4px) rotate(0.25deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+/* Sketched Hand-Drawn Underline */
+.sketch-underline {
+  width: min(88%, 520px);
+  height: 18px;
+  margin-top: -6px;
+  color: #d1b679;
+  filter: drop-shadow(0 2px 6px rgba(18, 22, 16, 0.6));
+  animation: sketchUnderlineJitter 3.2s steps(4) infinite;
+}
+
+@keyframes sketchUnderlineJitter {
+  0% { transform: scaleX(1) rotate(0deg); }
+  25% { transform: scaleX(0.99) rotate(-0.2deg); }
+  50% { transform: scaleX(1.01) rotate(0.15deg); }
+  75% { transform: scaleX(0.995) rotate(-0.1deg); }
+  100% { transform: scaleX(1) rotate(0deg); }
+}
+
+/* ==========================================================================
+   NOVA UI — NOTEBOOK SHOWCASE (5-SECOND CYCLING + GENTLE FLOAT)
+   ========================================================================== */
+
+.notebook-showcase-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -47%);
+  z-index: 10;
+  width: min(92vw, 980px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.notebook-stage-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.52;
+  max-height: clamp(380px, 58vh, 520px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+}
+
+/* Ambient shadow on the meadow ground */
+.notebook-ambient-shadow {
+  position: absolute;
+  bottom: 2%;
+  left: 50%;
+  width: 82%;
+  height: 48px;
+  background: radial-gradient(ellipse at center, rgba(14, 18, 12, 0.65) 0%, rgba(14, 18, 12, 0.3) 45%, transparent 70%);
+  transform: translateX(-50%);
+  filter: blur(14px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Gentle Sinusoidal Floating Motion Requested by User */
+.notebook-floating-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: gentleNotebookFloat 4.8s ease-in-out infinite;
+}
+
+@keyframes gentleNotebookFloat {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(-0.45deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+.notebook-cards-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notebook-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.97) translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.65s cubic-bezier(0.25, 1, 0.5, 1), transform 0.65s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.notebook-slide--active {
+  opacity: 1;
+  transform: scale(1) translateY(0px);
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.notebook-cutout-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: pointer;
+  filter: drop-shadow(0 14px 28px rgba(12, 16, 10, 0.65));
+  transition: filter 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.notebook-cutout-img:hover {
+  filter: drop-shadow(0 18px 36px rgba(10, 14, 8, 0.8));
+  transform: scale(1.015);
+}
+
+/* Quick Inspect Hover Button */
+.notebook-inspect-btn {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: rgba(26, 32, 22, 0.88);
+  border: 1px solid rgba(228, 205, 168, 0.5);
+  border-radius: 999px;
+  color: #f7ede0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.notebook-stage-wrap:hover .notebook-inspect-btn {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0px);
+}
+
+.notebook-inspect-btn:hover {
+  background: #d8c29d;
+  color: #1a1e16;
+  border-color: #d8c29d;
+  transform: translateX(-50%) translateY(-2px) scale(1.04);
+}
+
+/* Lateral Tactile Navigation Arrows */
+.notebook-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(24, 30, 20, 0.65);
+  border: 1px solid rgba(228, 205, 168, 0.35);
+  color: #f5eedf;
+  font-size: 26px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  z-index: 12;
+}
+
+.arrow-left {
+  left: -12px;
+}
+
+.arrow-right {
+  right: -12px;
+}
+
+.notebook-nav-arrow:hover {
+  background: #d8c29d;
+  color: #181d14;
+  border-color: #d8c29d;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* 5-Second Interval Controls Dock */
+.notebook-controls-dock {
+  width: 100%;
+  max-width: 620px;
+  margin-top: clamp(6px, 1.2vh, 14px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 8;
+}
+
+/* 5-Second Progress Bar */
+.cycle-progress-track {
+  width: 180px;
+  height: 3px;
+  background: rgba(228, 205, 168, 0.2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cycle-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #d8c29d;
+  border-radius: 999px;
+  animation: cycle5s linear 5000ms infinite;
+}
+
+@keyframes cycle5s {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.cycle-paused {
+  animation-play-state: paused !important;
+}
+
+/* Notebook Selector Tabs */
+.notebook-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.notebook-tab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: rgba(22, 28, 19, 0.65);
+  border: 1px solid rgba(228, 205, 168, 0.28);
+  border-radius: 999px;
+  color: #dfd4c0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tab-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(228, 205, 168, 0.5);
+  transition: background 0.2s ease;
+}
+
+.notebook-tab-pill:hover {
+  background: rgba(40, 50, 36, 0.85);
+  color: #fff;
+  border-color: rgba(228, 205, 168, 0.6);
+}
+
+.notebook-tab-pill--active {
+  background: #d8c29d;
+  color: #1a1e16;
+  font-weight: 600;
+  border-color: #d8c29d;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.notebook-tab-pill--active .tab-dot {
+  background: #1a1e16;
+}
+
+.active-notebook-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IM Fell English', Georgia, serif;
+  font-size: 13px;
+  color: #ebdcb9;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+.meta-category {
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #d1b679;
+}
+
+/* ==========================================================================
+   NOVA UI — STOPMOTION PAPER COLLAGE "TRY IT NOW" BUTTON
+   ========================================================================== */
+
+.try-it-now-collage-wrapper {
+  position: absolute;
+  bottom: clamp(14px, 3vh, 32px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The Stepped Stop-Motion Animation Requested by User */
+.try-it-now-stopmotion-btn {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  text-decoration: none;
+  animation: paperCollageStopmotion 2.2s steps(5) infinite;
+  filter: drop-shadow(0 8px 18px rgba(12, 16, 10, 0.7));
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+@keyframes paperCollageStopmotion {
+  0% {
+    transform: rotate(-1.4deg) translate(0px, 0px) scale(1);
+  }
+  20% {
+    transform: rotate(1.2deg) translate(-1.2px, 1px) scale(1.01);
+  }
+  40% {
+    transform: rotate(-0.5deg) translate(1px, -1px) scale(0.995);
+  }
+  60% {
+    transform: rotate(1.6deg) translate(1.2px, 1.2px) scale(1.015);
+  }
+  80% {
+    transform: rotate(-1.2deg) translate(-1px, -1.2px) scale(1);
+  }
+  100% {
+    transform: rotate(-1.4deg) translate(0px, 0px) scale(1);
+  }
+}
+
+.try-it-now-stopmotion-btn:hover {
+  animation-play-state: paused;
+  transform: scale(1.06) rotate(0deg);
+  filter: drop-shadow(0 14px 26px rgba(10, 14, 8, 0.85));
+}
+
+.try-it-now-stopmotion-btn:active {
+  transform: scale(0.97) rotate(0.5deg);
+}
+
+.torn-paper-banner {
+  position: relative;
+  width: clamp(230px, 24vw, 320px);
+  height: auto;
+}
+
+.torn-paper-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* Washi tape accents pinning the paper collage */
+.collage-washi-tape {
+  position: absolute;
+  top: -8px;
+  width: 32px;
+  height: 14px;
+  background: rgba(220, 205, 175, 0.55);
+  border: 1px dashed rgba(160, 140, 110, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.tape-left {
+  left: 14px;
+  transform: rotate(-18deg);
+}
+
+.tape-right {
+  right: 14px;
+  transform: rotate(16deg);
+}
+
+/* ==========================================================================
+   NOVA UI — UPSCALE / HIGH RESOLUTION LIGHTBOX MODAL
+   ========================================================================== */
+
+.upscale-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(12, 16, 10, 0.86);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 3vw, 32px);
+  animation: upscaleFadeIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes upscaleFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.upscale-modal-card {
+  position: relative;
+  width: min(94vw, 1020px);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #fbf7ee;
+  color: #2b251e;
+  border-radius: 12px;
+  border: 1px solid #d8c29d;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  padding: clamp(18px, 2.8vw, 32px);
+}
+
+.upscale-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eee3d1;
+  border: 1px solid #caa87b;
+  color: #3e3226;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.upscale-close-btn:hover {
+  background: #3e3226;
+  color: #fff;
+}
+
+.upscale-modal-header {
+  margin-bottom: 16px;
+}
+
+.upscale-badge {
+  display: inline-block;
+  font-family: 'Special Elite', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #8c5b36;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.upscale-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: #2a2016;
+}
+
+.upscale-quote {
+  font-family: 'IM Fell English', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(14px, 1.3vw, 17px);
+  color: #63503e;
+  margin: 0;
+}
+
+.upscale-image-viewport {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  max-height: 58vh;
+  background: radial-gradient(circle at center, #eee4d1 0%, #dfd1b8 100%);
+  border-radius: 8px;
+  border: 1px solid #d4c2a5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.upscale-large-img {
+  max-width: 95%;
+  max-height: 52vh;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px rgba(28, 20, 14, 0.4));
+  transition: transform 0.3s ease;
+}
+
+.upscale-large-img:hover {
+  transform: scale(1.05);
+}
+
+.upscale-modal-footer {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.upscale-stickers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stickers-heading {
+  font-family: 'Special Elite', monospace;
+  font-size: 11px;
+  color: #7b624b;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.stickers-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sticker-chip {
+  padding: 4px 10px;
+  background: #f0e6d4;
+  border: 1px dashed #c0aa8b;
+  border-radius: 4px;
+  font-family: 'IM Fell English', Georgia, serif;
+  font-size: 13px;
+  color: #4b3d2f;
+}
+
+.upscale-cta-row {
+  display: flex;
+  align-items: center;
+}
+
+.upscale-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  background: #8b3a2b;
+  color: #fff;
+  border-radius: 6px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(139, 58, 43, 0.35);
+  transition: all 0.2s ease;
+}
+
+.upscale-action-btn:hover {
+  background: #6f2a1e;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(139, 58, 43, 0.5);
+}
+
+/* ==========================================================================
+   INTERACTIVE GALLERY UPSCALE BADGES & CARDS UPGRADES
+   ========================================================================== */
+
+.gallery-card__upscale-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 5px 12px;
+  background: rgba(22, 28, 20, 0.75);
+  border: 1px solid rgba(228, 205, 168, 0.45);
+  border-radius: 999px;
+  color: #ebdcb9;
+  font-family: 'Special Elite', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: all 0.2s ease;
+  z-index: 5;
+}
+
+.gallery-card__upscale-btn:hover {
+  background: #d8c29d;
+  color: #1a1e16;
+  border-color: #d8c29d;
+  transform: scale(1.05);
+}
+
+.gallery-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.gallery-card__tag {
+  font-family: 'Special Elite', monospace;
+  font-size: 11px;
+  color: #bfa57d;
+  background: rgba(40, 48, 36, 0.4);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.gallery-card__inspect-action {
+  background: transparent;
+  border: 1px dashed rgba(228, 205, 168, 0.4);
+  padding: 6px 14px;
+  border-radius: 4px;
+  color: #ebdcb9;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gallery-card__inspect-action:hover {
+  background: rgba(228, 205, 168, 0.2);
+  color: #fff;
 }

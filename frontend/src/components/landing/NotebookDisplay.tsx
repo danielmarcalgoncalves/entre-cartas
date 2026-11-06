@@ -1,200 +1,328 @@
-import React, { forwardRef } from "react";
+"use client";
+
+import React, {
+  forwardRef,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
+import Link from "next/link";
+
+export interface NotebookItem {
+  id: string;
+  name: string;
+  category: string;
+  tagline: string;
+  imageSrc: string;
+  alt: string;
+  description: string;
+  stickers: string[];
+  quote: string;
+}
+
+const NOTEBOOK_SHOWCASE: NotebookItem[] = [
+  {
+    id: "caderno-afeto",
+    name: "01 · Memórias & Afeto",
+    category: "PERSONALIZAÇÃO EMOCIONAL",
+    tagline: "A new way to live life · Recordações Íntimas",
+    imageSrc: "/images/nova-ui/caderno-1-cutout.png",
+    alt: "Caderno Entre Cartas personalizado com foto de infância, adesivo Favorite Person, constelação e nuvem ilustrada",
+    description:
+      "Demonstração de colagem afetiva: fotos antigas recortadas à mão, notas afetuosas ('Favorite person'), figura celeste e versos sobre viver plenamente.",
+    stickers: [
+      "Foto de Infância Rasgada",
+      "Selo 'Favorite person'",
+      "Astro Andarilho",
+      "Nuvem a Grafite",
+      "Citação Poética",
+    ],
+    quote: "“We write to prove life twice, in the moment and in hindsight.”",
+  },
+  {
+    id: "caderno-snoopy",
+    name: "02 · Snoopy & Cinema",
+    category: "COLAGEM POP & CINEMATOGRÁFICA",
+    tagline: "This is soo good (: · Before Sunrise & Querubins",
+    imageSrc: "/images/nova-ui/caderno-2-cutout.png",
+    alt: "Caderno Entre Cartas personalizado com Snoopy coroado, cena de Before Sunrise, anjo querubim e gatinho",
+    description:
+      "Demonstração de diário pop e cinematográfico: ilustração do Snoopy coroado a traço livre, recorte de Julie Delpy e Ethan Hawke em Before Sunrise, querubim e gatinho.",
+    stickers: [
+      "Snoopy com Coroa de Ouro",
+      "Before Sunrise Polaroid",
+      "Querubim Barroco",
+      "Gatinho Dormindo",
+      "Caligrafia Espontânea",
+    ],
+    quote: "“Beauty is everywhere, hidden in the smallest details.”",
+  },
+  {
+    id: "caderno-surrealismo",
+    name: "03 · Surrealismo & Palco",
+    category: "DRAMATURGIA & CONCEITUAL",
+    tagline: "Literature is the most pleasant way to ignore life",
+    imageSrc: "/images/nova-ui/caderno-3-cutout.png",
+    alt: "Caderno Entre Cartas personalizado com colagem de cabeça partida surrealista, cortinas de ópera e arlequim",
+    description:
+      "Demonstração de estética dramática e conceitual: colagem surrealista com nota de $100 saindo dos pensamentos, cortinas teatrais de veludo carmesim e arlequim renascentista.",
+    stickers: [
+      "Retrato Bipartido Surrealista",
+      "Cortinas de Veludo Carmesim",
+      "Arlequim com Cetro Estelar",
+      "Aforismo de Fernando Pessoa",
+    ],
+    quote: "“Literature is the most pleasant way to ignore life.”",
+  },
+];
 
 export interface NotebookDisplayProps {
   id?: string;
   className?: string;
-  meadowPhotoUrl?: string;
-  flowerPhotoUrl?: string;
-  leftDateStamp?: string;
-  leftPageNumber?: string;
-  rightPageNumber?: string;
-  openingNote?: string;
-  marginNote?: React.ReactNode;
-  memoryCopy?: React.ReactNode;
-  quoteQuestion?: string;
-  quoteAnswer?: string;
-  tornNoteLines?: string[];
-  waxSealMonogram?: string;
-  customComposition?: React.ReactNode;
-}
-
-const DEFAULT_MEADOW = "/images/landing/meadow.jpg";
-const DEFAULT_FLOWER = "/images/landing/flower.jpg";
-
-function BotanicalSprig() {
-  return (
-    <svg
-      className="botanical-sprig"
-      viewBox="0 0 120 210"
-      aria-hidden="true"
-      fill="none"
-    >
-      <path d="M57 205C58 158 72 103 52 20" />
-      <path d="M58 173C35 159 24 142 21 120C43 124 57 140 58 173Z" />
-      <path d="M62 148C79 134 90 116 90 94C69 102 60 120 62 148Z" />
-      <path d="M57 116C38 104 27 87 27 68C46 73 58 91 57 116Z" />
-      <path d="M57 86C71 74 77 58 76 41C59 49 53 65 57 86Z" />
-      <path d="M52 39C43 31 43 18 51 8C61 16 62 29 52 39Z" />
-      <path d="M48 47C35 43 28 34 28 22C41 22 50 32 48 47Z" />
-    </svg>
-  );
-}
-
-function Star({ className = "" }: { className?: string }) {
-  return (
-    <span className={`ink-star ${className}`} aria-hidden="true">
-      ✦
-    </span>
-  );
+  onSelectNotebook?: (notebook: NotebookItem) => void;
 }
 
 export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
-  (
-    {
-      id = "journal",
-      className = "",
-      meadowPhotoUrl = DEFAULT_MEADOW,
-      flowerPhotoUrl = DEFAULT_FLOWER,
-      leftDateStamp = "JUNE 18 · SOMEWHERE QUIET",
-      leftPageNumber = "04",
-      rightPageNumber = "05",
-      openingNote = "I want to remember how the light found us here—",
-      marginNote = (
-        <>
-          keep this feeling
-          <br />
-          somewhere safe.
-        </>
-      ),
-      memoryCopy = (
-        <>
-          We stayed until the sky turned honey,
-          <br />
-          talking about all the lives we might live.
-        </>
-      ),
-      quoteQuestion = "“There are years that ask questions",
-      quoteAnswer = "and years that answer.”",
-      tornNoteLines = ["collect moments,", "not perfect sentences."],
-      waxSealMonogram = "BL",
-      customComposition,
-    },
-    ref
-  ) => {
+  ({ id = "journal", className = "", onSelectNotebook }, ref) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isHovered, setIsHovered] = useState(false);
+    const [isUpscaleOpen, setIsUpscaleOpen] = useState(false);
+    const [mouseTilt, setMouseTilt] = useState({ rotateX: 0, rotateY: 0 });
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const activeNotebook = NOTEBOOK_SHOWCASE[currentIndex];
+
+    // 5-second interval auto-advance
+    const advanceNext = useCallback(() => {
+      setCurrentIndex((prev) => (prev + 1) % NOTEBOOK_SHOWCASE.length);
+    }, []);
+
+    const advancePrev = useCallback(() => {
+      setCurrentIndex((prev) =>
+        prev === 0 ? NOTEBOOK_SHOWCASE.length - 1 : prev - 1
+      );
+    }, []);
+
+    useEffect(() => {
+      if (isHovered || isUpscaleOpen) return;
+
+      timerRef.current = setInterval(() => {
+        advanceNext();
+      }, 5000); // Exatos 5 segundos solicitados pelo usuário
+
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    }, [isHovered, isUpscaleOpen, advanceNext]);
+
+    // Interactive 3D tilt tracking cursor
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      // Gentle tilt between -3.5deg and 3.5deg
+      const rotX = ((y - centerY) / centerY) * -3.5;
+      const rotY = ((x - centerX) / centerX) * 3.5;
+
+      setMouseTilt({ rotateX: rotX, rotateY: rotY });
+    };
+
+    const handleMouseLeave = () => {
+      setIsHovered(false);
+      setMouseTilt({ rotateX: 0, rotateY: 0 });
+    };
+
     return (
       <div
         ref={ref}
-        className={`journal-object ${className}`}
         id={id}
-        aria-label="An open memory journal"
+        className={`notebook-showcase-container ${className}`}
+        aria-label="Demonstração interativa dos cadernos personalizados"
       >
-        <div className="journal-shadow" />
-        <div className="leather-cover" />
-        <div className="page-stack page-stack-left" />
-        <div className="page-stack page-stack-right" />
+        {/* Notebook Floating Presentation Area */}
+        <div
+          className="notebook-stage-wrap"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={handleMouseLeave}
+          onMouseMove={handleMouseMove}
+        >
+          {/* Subtle Ambient Floor Shadow */}
+          <div className="notebook-ambient-shadow" aria-hidden="true" />
 
-        {customComposition ? (
-          customComposition
-        ) : (
-          <div className="spread">
-            {/* LEFT PAGE: Ephemera, polaroid, typed fragment, pressed flower */}
-            <article className="page left-page" aria-label="Left journal page">
-              <div className="paper-grain" />
-              <span className="page-number">{leftPageNumber}</span>
-              <div className="date-stamp">{leftDateStamp}</div>
+          {/* Gentle Floating & Tilt Container */}
+          <div
+            className="notebook-floating-frame"
+            style={{
+              transform: `perspective(1100px) rotateX(${mouseTilt.rotateX.toFixed(
+                2
+              )}deg) rotateY(${mouseTilt.rotateY.toFixed(2)}deg)`,
+            }}
+          >
+            {/* The 3 Customized Notebooks with smooth transition */}
+            <div className="notebook-cards-stack">
+              {NOTEBOOK_SHOWCASE.map((item, index) => {
+                const isActive = index === currentIndex;
+                return (
+                  <div
+                    key={item.id}
+                    className={`notebook-slide ${
+                      isActive ? "notebook-slide--active" : "notebook-slide--inactive"
+                    }`}
+                    aria-hidden={!isActive}
+                  >
+                    <img
+                      src={item.imageSrc}
+                      alt={item.alt}
+                      className="notebook-cutout-img"
+                      draggable={false}
+                      loading="eager"
+                      onClick={() => setIsUpscaleOpen(true)}
+                      title="Clique para inspecionar em alta resolução"
+                    />
+                  </div>
+                );
+              })}
+            </div>
 
-              <p className="handwriting opening-note">{openingNote}</p>
+            {/* Quick Inspect Badge overlay on hover */}
+            <button
+              type="button"
+              className="notebook-inspect-btn"
+              onClick={() => setIsUpscaleOpen(true)}
+              aria-label="Ampliar e inspecionar detalhes do caderno"
+            >
+              <span className="inspect-icon">🔍</span>
+              <span>Inspecionar Personalização</span>
+            </button>
+          </div>
 
-              <figure className="polaroid meadow-polaroid">
-                <span className="tape tape-olive" />
+          {/* Lateral Previous/Next tactile paper buttons */}
+          <button
+            type="button"
+            className="notebook-nav-arrow arrow-left"
+            onClick={advancePrev}
+            aria-label="Caderno anterior"
+            title="Ver personalização anterior"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="notebook-nav-arrow arrow-right"
+            onClick={advanceNext}
+            aria-label="Próximo caderno"
+            title="Ver próxima personalização (intercala a cada 5s)"
+          >
+            ›
+          </button>
+        </div>
+
+        {/* 5-Second Cycle Progress Bar & Interactive Selector Tabs */}
+        <div className="notebook-controls-dock" aria-label="Controles de demonstração">
+          {/* Circular/Linear 5s Progress Bar */}
+          <div className="cycle-progress-track" title="Intercalando a cada 5 segundos">
+            <div
+              key={currentIndex}
+              className={`cycle-progress-bar ${isHovered ? "cycle-paused" : ""}`}
+            />
+          </div>
+
+          {/* Interactive Selector Tabs for the 3 Notebooks */}
+          <div className="notebook-tabs-row" role="tablist">
+            {NOTEBOOK_SHOWCASE.map((item, idx) => {
+              const isActive = idx === currentIndex;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`notebook-tab-pill ${
+                    isActive ? "notebook-tab-pill--active" : ""
+                  }`}
+                  onClick={() => {
+                    setCurrentIndex(idx);
+                    if (onSelectNotebook) onSelectNotebook(item);
+                  }}
+                >
+                  <span className="tab-dot" />
+                  <span className="tab-label">{item.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Notebook Feature Tagline */}
+          <div className="active-notebook-meta">
+            <span className="meta-category">{activeNotebook.category}</span>
+            <span className="meta-sep">·</span>
+            <span className="meta-tagline">{activeNotebook.tagline}</span>
+          </div>
+        </div>
+
+        {/* High-Resolution Upscale Inspection Lightbox Modal */}
+        {isUpscaleOpen && (
+          <div
+            className="upscale-modal-backdrop"
+            onClick={() => setIsUpscaleOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Inspeção de ${activeNotebook.name}`}
+          >
+            <div
+              className="upscale-modal-card"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="upscale-close-btn"
+                onClick={() => setIsUpscaleOpen(false)}
+                aria-label="Fechar inspeção"
+              >
+                ✕
+              </button>
+
+              <div className="upscale-modal-header">
+                <span className="upscale-badge">{activeNotebook.category}</span>
+                <h3 className="upscale-title">{activeNotebook.name}</h3>
+                <p className="upscale-quote">{activeNotebook.quote}</p>
+              </div>
+
+              <div className="upscale-image-viewport">
                 <img
-                  src={meadowPhotoUrl}
-                  alt="Soft white flowers in a summer meadow"
-                  loading="eager"
+                  src={activeNotebook.imageSrc}
+                  alt={activeNotebook.alt}
+                  className="upscale-large-img"
                 />
-                <figcaption>the long way home</figcaption>
-              </figure>
-
-              <div className="postmark" aria-hidden="true">
-                <span>WILD &amp; FREE</span>
-                <i />
-                <small>18 · VI · 24</small>
               </div>
 
-              <div className="typed-fragment">
-                <span>{quoteQuestion}</span>
-                <span>{quoteAnswer}</span>
+              <div className="upscale-modal-footer">
+                <div className="upscale-stickers-list">
+                  <span className="stickers-heading">Recortes & Adesivos Utilizados:</span>
+                  <div className="stickers-tags">
+                    {activeNotebook.stickers.map((stk, i) => (
+                      <span key={i} className="sticker-chip">
+                        ✦ {stk}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="upscale-cta-row">
+                  <Link
+                    href="/journal"
+                    className="upscale-action-btn"
+                    onClick={() => setIsUpscaleOpen(false)}
+                  >
+                    Personalizar Meu Caderno Agora ↝
+                  </Link>
+                </div>
               </div>
-
-              <p className="handwriting margin-note">{marginNote}</p>
-
-              <div className="pressed-flower" aria-hidden="true">
-                <i className="stem" />
-                <i className="leaf leaf-one" />
-                <i className="leaf leaf-two" />
-                <i className="petal petal-one" />
-                <i className="petal petal-two" />
-                <i className="petal petal-three" />
-                <i className="petal petal-four" />
-              </div>
-
-              <Star className="star-left-one" />
-              <Star className="star-left-two" />
-              <span className="scribble-loop" aria-hidden="true" />
-            </article>
-
-            {/* RIGHT PAGE: Envelope, analog flower polaroid, torn note, wax seal, botanical sprig */}
-            <article className="page right-page" aria-label="Right journal page">
-              <div className="paper-grain" />
-              <span className="page-number">{rightPageNumber}</span>
-
-              <div className="envelope">
-                <span className="envelope-flap" />
-                <span className="tiny-address">
-                  for the days
-                  <br />
-                  we keep forever
-                </span>
-                <span className="postage-stamp">
-                  <b>12</b>
-                  <i>✦</i>
-                </span>
-              </div>
-
-              <figure className="polaroid flower-polaroid">
-                <span className="tape tape-rust" />
-                <img
-                  src={flowerPhotoUrl}
-                  alt="Wildflowers photographed on analog film"
-                  loading="eager"
-                />
-                <figcaption>golden hour, again</figcaption>
-              </figure>
-
-              <p className="handwriting memory-copy">{memoryCopy}</p>
-
-              <div className="torn-note">
-                {tornNoteLines.map((line, idx) => (
-                  <p key={idx}>{line}</p>
-                ))}
-                <span className="wax-seal">{waxSealMonogram}</span>
-              </div>
-
-              <BotanicalSprig />
-              <div className="ink-lines" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-              <Star className="star-right-one" />
-              <Star className="star-right-two" />
-              <span className="moon-doodle" aria-hidden="true">
-                ☾
-              </span>
-            </article>
-
-            {/* Book spine binding shadow and highlight */}
-            <div className="binding" />
+            </div>
           </div>
         )}
       </div>

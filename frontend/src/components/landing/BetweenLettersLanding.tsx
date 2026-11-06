@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import gsap from "gsap";
 import LandingBackground from "./LandingBackground";
 import LandingTitle from "./LandingTitle";
@@ -9,34 +9,30 @@ import TryItNowButton from "./TryItNowButton";
 import "./landing.css";
 
 export interface BetweenLettersLandingProps {
-  backgroundPhotoUrl?: string;
-  meadowPhotoUrl?: string;
-  flowerPhotoUrl?: string;
+  initialBackground?: "meadow" | "sunset";
   eyebrow?: string;
   title?: string;
   flourish?: string;
   ctaHref?: string;
   ctaLabel?: string;
-  photoCredit?: string;
   className?: string;
 }
 
-const DEFAULT_BG = "/images/landing/background.jpg";
-const DEFAULT_MEADOW = "/images/landing/meadow.jpg";
-const DEFAULT_FLOWER = "/images/landing/flower.jpg";
+const BACKGROUNDS = {
+  meadow: "/images/nova-ui/chamomile-meadow-bg.jpg",
+  sunset: "/images/nova-ui/sunset-trees-bg.jpg",
+};
 
 export function BetweenLettersLanding({
-  backgroundPhotoUrl = DEFAULT_BG,
-  meadowPhotoUrl = DEFAULT_MEADOW,
-  flowerPhotoUrl = DEFAULT_FLOWER,
+  initialBackground = "meadow",
   eyebrow = "A PLACE FOR THINGS WORTH REMEMBERING",
-  title = "Between Letters",
+  title = "BETWEEN LETTERS",
   flourish = "✦",
   ctaHref = "/journal",
   ctaLabel = "TRY IT NOW",
-  photoCredit = "Field photograph by Annie Spratt · Unsplash",
   className = "",
 }: BetweenLettersLandingProps) {
+  const [activeTheme, setActiveTheme] = useState<"meadow" | "sunset">(initialBackground);
   const heroRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLElement>(null);
@@ -50,13 +46,7 @@ export function BetweenLettersLanding({
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    // In reduced motion mode, rely on standard instant appearance
-    if (prefersReducedMotion) {
-      if (journalRef.current) journalRef.current.classList.add("animate-fallback");
-      if (titleRef.current) titleRef.current.classList.add("animate-fallback");
-      if (btnRef.current) btnRef.current.classList.add("animate-fallback");
-      return;
-    }
+    if (prefersReducedMotion) return;
 
     const hero = heroRef.current;
     const bg = bgRef.current;
@@ -67,53 +57,43 @@ export function BetweenLettersLanding({
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
 
-      // 1. Smooth landscape wash appearance
+      // 1. Natural photographic wash appearance
       if (bg) {
         tl.fromTo(
           bg,
           { opacity: 0 },
-          { opacity: 1, duration: 0.9, ease: "power1.inOut" },
+          { opacity: 1, duration: 1.1, ease: "power1.inOut" },
           0
         );
       }
 
-      // 2. Gradual entry of title plate
+      // 2. Sketched title entrance
       if (titleEl) {
         tl.fromTo(
           titleEl,
-          { opacity: 0, y: -16 },
-          { opacity: 1, y: 0, duration: 0.85 },
-          0.2
+          { opacity: 0, y: -20, scale: 0.98 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.95 },
+          0.25
         );
       }
 
-      // 3. Notebook emerging with gentle scale and opacity
+      // 3. Notebook emerging with gentle physical depth
       if (journal) {
         tl.fromTo(
           journal,
-          { opacity: 0, y: 20, scale: 0.96 },
-          { opacity: 1, y: 0, scale: 1, duration: 1.05, ease: "cubic.out" },
-          0.35
+          { opacity: 0, y: 24, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 1.1, ease: "cubic.out" },
+          0.4
         );
-
-        // Subtle, slow breathing floating movement
-        gsap.to(journal, {
-          y: "-=3",
-          duration: 4.6,
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut",
-          delay: 1.4,
-        });
       }
 
-      // 4. Try it now button entrance
+      // 4. Try it now stopmotion button entrance
       if (btn) {
         tl.fromTo(
           btn,
-          { opacity: 0, y: 12 },
-          { opacity: 1, y: 0, duration: 0.75 },
-          0.65
+          { opacity: 0, y: 16, scale: 0.9 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.8 },
+          0.7
         );
       }
     }, hero);
@@ -121,18 +101,42 @@ export function BetweenLettersLanding({
     return () => ctx.revert();
   }, []);
 
+  const currentBgUrl = BACKGROUNDS[activeTheme];
+
   return (
     <main
       ref={heroRef}
-      className={`hero ${className}`}
+      className={`hero hero-nova-ui ${className}`}
       style={
         {
-          "--background-photo": `url("${backgroundPhotoUrl}")`,
+          "--background-photo": `url("${currentBgUrl}")`,
         } as React.CSSProperties
       }
     >
-      <LandingBackground ref={bgRef} imageUrl={backgroundPhotoUrl} />
+      {/* 1. Cinematic Background Layer */}
+      <LandingBackground ref={bgRef} imageUrl={currentBgUrl} />
 
+      {/* 2. Atmosphere / Scene Mood Switcher (Meadow / Sunset) */}
+      <div className="hero-atmosphere-switch" aria-label="Alternar atmosfera do cenário">
+        <button
+          type="button"
+          className={`atmosphere-pill ${activeTheme === "meadow" ? "atmosphere-pill--active" : ""}`}
+          onClick={() => setActiveTheme("meadow")}
+          title="Modo Campo de Camomila"
+        >
+          <span>🌾 Camomila</span>
+        </button>
+        <button
+          type="button"
+          className={`atmosphere-pill ${activeTheme === "sunset" ? "atmosphere-pill--active" : ""}`}
+          onClick={() => setActiveTheme("sunset")}
+          title="Modo Pôr do Sol na Floresta"
+        >
+          <span>🌅 Pôr do Sol</span>
+        </button>
+      </div>
+
+      {/* 3. Hand-Drawn Sketched Title */}
       <LandingTitle
         ref={titleRef}
         eyebrow={eyebrow}
@@ -140,15 +144,11 @@ export function BetweenLettersLanding({
         flourish={flourish}
       />
 
-      <NotebookDisplay
-        ref={journalRef}
-        meadowPhotoUrl={meadowPhotoUrl}
-        flowerPhotoUrl={flowerPhotoUrl}
-      />
+      {/* 4. Notebooks Demonstration Showcase (Cycles every 5 seconds) */}
+      <NotebookDisplay ref={journalRef} />
 
+      {/* 5. Stop-Motion Paper Collage "TRY IT NOW" Button */}
       <TryItNowButton ref={btnRef} href={ctaHref} label={ctaLabel} />
-
-      {photoCredit && <p className="photo-credit">{photoCredit}</p>}
     </main>
   );
 }

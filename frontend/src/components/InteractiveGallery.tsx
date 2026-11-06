@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 
 interface PlateItem {
@@ -15,69 +15,99 @@ interface PlateItem {
   aspect: "wide" | "tall" | "standard";
   href: string;
   linkText: string;
+  tags: string[];
 }
 
 const PLATES: PlateItem[] = [
   {
-    id: "plate-desk",
-    plateNumber: "PLATE 01",
-    category: "SANCTUARY DESK",
-    title: "The Open Journal & Epistolary Collage",
-    subtitle: "Hardbound leather volumes, pressed botanicals, and hand-ruled sheets.",
-    quote: "A thought written by hand is a quiet promise made to one's own soul.",
-    imageSrc: "/hero-collage.webp",
-    imageAlt: "Open antique scrapbook journal with pressed botanicals, wax seal, and vintage photograph",
+    id: "plate-notebook-1",
+    plateNumber: "PRANCHA 01",
+    category: "PERSONALIZAÇÃO AFETIVA",
+    title: "Caderno de Memórias & Recordações de Infância",
+    subtitle: "Fotografias rasgadas, carimbos 'Favorite Person', figura celeste e versos sobre viver como rei.",
+    quote: "Escrever é viver duas vezes: no instante em que o sangue corre e na releitura da saudade.",
+    imageSrc: "/images/nova-ui/caderno-1-cutout.png",
+    imageAlt: "Caderno aberto com foto infantil rasgada e adesivos poéticos",
     aspect: "wide",
     href: "/journal",
-    linkText: "Open Journal Desk ↗",
+    linkText: "Abrir Escrivaninha ↗",
+    tags: ["Foto Rasgada", "Favorite Person", "Astro Andarilho", "Nuvem Grafite"],
+  },
+  {
+    id: "plate-notebook-2",
+    plateNumber: "PRANCHA 02",
+    category: "COLAGEM POP & CINEMA",
+    title: "Caderno Snoopy Coroado & Before Sunrise",
+    subtitle: "Snoopy coroado à mão em ocre, Julie Delpy & Ethan Hawke e anjo querubim barroco.",
+    quote: "A beleza está escondida nos menores detalhes. Às vezes o mais precioso não é extraordinário.",
+    imageSrc: "/images/nova-ui/caderno-2-cutout.png",
+    imageAlt: "Caderno aberto com Snoopy coroado, cena de filme e anjo querubim",
+    aspect: "wide",
+    href: "/journal",
+    linkText: "Experimentar este Estilo ↗",
+    tags: ["Snoopy Coroado", "Before Sunrise", "Querubim", "Gato Dormindo"],
+  },
+  {
+    id: "plate-notebook-3",
+    plateNumber: "PRANCHA 03",
+    category: "DRAMATURGIA & CONCEITUAL",
+    title: "Caderno Surrealismo, Veludo & Palco",
+    subtitle: "Busto bipartido com pensamentos de cem dólares, cortinas de ópera e arlequim de cetro estelar.",
+    quote: "A literatura é a maneira mais agradável de ignorar a vida.",
+    imageSrc: "/images/nova-ui/caderno-3-cutout.png",
+    imageAlt: "Caderno aberto com colagem surrealista e cortinas barrocas",
+    aspect: "wide",
+    href: "/journal",
+    linkText: "Criar Colagem Teatral ↗",
+    tags: ["Busto Surrealista", "Cortinas Barrocas", "Arlequim", "Fernando Pessoa"],
   },
   {
     id: "plate-manuscript",
-    plateNumber: "PLATE 02",
-    category: "CALLIGRAPHIC GRAIN",
-    title: "Archival Manuscript & Iron Gall Inks",
-    subtitle: "Parchment fibers that hold the pressure and cadence of human writing.",
-    quote: "Ink on textured paper captures the silent rhythm of breath behind the words.",
+    plateNumber: "PRANCHA 04",
+    category: "GRÃO CALIGRÁFICO",
+    title: "Manuscrito de Época & Tintas Ferrogálicas",
+    subtitle: "Fibras de pergaminho que retêm a pressão e a cadência da escrita humana secular.",
+    quote: "A tinta no papel texturizado captura o ritmo silencioso da respiração por trás das palavras.",
     imageSrc: "/images/manuscrito-pixabay.jpg",
-    imageAlt: "Historic calligraphic manuscript with textured parchment and vintage script",
+    imageAlt: "Manuscrito histórico caligrafado em pergaminho de época",
     aspect: "tall",
     href: "/discover",
-    linkText: "Explore Archival Letters ↗",
+    linkText: "Explorar Cartas Históricas ↗",
+    tags: ["Pergaminho 1820", "Pena & Nanquim", "Arquivo Histórico"],
   },
   {
     id: "plate-folders",
-    plateNumber: "PLATE 03",
-    category: "PHYSICAL ARCHIVE",
-    title: "Tri-Color Correspondence Folders",
-    subtitle: "Rustic Brown, Botanical Moss, and Noble Wine envelopes kept in 3D perspective.",
-    quote: "Kept letters grouped by sentiment, safe from the casual glance of the world.",
+    plateNumber: "PRANCHA 05",
+    category: "ARQUIVO FÍSICO",
+    title: "Pastas Epistolares Tridimensionais",
+    subtitle: "Marrom Rústico, Musgo Botânico e Vinho Nobre com fechos e selo em ouro.",
+    quote: "Cartas guardadas por sentimento, protegidas do olhar apressado do mundo.",
     imageSrc: "/images/pastas/pasta-marrom.svg",
-    imageAlt: "Archival leather correspondence folder embossed with gold seal",
+    imageAlt: "Pasta de correspondência em couro marrom gravada a ouro",
     aspect: "standard",
     href: "/collections",
-    linkText: "View Epistolary Folders ↗",
+    linkText: "Ver Pastas 3D ↗",
+    tags: ["Couro Sintético 3D", "Selo de Lacre", "3 a 10 Pastas"],
   },
   {
     id: "plate-discard",
-    plateNumber: "PLATE 04",
-    category: "POSTAL RECEPTACLE",
-    title: "The Postal Discard & Restoration Receptacle",
-    subtitle: "A cast-iron postal discard bin with dynamic fullness and soft-deletion recovery.",
-    quote: "Even discarded thoughts rest in a sanctuary, waiting to be recovered or released.",
+    plateNumber: "PRANCHA 06",
+    category: "RECEPTÁCULO POSTAL",
+    title: "Lixeira Postal de Ferro Fundido",
+    subtitle: "Receptáculo postal com 3 estados físicos de acúmulo e restauração integral.",
+    quote: "Mesmo as ideias descartadas repousam em um santuário até que decida restaurá-las.",
     imageSrc: "/images/lixeira/foto-nova-1.png",
-    imageAlt: "Vintage brass postal discard receptacle with cast metal details",
+    imageAlt: "Lixeira postal em metal antigo e detalhes artesanais",
     aspect: "standard",
     href: "/journal",
-    linkText: "Visit Postal Desk ↗",
+    linkText: "Visitar Escrivaninha ↗",
+    tags: ["3 Níveis de Volume", "Soft Delete", "Recuperação Imediata"],
   },
 ];
 
-/**
- * InteractiveGallery Component
- * An editorial magazine-style composition presenting the tactile universe of Between Letters.
- * Features subtle cursor 3D tilt, zoom, and discreet editorial metadata captions.
- */
 export default function InteractiveGallery() {
+  const [upscalePlate, setUpscalePlate] = useState<PlateItem | null>(null);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const card = e.currentTarget;
     const rect = card.getBoundingClientRect();
@@ -102,15 +132,15 @@ export default function InteractiveGallery() {
       <div className="gallery-section-intro">
         <div className="gallery-section-kicker">
           <span className="gallery-star" aria-hidden="true">✳</span>
-          <span>ARCHIVAL PLATES · TACTILE EPHEMERA</span>
+          <span>PRANCHAS ARQUIVÍSTICAS · EPHEMERA TÁTIL</span>
           <span className="gallery-star" aria-hidden="true">✳</span>
         </div>
         <h2 className="gallery-section-title">
-          The Tactile Anatomy of Memory
+          A Anatomia Visual do Seu Caderno
         </h2>
         <p className="gallery-section-subtitle">
-          Every texture within Between Letters is crafted to feel tangible:
-          ruled rag paper, hand-folded envelopes, iron gall inks, and time-weathered postal relics.
+          Cada página no Between Letters reflete a sua identidade: adesivos recortados, polaroids com fita washi,
+          ilustrações feitas à mão e cadernos encadernados que respiram em sua escrivaninha.
         </p>
       </div>
 
@@ -122,7 +152,11 @@ export default function InteractiveGallery() {
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
-            <div className="gallery-card__media-wrap">
+            <div
+              className="gallery-card__media-wrap"
+              onClick={() => setUpscalePlate(plate)}
+              title="Clique para dar upscale e inspecionar em alta resolução"
+            >
               <img
                 src={plate.imageSrc}
                 alt={plate.imageAlt}
@@ -131,6 +165,17 @@ export default function InteractiveGallery() {
               />
               <div className="gallery-card__vignette" />
               <div className="gallery-card__plate-tag">{plate.plateNumber}</div>
+              <button
+                type="button"
+                className="gallery-card__upscale-btn"
+                aria-label={`Upscale ${plate.title}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUpscalePlate(plate);
+                }}
+              >
+                <span>🔍 Upscale</span>
+              </button>
             </div>
 
             <div className="gallery-card__content">
@@ -145,16 +190,93 @@ export default function InteractiveGallery() {
                 “{plate.quote}”
               </blockquote>
 
+              <div className="gallery-card__tags">
+                {plate.tags.map((tag, idx) => (
+                  <span key={idx} className="gallery-card__tag">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+
               <div className="gallery-card__action">
                 <Link href={plate.href} className="gallery-card__link">
                   <span>{plate.linkText}</span>
                   <span className="gallery-card__arrow" aria-hidden="true">→</span>
                 </Link>
+                <button
+                  type="button"
+                  className="gallery-card__inspect-action"
+                  onClick={() => setUpscalePlate(plate)}
+                >
+                  Inspecionar ↗
+                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* High-Resolution Upscale Lightbox Modal */}
+      {upscalePlate && (
+        <div
+          className="upscale-modal-backdrop"
+          onClick={() => setUpscalePlate(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Inspeção de ${upscalePlate.title}`}
+        >
+          <div
+            className="upscale-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="upscale-close-btn"
+              onClick={() => setUpscalePlate(null)}
+              aria-label="Fechar inspeção"
+            >
+              ✕
+            </button>
+
+            <div className="upscale-modal-header">
+              <span className="upscale-badge">{upscalePlate.plateNumber} · {upscalePlate.category}</span>
+              <h3 className="upscale-title">{upscalePlate.title}</h3>
+              <p className="upscale-quote">“{upscalePlate.quote}”</p>
+            </div>
+
+            <div className="upscale-image-viewport">
+              <img
+                src={upscalePlate.imageSrc}
+                alt={upscalePlate.imageAlt}
+                className="upscale-large-img"
+              />
+            </div>
+
+            <div className="upscale-modal-footer">
+              <div className="upscale-stickers-list">
+                <span className="stickers-heading">Elementos & Texturas:</span>
+                <div className="stickers-tags">
+                  {upscalePlate.tags.map((tag, i) => (
+                    <span key={i} className="sticker-chip">
+                      ✦ {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="upscale-cta-row">
+                <Link
+                  href={upscalePlate.href}
+                  className="upscale-action-btn"
+                  onClick={() => setUpscalePlate(null)}
+                >
+                  {upscalePlate.linkText}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

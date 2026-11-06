@@ -6,7 +6,7 @@ export interface LandingBackgroundProps {
   children?: React.ReactNode;
 }
 
-const DEFAULT_BACKGROUND = "/images/landing/background.jpg";
+const DEFAULT_BACKGROUND = "/images/nova-ui/chamomile-meadow-bg.jpg";
 
 export const LandingBackground = forwardRef<HTMLDivElement, LandingBackgroundProps>(
   ({ imageUrl = DEFAULT_BACKGROUND, className = "", children }, ref) => {
@@ -21,6 +21,10 @@ export const LandingBackground = forwardRef<HTMLDivElement, LandingBackgroundPro
           } as React.CSSProperties
         }
       >
+        <div
+          className="landing-bg-image"
+          style={{ backgroundImage: `url("${imageUrl}")` }}
+        />
         <div className="hero-wash" />
         <div className="film-grain" />
         {children}
