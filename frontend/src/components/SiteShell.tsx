@@ -22,7 +22,10 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   const { user, isPro, logout } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
 
-  const isPresentationPage = pathname === "/";
+  const isPresentationPage =
+    pathname === "/" ||
+    pathname === "/notebook" ||
+    pathname.startsWith("/notebook/");
 
   if (isPresentationPage) {
     return (

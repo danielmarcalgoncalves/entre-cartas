@@ -8,6 +8,7 @@ import React, {
   useCallback,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export interface NotebookItem {
   id: string;
@@ -83,6 +84,7 @@ export interface NotebookDisplayProps {
 
 export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
   ({ id = "journal", className = "", onSelectNotebook }, ref) => {
+    const router = useRouter();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const [isUpscaleOpen, setIsUpscaleOpen] = useState(false);
@@ -145,6 +147,10 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
       }
     };
 
+    const handleOpenNotebookExperience = () => {
+      router.push("/notebook");
+    };
+
     return (
       <div
         ref={ref}
@@ -172,7 +178,9 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                   <div
                     key={item.id}
                     className={`notebook-slide ${
-                      isActive ? "notebook-slide--active" : "notebook-slide--inactive"
+                      isActive
+                        ? "notebook-slide--active"
+                        : "notebook-slide--inactive"
                     }`}
                     aria-hidden={!isActive}
                   >
@@ -182,22 +190,22 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                       className="notebook-cutout-img"
                       draggable={false}
                       loading="eager"
-                      onClick={() => setIsUpscaleOpen(true)}
-                      title="Click to inspect in high resolution"
+                      onClick={handleOpenNotebookExperience}
+                      title="Click to open interactive notebook experience"
                     />
                   </div>
                 );
               })}
             </div>
 
-            {/* Quick Inspect Badge overlay on hover */}
+            {/* Quick Open Notebook Badge overlay on hover */}
             <button
               type="button"
               className="notebook-inspect-btn"
-              onClick={() => setIsUpscaleOpen(true)}
-              aria-label="Inspect notebook details"
+              onClick={handleOpenNotebookExperience}
+              aria-label="Open interactive notebook experience"
             >
-              <span>Inspect Notebook</span>
+              <span>Open Notebook</span>
             </button>
           </div>
 
@@ -285,7 +293,9 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
 
               <div className="upscale-modal-footer">
                 <div className="upscale-stickers-list">
-                  <span className="stickers-heading">Featured Cutouts & Ephemera:</span>
+                  <span className="stickers-heading">
+                    Featured Cutouts &amp; Ephemera:
+                  </span>
                   <div className="stickers-tags">
                     {activeNotebook.stickers.map((stk, i) => (
                       <span key={i} className="sticker-chip">
