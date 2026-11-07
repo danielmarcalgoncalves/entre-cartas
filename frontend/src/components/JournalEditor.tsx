@@ -1859,7 +1859,7 @@ export default function JournalEditor() {
 
               {cadernoPromptNotice && (
                 <div className="drawer-mandatory-alert">
-                  <span className="drawer-alert-icon">⚠️</span>
+                  <span className="drawer-alert-icon">!</span>
                   <div className="drawer-alert-body">
                     <strong>Mandatory Creation:</strong>
                     <span>{cadernoPromptNotice}</span>
@@ -2014,7 +2014,7 @@ export default function JournalEditor() {
 
               {folderPromptNotice && (
                 <div className="drawer-mandatory-alert">
-                  <span className="drawer-alert-icon">⚠️</span>
+                  <span className="drawer-alert-icon">!</span>
                   <div className="drawer-alert-body">
                     <strong>Mandatory Creation:</strong>
                     <span>{folderPromptNotice}</span>

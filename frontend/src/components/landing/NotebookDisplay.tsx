@@ -24,54 +24,52 @@ export interface NotebookItem {
 const NOTEBOOK_SHOWCASE: NotebookItem[] = [
   {
     id: "caderno-afeto",
-    name: "01 · Memórias & Afeto",
-    category: "PERSONALIZAÇÃO EMOCIONAL",
-    tagline: "A new way to live life · Recordações Íntimas",
+    name: "Memories & Affection",
+    category: "PERSONAL JOURNAL",
+    tagline: "A new way to live life · Intimate memories",
     imageSrc: "/images/nova-ui/caderno-1-cutout.png",
-    alt: "Caderno Entre Cartas personalizado com foto de infância, adesivo Favorite Person, constelação e nuvem ilustrada",
+    alt: "Customized journal with vintage photos and handwritten notes",
     description:
-      "Demonstração de colagem afetiva: fotos antigas recortadas à mão, notas afetuosas ('Favorite person'), figura celeste e versos sobre viver plenamente.",
+      "Handmade journaling with nostalgic cutouts, personal notes, and reflective prose.",
     stickers: [
-      "Foto de Infância Rasgada",
-      "Selo 'Favorite person'",
-      "Astro Andarilho",
-      "Nuvem a Grafite",
-      "Citação Poética",
+      "Vintage Cutout",
+      "Favorite Person Stamp",
+      "Starlit Notes",
+      "Graphite Sketch",
     ],
     quote: "“We write to prove life twice, in the moment and in hindsight.”",
   },
   {
     id: "caderno-snoopy",
-    name: "02 · Snoopy & Cinema",
-    category: "COLAGEM POP & CINEMATOGRÁFICA",
-    tagline: "This is soo good (: · Before Sunrise & Querubins",
+    name: "Cinema & Ephemera",
+    category: "POP COLLAGE & FILM",
+    tagline: "This is soo good (: · Cinema memories",
     imageSrc: "/images/nova-ui/caderno-2-cutout.png",
-    alt: "Caderno Entre Cartas personalizado com Snoopy coroado, cena de Before Sunrise, anjo querubim e gatinho",
+    alt: "Journal with film scenes and handwritten calligraphy",
     description:
-      "Demonstração de diário pop e cinematográfico: ilustração do Snoopy coroado a traço livre, recorte de Julie Delpy e Ethan Hawke em Before Sunrise, querubim e gatinho.",
+      "Playful journaling inspired by classic cinema, whimsical art, and spontaneous quotes.",
     stickers: [
-      "Snoopy com Coroa de Ouro",
-      "Before Sunrise Polaroid",
-      "Querubim Barroco",
-      "Gatinho Dormindo",
-      "Caligrafia Espontânea",
+      "Golden Crown Sketch",
+      "Film Still Polaroid",
+      "Baroque Cherub",
+      "Sleeping Cat",
     ],
     quote: "“Beauty is everywhere, hidden in the smallest details.”",
   },
   {
     id: "caderno-surrealismo",
-    name: "03 · Surrealismo & Palco",
-    category: "DRAMATURGIA & CONCEITUAL",
+    name: "Surrealism & Stage",
+    category: "DRAMATIC & CONCEPTUAL",
     tagline: "Literature is the most pleasant way to ignore life",
     imageSrc: "/images/nova-ui/caderno-3-cutout.png",
-    alt: "Caderno Entre Cartas personalizado com colagem de cabeça partida surrealista, cortinas de ópera e arlequim",
+    alt: "Journal with conceptual art and velvet drape collages",
     description:
-      "Demonstração de estética dramática e conceitual: colagem surrealista com nota de $100 saindo dos pensamentos, cortinas teatrais de veludo carmesim e arlequim renascentista.",
+      "Dramatic collage aesthetics featuring surrealist compositions and literary aphorisms.",
     stickers: [
-      "Retrato Bipartido Surrealista",
-      "Cortinas de Veludo Carmesim",
-      "Arlequim com Cetro Estelar",
-      "Aforismo de Fernando Pessoa",
+      "Surreal Portrait",
+      "Crimson Velvet Drapes",
+      "Celestial Harlequin",
+      "Literary Aphorism",
     ],
     quote: "“Literature is the most pleasant way to ignore life.”",
   },
@@ -88,7 +86,8 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const [isUpscaleOpen, setIsUpscaleOpen] = useState(false);
-    const [mouseTilt, setMouseTilt] = useState({ rotateX: 0, rotateY: 0 });
+    const frameRef = useRef<HTMLDivElement>(null);
+    const rafRef = useRef<number | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     const activeNotebook = NOTEBOOK_SHOWCASE[currentIndex];
@@ -109,14 +108,14 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
 
       timerRef.current = setInterval(() => {
         advanceNext();
-      }, 5000); // Exatos 5 segundos solicitados pelo usuário
+      }, 5000);
 
       return () => {
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }, [isHovered, isUpscaleOpen, advanceNext]);
 
-    // Interactive 3D tilt tracking cursor
+    // Interactive 3D tilt tracking cursor via rAF without React state re-renders
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -124,16 +123,26 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
 
-      // Gentle tilt between -3.5deg and 3.5deg
-      const rotX = ((y - centerY) / centerY) * -3.5;
-      const rotY = ((x - centerX) / centerX) * 3.5;
+      const rotX = ((y - centerY) / centerY) * -2.5;
+      const rotY = ((x - centerX) / centerX) * 2.5;
 
-      setMouseTilt({ rotateX: rotX, rotateY: rotY });
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        if (frameRef.current) {
+          frameRef.current.style.transform = `perspective(1100px) rotateX(${rotX.toFixed(
+            2
+          )}deg) rotateY(${rotY.toFixed(2)}deg)`;
+        }
+      });
     };
 
     const handleMouseLeave = () => {
       setIsHovered(false);
-      setMouseTilt({ rotateX: 0, rotateY: 0 });
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (frameRef.current) {
+        frameRef.current.style.transform =
+          "perspective(1100px) rotateX(0deg) rotateY(0deg)";
+      }
     };
 
     return (
@@ -141,9 +150,9 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
         ref={ref}
         id={id}
         className={`notebook-showcase-container ${className}`}
-        aria-label="Demonstração interativa dos cadernos personalizados"
+        aria-label="Interactive customized journal showcase"
       >
-        {/* Notebook Floating Presentation Area */}
+        {/* Notebook Presentation Area */}
         <div
           className="notebook-stage-wrap"
           onMouseEnter={() => setIsHovered(true)}
@@ -153,15 +162,8 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
           {/* Subtle Ambient Floor Shadow */}
           <div className="notebook-ambient-shadow" aria-hidden="true" />
 
-          {/* Gentle Floating & Tilt Container */}
-          <div
-            className="notebook-floating-frame"
-            style={{
-              transform: `perspective(1100px) rotateX(${mouseTilt.rotateX.toFixed(
-                2
-              )}deg) rotateY(${mouseTilt.rotateY.toFixed(2)}deg)`,
-            }}
-          >
+          {/* Tilt Container */}
+          <div ref={frameRef} className="notebook-floating-frame">
             {/* The 3 Customized Notebooks with smooth transition */}
             <div className="notebook-cards-stack">
               {NOTEBOOK_SHOWCASE.map((item, index) => {
@@ -181,7 +183,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                       draggable={false}
                       loading="eager"
                       onClick={() => setIsUpscaleOpen(true)}
-                      title="Clique para inspecionar em alta resolução"
+                      title="Click to inspect in high resolution"
                     />
                   </div>
                 );
@@ -193,10 +195,9 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
               type="button"
               className="notebook-inspect-btn"
               onClick={() => setIsUpscaleOpen(true)}
-              aria-label="Ampliar e inspecionar detalhes do caderno"
+              aria-label="Inspect notebook details"
             >
-              <span className="inspect-icon">🔍</span>
-              <span>Inspecionar Personalização</span>
+              <span>Inspect Notebook</span>
             </button>
           </div>
 
@@ -205,8 +206,8 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
             type="button"
             className="notebook-nav-arrow arrow-left"
             onClick={advancePrev}
-            aria-label="Caderno anterior"
-            title="Ver personalização anterior"
+            aria-label="Previous notebook"
+            title="View previous notebook"
           >
             ‹
           </button>
@@ -214,25 +215,16 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
             type="button"
             className="notebook-nav-arrow arrow-right"
             onClick={advanceNext}
-            aria-label="Próximo caderno"
-            title="Ver próxima personalização (intercala a cada 5s)"
+            aria-label="Next notebook"
+            title="View next notebook"
           >
             ›
           </button>
         </div>
 
-        {/* 5-Second Cycle Progress Bar & Interactive Selector Tabs */}
-        <div className="notebook-controls-dock" aria-label="Controles de demonstração">
-          {/* Circular/Linear 5s Progress Bar */}
-          <div className="cycle-progress-track" title="Intercalando a cada 5 segundos">
-            <div
-              key={currentIndex}
-              className={`cycle-progress-bar ${isHovered ? "cycle-paused" : ""}`}
-            />
-          </div>
-
-          {/* Interactive Selector Tabs for the 3 Notebooks */}
-          <div className="notebook-tabs-row" role="tablist">
+        {/* Subtle dot indicators for active notebook slide */}
+        <div className="notebook-controls-dock" aria-label="Slide indicators">
+          <div className="notebook-dots-row" role="tablist">
             {NOTEBOOK_SHOWCASE.map((item, idx) => {
               const isActive = idx === currentIndex;
               return (
@@ -241,26 +233,17 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  className={`notebook-tab-pill ${
-                    isActive ? "notebook-tab-pill--active" : ""
+                  aria-label={`Slide ${idx + 1}`}
+                  className={`notebook-dot-pill ${
+                    isActive ? "notebook-dot-pill--active" : ""
                   }`}
                   onClick={() => {
                     setCurrentIndex(idx);
                     if (onSelectNotebook) onSelectNotebook(item);
                   }}
-                >
-                  <span className="tab-dot" />
-                  <span className="tab-label">{item.name}</span>
-                </button>
+                />
               );
             })}
-          </div>
-
-          {/* Active Notebook Feature Tagline */}
-          <div className="active-notebook-meta">
-            <span className="meta-category">{activeNotebook.category}</span>
-            <span className="meta-sep">·</span>
-            <span className="meta-tagline">{activeNotebook.tagline}</span>
           </div>
         </div>
 
@@ -271,7 +254,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
             onClick={() => setIsUpscaleOpen(false)}
             role="dialog"
             aria-modal="true"
-            aria-label={`Inspeção de ${activeNotebook.name}`}
+            aria-label={`Inspecting ${activeNotebook.name}`}
           >
             <div
               className="upscale-modal-card"
@@ -281,7 +264,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                 type="button"
                 className="upscale-close-btn"
                 onClick={() => setIsUpscaleOpen(false)}
-                aria-label="Fechar inspeção"
+                aria-label="Close inspection"
               >
                 ✕
               </button>
@@ -302,7 +285,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
 
               <div className="upscale-modal-footer">
                 <div className="upscale-stickers-list">
-                  <span className="stickers-heading">Recortes & Adesivos Utilizados:</span>
+                  <span className="stickers-heading">Featured Cutouts & Ephemera:</span>
                   <div className="stickers-tags">
                     {activeNotebook.stickers.map((stk, i) => (
                       <span key={i} className="sticker-chip">
@@ -318,7 +301,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                     className="upscale-action-btn"
                     onClick={() => setIsUpscaleOpen(false)}
                   >
-                    Personalizar Meu Caderno Agora ↝
+                    Customize My Journal Now ↝
                   </Link>
                 </div>
               </div>

@@ -40,7 +40,7 @@ export function Polaroid({ src, alt, caption, className = "" }: { src?: string; 
   return (
     <figure className={`polaroid ${className}`}>
       <div className="polaroid__image">
-        {src ? <img src={src} alt={alt || "Polaroid photograph"} /> : <div className="polaroid__placeholder"><span>📷</span><small>photo of the day</small></div>}
+        {src ? <img src={src} alt={alt || "Polaroid photograph"} /> : <div className="polaroid__placeholder"><span>✦</span><small>photo of the day</small></div>}
       </div>
       {caption && <figcaption>{caption}</figcaption>}
     </figure>

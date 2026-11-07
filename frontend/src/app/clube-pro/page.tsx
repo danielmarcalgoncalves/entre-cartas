@@ -121,7 +121,7 @@ export default function ClubeProPage() {
           }}
         >
           <span className="wax-seal" style={{ margin: "0 auto 16px" }}>
-            👑
+            ★
           </span>
           <span className="eyebrow">You are an honored member</span>
           <h2 className="display-title" style={{ fontSize: "36px", margin: "10px 0" }}>

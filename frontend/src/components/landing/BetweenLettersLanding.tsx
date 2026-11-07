@@ -117,22 +117,22 @@ export function BetweenLettersLanding({
       <LandingBackground ref={bgRef} imageUrl={currentBgUrl} />
 
       {/* 2. Atmosphere / Scene Mood Switcher (Meadow / Sunset) */}
-      <div className="hero-atmosphere-switch" aria-label="Alternar atmosfera do cenário">
+      <div className="hero-atmosphere-switch" aria-label="Toggle scenery atmosphere">
         <button
           type="button"
           className={`atmosphere-pill ${activeTheme === "meadow" ? "atmosphere-pill--active" : ""}`}
           onClick={() => setActiveTheme("meadow")}
-          title="Modo Campo de Camomila"
+          title="Chamomile Meadow Mode"
         >
-          <span>🌾 Camomila</span>
+          <span>Chamomile</span>
         </button>
         <button
           type="button"
           className={`atmosphere-pill ${activeTheme === "sunset" ? "atmosphere-pill--active" : ""}`}
           onClick={() => setActiveTheme("sunset")}
-          title="Modo Pôr do Sol na Floresta"
+          title="Forest Sunset Mode"
         >
-          <span>🌅 Pôr do Sol</span>
+          <span>Sunset</span>
         </button>
       </div>
 

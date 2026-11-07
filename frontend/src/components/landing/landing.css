@@ -9,17 +9,23 @@
   --paper: #eee3d1;
   position: relative;
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
   min-height: 100svh;
-  height: 100svh;
+  max-width: 100vw;
   overflow: hidden;
   isolation: isolate;
   background-image: var(--background-photo);
-  background-position: center 55%;
+  background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;
   color: #33271f;
   font-family: 'IM Fell English', Georgia, serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(10px, 1.5vh, 20px) clamp(12px, 2.5vw, 32px) clamp(10px, 1.5vh, 20px);
+  box-sizing: border-box;
 }
 
 .hero::before {
@@ -45,16 +51,7 @@
 
 .film-grain,
 .paper-grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.16;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
-}
-
-.film-grain {
-  z-index: 10;
+  display: none;
 }
 
 /* ==========================================================================
@@ -101,813 +98,6 @@
   color: #d1b679;
   font-size: clamp(12px, 1.3vw, 20px);
   transform: rotate(18deg);
-}
-
-/* ==========================================================================
-   NOTEBOOK DISPLAY (SCRAPBOOK JOURNAL OBJECT)
-   ========================================================================== */
-
-.journal-object {
-  position: absolute;
-  top: 20%;
-  left: 50%;
-  z-index: 2;
-  width: min(73vw, 1010px);
-  aspect-ratio: 1.72;
-  perspective: 1600px;
-  transform: translateX(-50%) rotate(-0.6deg);
-  transform-origin: center;
-}
-
-.journal-shadow {
-  position: absolute;
-  inset: 8% 0 -7%;
-  z-index: -3;
-  border-radius: 45%;
-  background: rgba(18, 18, 11, 0.72);
-  filter: blur(34px);
-  transform: rotate(1deg) scaleX(0.94);
-}
-
-.leather-cover {
-  position: absolute;
-  inset: -2.3% -1.7% -3%;
-  z-index: -2;
-  border: 1px solid rgba(239, 208, 154, 0.35);
-  border-radius: 4% 4.5% 3.5% 4%;
-  background:
-    radial-gradient(circle at 18% 20%, rgba(188, 126, 76, 0.36), transparent 24%),
-    radial-gradient(circle at 80% 70%, rgba(20, 7, 4, 0.25), transparent 42%),
-    repeating-linear-gradient(72deg, transparent 0 4px, rgba(255, 223, 169, 0.025) 5px),
-    #68452f;
-  box-shadow:
-    inset 0 0 0 4px rgba(56, 29, 18, 0.42),
-    inset 0 0 34px rgba(21, 10, 7, 0.7),
-    0 25px 34px rgba(24, 23, 14, 0.58);
-  transform: rotateX(3deg);
-}
-
-.leather-cover::after {
-  position: absolute;
-  inset: 1.4%;
-  border: 1px dashed rgba(213, 168, 111, 0.4);
-  border-radius: 3%;
-  content: '';
-}
-
-.page-stack {
-  position: absolute;
-  top: 1.5%;
-  bottom: 0;
-  z-index: -1;
-  width: 50%;
-  border: 1px solid #c8b99e;
-  background: repeating-linear-gradient(
-    0deg,
-    #d5c8b0 0,
-    #d5c8b0 1px,
-    #f0e5d2 2px,
-    #f0e5d2 4px
-  );
-  box-shadow: 0 8px 12px rgba(48, 35, 22, 0.35);
-}
-
-.page-stack-left {
-  left: 0.1%;
-  border-radius: 3% 0 0 3.5%;
-  transform: rotateY(3deg) rotate(-0.5deg);
-}
-
-.page-stack-right {
-  right: 0.1%;
-  border-radius: 0 3% 3.5% 0;
-  transform: rotateY(-3deg) rotate(0.7deg);
-}
-
-.spread {
-  position: absolute;
-  inset: 0 1% 1.5%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  transform: rotateX(3deg);
-  transform-style: preserve-3d;
-}
-
-.page {
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 25% 12%, rgba(255, 255, 255, 0.46), transparent 27%),
-    linear-gradient(100deg, transparent 82%, rgba(105, 80, 51, 0.08)),
-    var(--paper);
-  box-shadow: inset 0 0 38px rgba(113, 82, 45, 0.15);
-}
-
-.left-page {
-  border-radius: 3% 0.4% 0.7% 3%;
-  clip-path: polygon(0.4% 0.5%, 99.7% 0, 100% 98.8%, 84% 99.5%, 64% 99%, 44% 99.6%, 23% 99%, 0 99.5%);
-}
-
-.right-page {
-  border-radius: 0.4% 3% 3% 0.7%;
-  clip-path: polygon(0 0.2%, 99.7% 0.7%, 100% 99%, 78% 99.5%, 54% 99%, 27% 99.7%, 0 98.8%);
-}
-
-.paper-grain {
-  z-index: 20;
-  opacity: 0.18;
-  mix-blend-mode: multiply;
-}
-
-.binding {
-  position: absolute;
-  top: 0.6%;
-  bottom: 0.5%;
-  left: 50%;
-  z-index: 25;
-  width: 3.6%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(67, 48, 30, 0.16) 30%,
-    rgba(255, 250, 237, 0.45) 51%,
-    rgba(68, 47, 29, 0.2) 70%,
-    transparent
-  );
-  filter: blur(1px);
-  pointer-events: none;
-  transform: translateX(-50%);
-}
-
-.page-number {
-  position: absolute;
-  bottom: 3%;
-  color: rgba(71, 54, 39, 0.65);
-  font-size: clamp(6px, 0.62vw, 10px);
-  letter-spacing: 0.18em;
-  font-family: 'IM Fell English', Georgia, serif;
-}
-
-.left-page .page-number {
-  left: 5%;
-}
-
-.right-page .page-number {
-  right: 5%;
-}
-
-.date-stamp {
-  position: absolute;
-  top: 5%;
-  left: 7%;
-  padding-bottom: 1%;
-  border-bottom: 1px solid rgba(73, 60, 45, 0.42);
-  color: #5f5548;
-  font-size: clamp(5px, 0.56vw, 9px);
-  letter-spacing: 0.19em;
-  font-family: 'IM Fell English', Georgia, serif;
-}
-
-.handwriting {
-  position: absolute;
-  z-index: 3;
-  margin: 0;
-  color: #3d352b;
-  font-family: 'Caveat', cursive;
-  font-weight: 500;
-  line-height: 0.93;
-}
-
-.opening-note {
-  top: 13%;
-  left: 9%;
-  width: 36%;
-  font-size: clamp(10px, 1.25vw, 20px);
-  transform: rotate(-3deg);
-}
-
-.polaroid {
-  position: absolute;
-  z-index: 2;
-  margin: 0;
-  padding: 2.2% 2.2% 5.8%;
-  background: #f5efe3;
-  box-shadow: 0 5px 10px rgba(66, 49, 32, 0.28);
-}
-
-.polaroid img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: sepia(0.15) saturate(0.8) contrast(0.95);
-}
-
-.polaroid figcaption {
-  position: absolute;
-  right: 5%;
-  bottom: 1.1%;
-  left: 5%;
-  overflow: hidden;
-  color: #51463a;
-  font-family: 'Caveat', cursive;
-  font-size: clamp(7px, 0.87vw, 14px);
-  line-height: 1;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.meadow-polaroid {
-  top: 11%;
-  right: 7%;
-  width: 45%;
-  height: 43%;
-  transform: rotate(4deg);
-}
-
-.flower-polaroid {
-  top: 8%;
-  left: 8%;
-  width: 41%;
-  height: 42%;
-  transform: rotate(-3.5deg);
-}
-
-.tape {
-  position: absolute;
-  top: -7%;
-  left: 34%;
-  z-index: 3;
-  width: 37%;
-  height: 13%;
-  opacity: 0.84;
-  clip-path: polygon(3% 8%, 96% 0, 100% 88%, 6% 100%);
-  transform: rotate(-3deg);
-}
-
-.tape-olive {
-  background:
-    repeating-linear-gradient(45deg, transparent 0 4px, rgba(60, 62, 43, 0.12) 5px 6px),
-    #a7a47b;
-}
-
-.tape-rust {
-  left: 28%;
-  width: 43%;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 7px, rgba(100, 46, 36, 0.13) 8px 9px),
-    #bd7565;
-}
-
-.postmark {
-  position: absolute;
-  bottom: 12%;
-  left: 30%;
-  width: 21%;
-  aspect-ratio: 1;
-  border: 1.5px solid rgba(106, 55, 44, 0.63);
-  border-radius: 50%;
-  color: rgba(106, 55, 44, 0.7);
-  font-family: Georgia, serif;
-  font-size: clamp(4px, 0.48vw, 8px);
-  letter-spacing: 0.05em;
-  text-align: center;
-  transform: rotate(-18deg);
-}
-
-.postmark span {
-  display: block;
-  margin-top: 23%;
-}
-
-.postmark i {
-  display: block;
-  width: 72%;
-  margin: 8% auto;
-  border-top: 1px solid currentColor;
-}
-
-.postmark small {
-  font-size: inherit;
-}
-
-.typed-fragment {
-  position: absolute;
-  bottom: 8%;
-  left: 7%;
-  display: flex;
-  flex-direction: column;
-  font-family: 'IM Fell English', serif;
-  font-size: clamp(6px, 0.65vw, 10px);
-  line-height: 1.35;
-  transform: rotate(1deg);
-}
-
-.typed-fragment span {
-  width: fit-content;
-  padding: 1px 4px;
-  background: rgba(234, 218, 192, 0.86);
-  box-shadow: 1px 1px rgba(98, 72, 46, 0.12);
-}
-
-.margin-note {
-  right: 5%;
-  bottom: 18%;
-  width: 30%;
-  font-size: clamp(8px, 1vw, 16px);
-  text-align: center;
-  transform: rotate(-6deg);
-}
-
-.pressed-flower {
-  position: absolute;
-  bottom: 4%;
-  left: 53%;
-  width: 13%;
-  height: 34%;
-  opacity: 0.76;
-  transform: rotate(10deg);
-}
-
-.pressed-flower .stem {
-  position: absolute;
-  bottom: 0;
-  left: 52%;
-  width: 2px;
-  height: 85%;
-  background: #74775b;
-  transform: rotate(5deg);
-}
-
-.pressed-flower .leaf {
-  position: absolute;
-  width: 24%;
-  height: 24%;
-  border-radius: 100% 0;
-  background: #777854;
-}
-
-.leaf-one {
-  bottom: 29%;
-  left: 34%;
-  transform: rotate(15deg);
-}
-
-.leaf-two {
-  right: 22%;
-  bottom: 48%;
-  transform: rotate(80deg);
-}
-
-.pressed-flower .petal {
-  position: absolute;
-  top: 3%;
-  left: 42%;
-  width: 29%;
-  height: 22%;
-  border-radius: 70% 30% 60% 40%;
-  background: #9c5147;
-  transform-origin: 50% 100%;
-}
-
-.petal-two {
-  transform: rotate(85deg);
-}
-
-.petal-three {
-  transform: rotate(175deg);
-}
-
-.petal-four {
-  transform: rotate(265deg);
-}
-
-.ink-star {
-  position: absolute;
-  color: #9c5147;
-  font-family: Georgia, serif;
-  font-size: clamp(8px, 1.1vw, 17px);
-}
-
-.star-left-one {
-  top: 10%;
-  left: 50%;
-}
-
-.star-left-two {
-  right: 8%;
-  bottom: 7%;
-  color: #b39a68;
-}
-
-.scribble-loop {
-  position: absolute;
-  top: 48%;
-  left: 7%;
-  width: 20%;
-  height: 19%;
-  border: 1px solid rgba(63, 55, 44, 0.55);
-  border-right-color: transparent;
-  border-radius: 52% 48% 54% 46%;
-  transform: rotate(-14deg);
-}
-
-.scribble-loop::after {
-  position: absolute;
-  right: -18%;
-  bottom: -21%;
-  width: 80%;
-  height: 62%;
-  border-top: 1px solid rgba(63, 55, 44, 0.55);
-  border-radius: 50%;
-  content: '';
-  transform: rotate(16deg);
-}
-
-.envelope {
-  position: absolute;
-  right: 7%;
-  bottom: 9%;
-  width: 44%;
-  height: 32%;
-  background: #d9c7aa;
-  box-shadow: 2px 3px 7px rgba(78, 53, 32, 0.23);
-  transform: rotate(3deg);
-}
-
-.envelope-flap {
-  position: absolute;
-  inset: 0;
-  clip-path: polygon(0 0, 100% 0, 51% 62%);
-  background: #e6d6bc;
-  filter: drop-shadow(0 1px 0 rgba(80, 55, 36, 0.2));
-}
-
-.tiny-address {
-  position: absolute;
-  bottom: 16%;
-  left: 10%;
-  color: #665545;
-  font-family: 'Caveat', cursive;
-  font-size: clamp(6px, 0.68vw, 11px);
-  line-height: 1;
-}
-
-.postage-stamp {
-  position: absolute;
-  top: 9%;
-  right: 7%;
-  display: grid;
-  width: 20%;
-  aspect-ratio: 0.83;
-  place-content: center;
-  border: 1px dashed #eee2ce;
-  outline: 1px solid #984e44;
-  background: #9c5147;
-  color: #f1dfc7;
-  font-size: clamp(5px, 0.55vw, 9px);
-  text-align: center;
-}
-
-.postage-stamp b,
-.postage-stamp i {
-  display: block;
-  line-height: 0.9;
-}
-
-.memory-copy {
-  top: 55%;
-  left: 7%;
-  width: 44%;
-  font-size: clamp(8px, 1.1vw, 17px);
-  transform: rotate(2deg);
-}
-
-.torn-note {
-  position: absolute;
-  top: 18%;
-  right: 7%;
-  z-index: 3;
-  width: 39%;
-  min-height: 29%;
-  padding: 9% 5% 5%;
-  background: #e7d5b8;
-  box-shadow: 2px 4px 9px rgba(73, 52, 32, 0.22);
-  clip-path: polygon(1% 4%, 10% 1%, 19% 4%, 28% 0, 39% 4%, 50% 1%, 62% 4%, 74% 0, 84% 3%, 99% 0, 97% 97%, 86% 99%, 72% 97%, 60% 100%, 47% 97%, 33% 100%, 20% 96%, 5% 100%);
-  color: #473b2f;
-  font-family: 'Caveat', cursive;
-  font-size: clamp(7px, 0.9vw, 14px);
-  line-height: 1.05;
-  text-align: center;
-  transform: rotate(5deg);
-}
-
-.torn-note p {
-  margin: 0;
-}
-
-.wax-seal {
-  position: absolute;
-  bottom: -10%;
-  left: 43%;
-  display: grid;
-  width: 22%;
-  aspect-ratio: 1;
-  place-content: center;
-  border-radius: 47% 53% 48% 52%;
-  background: radial-gradient(circle at 38% 33%, #bd6b5c, #75332d 68%);
-  box-shadow:
-    inset 0 0 0 3px rgba(98, 37, 32, 0.22),
-    1px 2px 3px rgba(55, 35, 24, 0.35);
-  color: #dba292;
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(5px, 0.58vw, 9px);
-}
-
-.botanical-sprig {
-  position: absolute;
-  right: 1.5%;
-  bottom: -7%;
-  width: 23%;
-  height: 49%;
-  stroke: #5e654a;
-  stroke-width: 1.6;
-  opacity: 0.7;
-  transform: rotate(-9deg);
-}
-
-.ink-lines {
-  position: absolute;
-  right: 7%;
-  bottom: 43%;
-  width: 32%;
-  transform: rotate(-3deg);
-}
-
-.ink-lines span {
-  display: block;
-  margin-top: 5%;
-  border-top: 1px solid rgba(83, 67, 49, 0.24);
-}
-
-.star-right-one {
-  top: 4%;
-  right: 4%;
-  color: #b39a68;
-}
-
-.star-right-two {
-  right: 44%;
-  bottom: 8%;
-  color: #9c5147;
-  transform: rotate(23deg);
-}
-
-.moon-doodle {
-  position: absolute;
-  right: 43%;
-  bottom: 18%;
-  color: rgba(64, 62, 47, 0.76);
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(14px, 2.3vw, 36px);
-  transform: rotate(-15deg);
-}
-
-/* ==========================================================================
-   BUTTON: TRY IT NOW
-   ========================================================================== */
-
-.enter-button {
-  position: absolute;
-  bottom: clamp(30px, 5.5vh, 58px);
-  left: 50%;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 11px 24px 10px 27px;
-  border: 1px solid rgba(248, 237, 215, 0.72);
-  border-radius: 999px 970px 999px 940px;
-  background: rgba(45, 47, 34, 0.73);
-  box-shadow:
-    0 8px 24px rgba(27, 27, 18, 0.28),
-    inset 0 0 0 1px rgba(55, 44, 31, 0.4);
-  color: #f5ebda;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: clamp(12px, 1vw, 16px);
-  letter-spacing: 0.17em;
-  text-decoration: none;
-  text-transform: uppercase;
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
-  transform: translateX(-50%) rotate(-0.5deg);
-  transition:
-    color 220ms ease,
-    background 220ms ease,
-    transform 220ms ease,
-    box-shadow 220ms ease;
-  cursor: pointer;
-  user-select: none;
-}
-
-.enter-button i {
-  font-family: Georgia, serif;
-  font-size: 20px;
-  font-style: normal;
-  line-height: 0;
-  transition: transform 220ms ease;
-}
-
-.enter-button:hover,
-.enter-button:focus-visible {
-  background: rgba(243, 235, 221, 0.9);
-  color: #3c3027;
-  outline: none;
-  transform: translateX(-50%) translateY(-3px) rotate(0.7deg);
-  box-shadow:
-    0 12px 30px rgba(27, 27, 18, 0.35),
-    inset 0 0 0 1px rgba(55, 44, 31, 0.5);
-}
-
-.enter-button:hover i,
-.enter-button:focus-visible i {
-  transform: translateX(4px);
-}
-
-.enter-button:active {
-  transform: translateX(-50%) translateY(-1px) scale(0.98);
-}
-
-/* ==========================================================================
-   PHOTO CREDIT
-   ========================================================================== */
-
-.photo-credit {
-  position: absolute;
-  right: 15px;
-  bottom: 10px;
-  z-index: 3;
-  margin: 0;
-  color: rgba(246, 237, 220, 0.65);
-  font-size: 8px;
-  letter-spacing: 0.06em;
-  text-shadow: 0 1px 5px #263022;
-  font-family: 'IM Fell English', Georgia, serif;
-}
-
-/* ==========================================================================
-   RESPONSIVE QUERIES
-   ========================================================================== */
-
-@media (max-aspect-ratio: 4 / 3) {
-  .hero {
-    background-position: center;
-  }
-
-  .hero-header {
-    top: 3.5vh;
-  }
-
-  .journal-object {
-    top: 22%;
-    width: 94vw;
-  }
-
-  .enter-button {
-    bottom: 8vh;
-  }
-}
-
-@media (max-width: 640px) {
-  .hero::before {
-    background:
-      linear-gradient(180deg, rgba(22, 30, 23, 0.38), transparent 36%),
-      linear-gradient(0deg, rgba(23, 27, 19, 0.4), transparent 32%);
-  }
-
-  .hero-header {
-    top: 4.8vh;
-  }
-
-  .hero-header h1 {
-    font-size: clamp(43px, 14vw, 62px);
-    line-height: 0.85;
-  }
-
-  .eyebrow {
-    margin-bottom: 7px;
-    font-size: 7px;
-    letter-spacing: 0.24em;
-  }
-
-  .title-flourish {
-    display: none;
-  }
-
-  .journal-object {
-    top: 25%;
-    width: 96vw;
-    transform: translateX(-50%) rotate(-0.8deg) scaleY(1.08);
-  }
-
-  .opening-note {
-    width: 40%;
-  }
-
-  .meadow-polaroid {
-    right: 5%;
-    width: 48%;
-  }
-
-  .flower-polaroid {
-    left: 6%;
-    width: 44%;
-  }
-
-  .memory-copy {
-    left: 6%;
-    width: 48%;
-  }
-
-  .torn-note {
-    right: 4%;
-    width: 42%;
-  }
-
-  .enter-button {
-    bottom: 8.5vh;
-    padding: 10px 21px 9px 24px;
-    font-size: 11px;
-  }
-
-  .photo-credit {
-    right: 8px;
-    bottom: 7px;
-    font-size: 6px;
-  }
-}
-
-@media (max-height: 680px) {
-  .hero-header {
-    top: 15px;
-  }
-
-  .hero-header h1 {
-    font-size: clamp(40px, 7.5vh, 58px);
-  }
-
-  .eyebrow {
-    margin-bottom: 3px;
-  }
-
-  .journal-object {
-    top: 20%;
-    width: min(68vw, 900px);
-  }
-
-  .enter-button {
-    bottom: 20px;
-    padding-block: 8px;
-  }
-}
-
-/* ==========================================================================
-   ENTRANCE ANIMATIONS (CSS Fallbacks)
-   ========================================================================== */
-
-@media (prefers-reduced-motion: no-preference) {
-  .journal-object.animate-fallback {
-    animation: settle-in 1100ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-
-  .hero-header.animate-fallback {
-    animation: fade-in 900ms 180ms ease both;
-  }
-
-  .enter-button.animate-fallback {
-    animation: fade-in-button 800ms 500ms ease both;
-  }
-
-  @keyframes settle-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(18px) rotate(1deg) scale(0.97);
-    }
-  }
-
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-8px);
-    }
-  }
-
-  @keyframes fade-in-button {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(8px);
-    }
-  }
 }
 
 /* ==========================================================================
@@ -964,10 +154,10 @@
    ========================================================================== */
 
 .sketch-title-container {
-  position: absolute;
-  top: clamp(14px, 2.2vh, 32px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
   z-index: 15;
   display: flex;
   flex-direction: column;
@@ -975,6 +165,7 @@
   text-align: center;
   pointer-events: auto;
   user-select: none;
+  margin-top: 2px;
 }
 
 .sketch-eyebrow-wrap {
@@ -1014,7 +205,7 @@
 .sketch-title {
   margin: 0;
   font-family: 'Cabin Sketch', 'Fredericka the Great', 'IM Fell English', Georgia, serif;
-  font-size: clamp(48px, 6.2vw, 88px);
+  font-size: clamp(38px, 5vw, 74px);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1024,7 +215,8 @@
   flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
-  filter: url('#pencil-sketch-filter') drop-shadow(0 4px 16px rgba(16, 20, 14, 0.75));
+  text-shadow: 0 3px 12px rgba(16, 20, 14, 0.75), 0 1px 2px rgba(0, 0, 0, 0.9);
+  will-change: transform;
   text-shadow:
     0 1px 0 #182017,
     0 2px 0 #182017,
@@ -1033,10 +225,9 @@
   cursor: default;
 }
 
-/* Stepped Animation: gives letters the subtle live wobble of hand-drawn animation */
+/* Static hand-drawn sketch letter with smooth hover */
 .sketch-letter {
   display: inline-block;
-  animation: sketchLetterWobble 2.4s steps(3) infinite;
   transition: transform 0.2s ease, color 0.2s ease;
 }
 
@@ -1050,20 +241,7 @@
   text-shadow: 0 0 16px rgba(255, 235, 195, 0.85);
 }
 
-@keyframes sketchLetterWobble {
-  0% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  33% {
-    transform: translate(-0.6px, 0.4px) rotate(-0.35deg);
-  }
-  66% {
-    transform: translate(0.5px, -0.4px) rotate(0.25deg);
-  }
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-}
+
 
 /* Sketched Hand-Drawn Underline */
 .sketch-underline {
@@ -1072,39 +250,36 @@
   margin-top: -6px;
   color: #d1b679;
   filter: drop-shadow(0 2px 6px rgba(18, 22, 16, 0.6));
-  animation: sketchUnderlineJitter 3.2s steps(4) infinite;
+  /* static underline */
 }
 
-@keyframes sketchUnderlineJitter {
-  0% { transform: scaleX(1) rotate(0deg); }
-  25% { transform: scaleX(0.99) rotate(-0.2deg); }
-  50% { transform: scaleX(1.01) rotate(0.15deg); }
-  75% { transform: scaleX(0.995) rotate(-0.1deg); }
-  100% { transform: scaleX(1) rotate(0deg); }
-}
+
 
 /* ==========================================================================
    NOVA UI — NOTEBOOK SHOWCASE (5-SECOND CYCLING + GENTLE FLOAT)
    ========================================================================== */
 
 .notebook-showcase-container {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -47%);
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
   z-index: 10;
-  width: min(92vw, 980px);
+  width: min(95vw, 1180px);
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  margin: auto 0;
+  flex: 1 1 auto;
 }
 
 .notebook-stage-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 1.52;
-  max-height: clamp(380px, 58vh, 520px);
+  height: clamp(340px, 62vh, 680px);
+  max-height: 64svh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1135,20 +310,10 @@
   justify-content: center;
   z-index: 2;
   transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
-  animation: gentleNotebookFloat 4.8s ease-in-out infinite;
+  /* static notebook frame */
 }
 
-@keyframes gentleNotebookFloat {
-  0% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(-0.45deg);
-  }
-  100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-}
+
 
 .notebook-cards-stack {
   position: relative;
@@ -1179,11 +344,13 @@
 }
 
 .notebook-cutout-img {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   cursor: pointer;
-  filter: drop-shadow(0 14px 28px rgba(12, 16, 10, 0.65));
+  filter: drop-shadow(0 18px 34px rgba(12, 16, 10, 0.7));
   transition: filter 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -1255,11 +422,11 @@
 }
 
 .arrow-left {
-  left: -12px;
+  left: clamp(2px, 1vw, 14px);
 }
 
 .arrow-right {
-  right: -12px;
+  right: clamp(2px, 1vw, 14px);
 }
 
 .notebook-nav-arrow:hover {
@@ -1269,174 +436,74 @@
   transform: translateY(-50%) scale(1.1);
 }
 
-/* 5-Second Interval Controls Dock */
+/* Slide Indicators Dock */
 .notebook-controls-dock {
   width: 100%;
   max-width: 620px;
-  margin-top: clamp(6px, 1.2vh, 14px);
+  margin-top: clamp(2px, 0.6vh, 8px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   z-index: 8;
 }
 
-/* 5-Second Progress Bar */
-.cycle-progress-track {
-  width: 180px;
-  height: 3px;
-  background: rgba(228, 205, 168, 0.2);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.cycle-progress-bar {
-  height: 100%;
-  width: 0%;
-  background: #d8c29d;
-  border-radius: 999px;
-  animation: cycle5s linear 5000ms infinite;
-}
-
-@keyframes cycle5s {
-  from { width: 0%; }
-  to { width: 100%; }
-}
-
-.cycle-paused {
-  animation-play-state: paused !important;
-}
-
-/* Notebook Selector Tabs */
-.notebook-tabs-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.notebook-tab-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  background: rgba(22, 28, 19, 0.65);
-  border: 1px solid rgba(228, 205, 168, 0.28);
-  border-radius: 999px;
-  color: #dfd4c0;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 13px;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.tab-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: rgba(228, 205, 168, 0.5);
-  transition: background 0.2s ease;
-}
-
-.notebook-tab-pill:hover {
-  background: rgba(40, 50, 36, 0.85);
-  color: #fff;
-  border-color: rgba(228, 205, 168, 0.6);
-}
-
-.notebook-tab-pill--active {
-  background: #d8c29d;
-  color: #1a1e16;
-  font-weight: 600;
-  border-color: #d8c29d;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-}
-
-.notebook-tab-pill--active .tab-dot {
-  background: #1a1e16;
-}
-
-.active-notebook-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: 'IM Fell English', Georgia, serif;
-  font-size: 13px;
-  color: #ebdcb9;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
-}
-
-.meta-category {
-  letter-spacing: 0.12em;
-  font-size: 11px;
-  text-transform: uppercase;
-  color: #d1b679;
-}
-
 /* ==========================================================================
-   NOVA UI — STOPMOTION PAPER COLLAGE "TRY IT NOW" BUTTON
+   NOVA UI — PAPER COLLAGE "TRY IT NOW" BUTTON
    ========================================================================== */
 
 .try-it-now-collage-wrapper {
-  position: absolute;
-  bottom: clamp(14px, 3vh, 32px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  bottom: auto;
+  left: auto;
+  transform: none;
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-top: clamp(4px, 0.8vh, 10px);
 }
 
-/* The Stepped Stop-Motion Animation Requested by User */
+/* Static at rest; subtle lift & gentle paper sway on hover */
 .try-it-now-stopmotion-btn {
   position: relative;
   display: block;
   cursor: pointer;
   text-decoration: none;
-  animation: paperCollageStopmotion 2.2s steps(5) infinite;
+  transform: translateY(0) scale(1);
   filter: drop-shadow(0 8px 18px rgba(12, 16, 10, 0.7));
-  transition: transform 0.2s ease, filter 0.2s ease;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease;
 }
 
-@keyframes paperCollageStopmotion {
-  0% {
-    transform: rotate(-1.4deg) translate(0px, 0px) scale(1);
+@keyframes tryItNowGentleHover {
+  0%, 100% {
+    transform: rotate(0deg) translateY(0);
   }
-  20% {
-    transform: rotate(1.2deg) translate(-1.2px, 1px) scale(1.01);
-  }
-  40% {
-    transform: rotate(-0.5deg) translate(1px, -1px) scale(0.995);
-  }
-  60% {
-    transform: rotate(1.6deg) translate(1.2px, 1.2px) scale(1.015);
-  }
-  80% {
-    transform: rotate(-1.2deg) translate(-1px, -1.2px) scale(1);
-  }
-  100% {
-    transform: rotate(-1.4deg) translate(0px, 0px) scale(1);
+  50% {
+    transform: rotate(-1.2deg) translateY(-2.5px);
   }
 }
 
-.try-it-now-stopmotion-btn:hover {
-  animation-play-state: paused;
-  transform: scale(1.06) rotate(0deg);
+.try-it-now-stopmotion-btn:hover,
+.try-it-now-stopmotion-btn:focus-visible {
+  transform: translateY(-4px) scale(1.05);
   filter: drop-shadow(0 14px 26px rgba(10, 14, 8, 0.85));
 }
 
+.try-it-now-stopmotion-btn:hover .torn-paper-banner,
+.try-it-now-stopmotion-btn:focus-visible .torn-paper-banner {
+  animation: tryItNowGentleHover 1.8s ease-in-out infinite;
+}
+
 .try-it-now-stopmotion-btn:active {
-  transform: scale(0.97) rotate(0.5deg);
+  transform: translateY(-1px) scale(0.98);
 }
 
 .torn-paper-banner {
   position: relative;
-  width: clamp(230px, 24vw, 320px);
+  width: clamp(220px, 22vw, 300px);
   height: auto;
+  will-change: transform;
 }
 
 .torn-paper-img {
@@ -1444,29 +511,6 @@
   height: auto;
   display: block;
   object-fit: contain;
-}
-
-/* Washi tape accents pinning the paper collage */
-.collage-washi-tape {
-  position: absolute;
-  top: -8px;
-  width: 32px;
-  height: 14px;
-  background: rgba(220, 205, 175, 0.55);
-  border: 1px dashed rgba(160, 140, 110, 0.4);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(2px);
-  pointer-events: none;
-}
-
-.tape-left {
-  left: 14px;
-  transform: rotate(-18deg);
-}
-
-.tape-right {
-  right: 14px;
-  transform: rotate(16deg);
 }
 
 /* ==========================================================================
@@ -1713,4 +757,77 @@
 .gallery-card__inspect-action:hover {
   background: rgba(228, 205, 168, 0.2);
   color: #fff;
+}
+
+/* Minimal Slide Indicator Dots */
+.notebook-dots-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.notebook-dot-pill {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(228, 205, 168, 0.4);
+  border: 1px solid rgba(22, 28, 19, 0.4);
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.notebook-dot-pill:hover {
+  background: rgba(228, 205, 168, 0.85);
+  transform: scale(1.25);
+}
+
+.notebook-dot-pill--active {
+  width: 26px;
+  border-radius: 999px;
+  background: #d8c29d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Comprehensive Responsiveness & Performance */
+@media (max-width: 768px) {
+  .hero {
+    padding: 14px 10px;
+    height: auto;
+    min-height: 100svh;
+  }
+  .sketch-title {
+    font-size: clamp(32px, 8.5vw, 52px);
+    letter-spacing: 0.06em;
+  }
+  .notebook-stage-wrap {
+    height: clamp(300px, 54vh, 460px);
+    max-height: none;
+  }
+  .torn-paper-banner {
+    width: clamp(190px, 56vw, 250px);
+  }
+  .notebook-nav-arrow {
+    width: 34px;
+    height: 34px;
+    font-size: 20px;
+  }
+  .arrow-left { left: 4px; }
+  .arrow-right { right: 4px; }
+}
+
+@media (max-width: 480px) {
+  .sketch-title {
+    font-size: 30px;
+  }
+  .sketch-eyebrow {
+    font-size: 8px;
+    letter-spacing: 0.16em;
+    padding: 2px 10px;
+  }
+  .notebook-stage-wrap {
+    height: clamp(250px, 46vh, 360px);
+  }
 }

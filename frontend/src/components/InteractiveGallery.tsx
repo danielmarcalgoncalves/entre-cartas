@@ -21,87 +21,87 @@ interface PlateItem {
 const PLATES: PlateItem[] = [
   {
     id: "plate-notebook-1",
-    plateNumber: "PRANCHA 01",
-    category: "PERSONALIZAÇÃO AFETIVA",
-    title: "Caderno de Memórias & Recordações de Infância",
-    subtitle: "Fotografias rasgadas, carimbos 'Favorite Person', figura celeste e versos sobre viver como rei.",
-    quote: "Escrever é viver duas vezes: no instante em que o sangue corre e na releitura da saudade.",
+    plateNumber: "PLATE 01",
+    category: "PERSONAL JOURNALING",
+    title: "Memories & Childhood Keepsakes",
+    subtitle: "Torn paper photographs, Favorite Person marks, celestial motifs and poetic reminders.",
+    quote: "To write is to live twice: in the moment and in hindsight.",
     imageSrc: "/images/nova-ui/caderno-1-cutout.png",
-    imageAlt: "Caderno aberto com foto infantil rasgada e adesivos poéticos",
+    imageAlt: "Open journal with torn photos and stickers",
     aspect: "wide",
     href: "/journal",
-    linkText: "Abrir Escrivaninha ↗",
-    tags: ["Foto Rasgada", "Favorite Person", "Astro Andarilho", "Nuvem Grafite"],
+    linkText: "Open Writing Desk ↗",
+    tags: ["Torn Photo", "Favorite Person", "Starlit Motif", "Graphite Notes"],
   },
   {
     id: "plate-notebook-2",
-    plateNumber: "PRANCHA 02",
-    category: "COLAGEM POP & CINEMA",
-    title: "Caderno Snoopy Coroado & Before Sunrise",
-    subtitle: "Snoopy coroado à mão em ocre, Julie Delpy & Ethan Hawke e anjo querubim barroco.",
-    quote: "A beleza está escondida nos menores detalhes. Às vezes o mais precioso não é extraordinário.",
+    plateNumber: "PLATE 02",
+    category: "POP COLLAGE & CINEMA",
+    title: "Crowned Snoopy & Before Sunrise",
+    subtitle: "Hand-inked playful sketches, film stills, and baroque cherub cutouts.",
+    quote: "Beauty is hidden in the smallest details of the ordinary day.",
     imageSrc: "/images/nova-ui/caderno-2-cutout.png",
-    imageAlt: "Caderno aberto com Snoopy coroado, cena de filme e anjo querubim",
+    imageAlt: "Open journal with playful illustrations and cherubs",
     aspect: "wide",
     href: "/journal",
-    linkText: "Experimentar este Estilo ↗",
-    tags: ["Snoopy Coroado", "Before Sunrise", "Querubim", "Gato Dormindo"],
+    linkText: "Try This Style ↗",
+    tags: ["Crowned Sketch", "Before Sunrise", "Cherub", "Resting Cat"],
   },
   {
     id: "plate-notebook-3",
-    plateNumber: "PRANCHA 03",
-    category: "DRAMATURGIA & CONCEITUAL",
-    title: "Caderno Surrealismo, Veludo & Palco",
-    subtitle: "Busto bipartido com pensamentos de cem dólares, cortinas de ópera e arlequim de cetro estelar.",
-    quote: "A literatura é a maneira mais agradável de ignorar a vida.",
+    plateNumber: "PLATE 03",
+    category: "DRAMATIC & CONCEPTUAL",
+    title: "Surrealism, Velvet & Stage",
+    subtitle: "Surrealist cutouts, theatre curtains and starry harlequins.",
+    quote: "Literature is the most pleasant way to ignore life.",
     imageSrc: "/images/nova-ui/caderno-3-cutout.png",
-    imageAlt: "Caderno aberto com colagem surrealista e cortinas barrocas",
+    imageAlt: "Open journal with surrealist art and baroque drapes",
     aspect: "wide",
     href: "/journal",
-    linkText: "Criar Colagem Teatral ↗",
-    tags: ["Busto Surrealista", "Cortinas Barrocas", "Arlequim", "Fernando Pessoa"],
+    linkText: "Create Theatrical Collage ↗",
+    tags: ["Surreal Bust", "Baroque Drapes", "Harlequin", "Literary Quote"],
   },
   {
     id: "plate-manuscript",
-    plateNumber: "PRANCHA 04",
-    category: "GRÃO CALIGRÁFICO",
-    title: "Manuscrito de Época & Tintas Ferrogálicas",
-    subtitle: "Fibras de pergaminho que retêm a pressão e a cadência da escrita humana secular.",
-    quote: "A tinta no papel texturizado captura o ritmo silencioso da respiração por trás das palavras.",
+    plateNumber: "PLATE 04",
+    category: "CALLIGRAPHIC GRAIN",
+    title: "Historical Manuscript & Archival Ink",
+    subtitle: "Aged parchment fibers capturing the cadence of human handwriting.",
+    quote: "Ink on textured paper preserves the rhythm of the writer.",
     imageSrc: "/images/manuscrito-pixabay.jpg",
-    imageAlt: "Manuscrito histórico caligrafado em pergaminho de época",
+    imageAlt: "Historical manuscript written on vintage parchment",
     aspect: "tall",
     href: "/discover",
-    linkText: "Explorar Cartas Históricas ↗",
-    tags: ["Pergaminho 1820", "Pena & Nanquim", "Arquivo Histórico"],
+    linkText: "Explore Historic Letters ↗",
+    tags: ["Aged Parchment", "Pen & Ink", "Archival Reserve"],
   },
   {
     id: "plate-folders",
-    plateNumber: "PRANCHA 05",
-    category: "ARQUIVO FÍSICO",
-    title: "Pastas Epistolares Tridimensionais",
-    subtitle: "Marrom Rústico, Musgo Botânico e Vinho Nobre com fechos e selo em ouro.",
-    quote: "Cartas guardadas por sentimento, protegidas do olhar apressado do mundo.",
+    plateNumber: "PLATE 05",
+    category: "PHYSICAL ARCHIVE",
+    title: "Three-Dimensional Epistolary Folders",
+    subtitle: "Rustic Brown, Botanical Moss, and Noble Burgundy with gold-embossed clasps.",
+    quote: "Letters kept by feeling, shielded from the rush of the world.",
     imageSrc: "/images/pastas/pasta-marrom.svg",
-    imageAlt: "Pasta de correspondência em couro marrom gravada a ouro",
+    imageAlt: "Brown leather epistolary folder embossed in gold",
     aspect: "standard",
     href: "/collections",
-    linkText: "Ver Pastas 3D ↗",
-    tags: ["Couro Sintético 3D", "Selo de Lacre", "3 a 10 Pastas"],
+    linkText: "View 3D Folders ↗",
+    tags: ["3D Leather", "Wax Seal", "3 to 10 Folders"],
   },
   {
     id: "plate-discard",
-    plateNumber: "PRANCHA 06",
-    category: "RECEPTÁCULO POSTAL",
-    title: "Lixeira Postal de Ferro Fundido",
-    subtitle: "Receptáculo postal com 3 estados físicos de acúmulo e restauração integral.",
-    quote: "Mesmo as ideias descartadas repousam em um santuário até que decida restaurá-las.",
+    plateNumber: "PLATE 06",
+    category: "POSTAL RECEPTACLE",
+    title: "Cast Metal Postal Bin",
+    subtitle: "Postal receptacle reflecting 3 fullness states and full letter restoration.",
+    quote: "Even discarded thoughts rest gently until you choose to restore them.",
     imageSrc: "/images/lixeira/foto-nova-1.png",
-    imageAlt: "Lixeira postal em metal antigo e detalhes artesanais",
+    imageAlt: "Postal discard receptacle with artisan metal details",
     aspect: "standard",
     href: "/journal",
-    linkText: "Visitar Escrivaninha ↗",
-    tags: ["3 Níveis de Volume", "Soft Delete", "Recuperação Imediata"],
+    linkText: "Visit Writing Desk ↗",
+    tags: ["3 Fullness States", "Soft Delete", "Instant Recovery"],
   },
 ];
 
@@ -116,10 +116,12 @@ export default function InteractiveGallery() {
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
 
-    const rotateX = ((y - centerY) / centerY) * -5;
-    const rotateY = ((x - centerX) / centerX) * 5;
+    const rotateX = ((y - centerY) / centerY) * -3;
+    const rotateY = ((x - centerX) / centerX) * 3;
 
-    card.style.transform = `perspective(900px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
+    window.requestAnimationFrame(() => {
+      card.style.transform = `perspective(900px) rotateX(${rotateX.toFixed(1)}deg) rotateY(${rotateY.toFixed(1)}deg) translateY(-3px)`;
+    });
   };
 
   const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -132,15 +134,14 @@ export default function InteractiveGallery() {
       <div className="gallery-section-intro">
         <div className="gallery-section-kicker">
           <span className="gallery-star" aria-hidden="true">✳</span>
-          <span>PRANCHAS ARQUIVÍSTICAS · EPHEMERA TÁTIL</span>
+          <span>ARCHIVAL PLATES · TACTILE EPHEMERA</span>
           <span className="gallery-star" aria-hidden="true">✳</span>
         </div>
         <h2 className="gallery-section-title">
-          A Anatomia Visual do Seu Caderno
+          Visual Anatomy of Your Writing Desk
         </h2>
         <p className="gallery-section-subtitle">
-          Cada página no Between Letters reflete a sua identidade: adesivos recortados, polaroids com fita washi,
-          ilustrações feitas à mão e cadernos encadernados que respiram em sua escrivaninha.
+          Every page reflects your authentic thoughts: artisan leather journals, tactile epistolary folders, and honest memories kept safe.
         </p>
       </div>
 
@@ -174,7 +175,7 @@ export default function InteractiveGallery() {
                   setUpscalePlate(plate);
                 }}
               >
-                <span>🔍 Upscale</span>
+                <span>Upscale</span>
               </button>
             </div>
 

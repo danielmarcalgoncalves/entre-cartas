@@ -76,7 +76,7 @@ export default function AboutPresentation() {
             {/* Feature 1: Leather Journals */}
             <div className="feature-item">
               <div className="feature-icon-badge" aria-hidden="true">
-                <span>📖</span>
+                <span>01</span>
               </div>
               <h4 className="feature-heading">Hardbound Leather Volumes</h4>
               <p className="feature-description">
@@ -94,7 +94,7 @@ export default function AboutPresentation() {
             {/* Feature 2: Epistolary Folders */}
             <div className="feature-item">
               <div className="feature-icon-badge" aria-hidden="true">
-                <span>📁</span>
+                <span>02</span>
               </div>
               <h4 className="feature-heading">Correspondence Folders</h4>
               <p className="feature-description">
@@ -111,7 +111,7 @@ export default function AboutPresentation() {
             {/* Feature 3: Postal Discard Bin */}
             <div className="feature-item">
               <div className="feature-icon-badge" aria-hidden="true">
-                <span>📮</span>
+                <span>03</span>
               </div>
               <h4 className="feature-heading">Postal Discard Receptacle</h4>
               <p className="feature-description">
@@ -128,7 +128,7 @@ export default function AboutPresentation() {
             {/* Feature 4: Archival Papers & Inks */}
             <div className="feature-item">
               <div className="feature-icon-badge" aria-hidden="true">
-                <span>✒️</span>
+                <span>04</span>
               </div>
               <h4 className="feature-heading">Archival Papers & Prompts</h4>
               <p className="feature-description">

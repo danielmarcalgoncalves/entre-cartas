@@ -518,7 +518,7 @@ export default function PersonalJournalShelf() {
                 onClick={() => setIsTrashModalOpen(true)}
                 title="Open Postal Discard Bin"
               >
-                🗑 {trashLetters.length} discarded
+                {trashLetters.length} discarded
               </button>
             )}
           </div>
@@ -535,7 +535,7 @@ export default function PersonalJournalShelf() {
               role="status"
               aria-live="polite"
             >
-              <span className="postal-trash-toast-icon">🗑️</span>
+              <span className="postal-trash-toast-icon">✕</span>
               <span className="postal-trash-toast-text">{trashFeedback}</span>
             </motion.div>
           )}
@@ -693,7 +693,7 @@ export default function PersonalJournalShelf() {
                   onClick={() => setIsDeleteNotebookModalOpen(true)}
                   title="Permanently delete this journal"
                 >
-                  <span>🗑 DELETE</span>
+                  <span>DELETE</span>
                 </button>
 
                 <button
@@ -905,7 +905,7 @@ export default function PersonalJournalShelf() {
                             onClick={() => excluirCartaPermanentemente(carta)}
                             title="Permanently delete from trash"
                           >
-                            🗑 Delete
+                            Delete
                           </button>
                         </div>
                       </div>
@@ -926,7 +926,7 @@ export default function PersonalJournalShelf() {
                       onClick={esvaziarLixeiraPermanentemente}
                       title="Permanently delete all letters from trash"
                     >
-                      🗑 Empty trash
+                      Empty trash
                     </button>
                   )}
                 </div>
@@ -959,7 +959,7 @@ export default function PersonalJournalShelf() {
               transition={{ duration: 0.2 }}
             >
               <div className="delete-modal-warning-header">
-                <span className="delete-modal-icon" aria-hidden="true">⚠️</span>
+                <span className="delete-modal-icon" aria-hidden="true">!</span>
                 <h3 className="delete-modal-title">Permanently Delete Journal</h3>
               </div>
 

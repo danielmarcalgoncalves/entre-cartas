@@ -48,10 +48,10 @@ export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>
           href={href}
           onClick={handleClick}
           className={`try-it-now-stopmotion-btn ${className}`}
-          aria-label={`${label} — Abrir e experimentar o caderno de anotações`}
-          title="Clique para abrir e personalizar seu caderno"
+          aria-label={`${label} — Open and customize your journal`}
+          title="Click to open and customize your journal"
         >
-          {/* Authentic Torn Kraft-Paper Ribbon Image from fotos-nova-ui */}
+          {/* Authentic Torn Kraft-Paper Ribbon Image */}
           <div className="torn-paper-banner">
             <img
               src="/images/nova-ui/try-it-now-cutout.png"
@@ -62,10 +62,6 @@ export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>
             {/* Hidden Accessible Text for Screen Readers */}
             <span className="sr-only">{label}</span>
           </div>
-
-          {/* Interactive tactile paper pins / tape accents */}
-          <span className="collage-washi-tape tape-left" aria-hidden="true" />
-          <span className="collage-washi-tape tape-right" aria-hidden="true" />
         </Link>
       </div>
     );
