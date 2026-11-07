@@ -1,3 +1,5 @@
+name: filmecc-main
+
 services:
   app:
     build:

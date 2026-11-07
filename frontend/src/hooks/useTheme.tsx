@@ -19,19 +19,15 @@ function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "dark";
 
   try {
+    const isHomePage = window.location.pathname === "/" || window.location.pathname === "";
+    if (isHomePage) return "dark";
+
     const saved = window.localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
     if (saved === "light" || saved === "dark") {
       return saved;
     }
   } catch {
     // localStorage may be inaccessible
-  }
-
-  // Fallback to OS preference
-  if (typeof window !== "undefined" && window.matchMedia) {
-    if (window.matchMedia("(prefers-color-scheme: light)").matches) {
-      return "light";
-    }
   }
 
   return "dark";
@@ -49,12 +45,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Read actual theme initialized by inline head script or storage
-    const initial = (document.documentElement.getAttribute("data-theme") as Theme) || getInitialTheme();
+    const isHomePage = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+    const initial = isHomePage ? "dark" : ((document.documentElement.getAttribute("data-theme") as Theme) || getInitialTheme());
     applyTheme(initial);
     setMounted(true);
 
     const handleStorage = (event: StorageEvent) => {
+      const isNowHome = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+      if (isNowHome) {
+        applyTheme("dark");
+        return;
+      }
       if (event.key === THEME_STORAGE_KEY && event.newValue) {
         const nextTheme = event.newValue as Theme;
         if (nextTheme === "light" || nextTheme === "dark") {
@@ -64,6 +65,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleCustomChange = (event: Event) => {
+      const isNowHome = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+      if (isNowHome) {
+        applyTheme("dark");
+        return;
+      }
       const customEvent = event as CustomEvent<{ theme: Theme }>;
       if (customEvent.detail?.theme) {
         applyTheme(customEvent.detail.theme);
@@ -81,6 +87,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = useCallback(
     (nextTheme: Theme) => {
+      const isHomePage = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+      if (isHomePage) {
+        applyTheme("dark");
+        return;
+      }
       applyTheme(nextTheme);
       try {
         window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
@@ -95,9 +106,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const toggleTheme = useCallback(() => {
+    const isHomePage = typeof window !== "undefined" && (window.location.pathname === "/" || window.location.pathname === "");
+    if (isHomePage) {
+      applyTheme("dark");
+      return;
+    }
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
-  }, [theme, setTheme]);
+  }, [theme, setTheme, applyTheme]);
 
   return (
     <ThemeContext.Provider value={{ theme: mounted ? theme : "dark", toggleTheme, setTheme }}>

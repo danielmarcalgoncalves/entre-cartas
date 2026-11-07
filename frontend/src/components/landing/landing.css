@@ -14,7 +14,7 @@
   max-width: 100vw;
   overflow: hidden;
   isolation: isolate;
-  background-image: var(--background-photo);
+  background-color: #19130e;
   background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;
@@ -26,6 +26,38 @@
   justify-content: space-between;
   padding: clamp(10px, 1.5vh, 20px) clamp(12px, 2.5vw, 32px) clamp(10px, 1.5vh, 20px);
   box-sizing: border-box;
+}
+
+
+/* ==========================================================================
+   NOVA UI — 15-SECOND CROSS-FADING BACKGROUND LAYERS
+   ========================================================================== */
+.landing-background-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-bg-image {
+  position: absolute;
+  inset: 0;
+  background-position: center center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  transition: opacity 1.8s ease-in-out;
+  will-change: opacity;
+}
+
+.landing-bg-image--active {
+  opacity: 1;
+  z-index: 1;
+}
+
+.landing-bg-image--inactive {
+  opacity: 0;
+  z-index: 0;
 }
 
 .hero::before {
@@ -449,68 +481,123 @@
 }
 
 /* ==========================================================================
-   NOVA UI — PAPER COLLAGE "TRY IT NOW" BUTTON
+   NOVA UI — VINTAGE PAPER TICKET "TRY IT NOW" BUTTON (SIMPLE & TACTILE)
    ========================================================================== */
 
 .try-it-now-collage-wrapper {
   position: relative;
-  bottom: auto;
-  left: auto;
-  transform: none;
   z-index: 20;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-top: clamp(4px, 0.8vh, 10px);
+  margin-top: clamp(6px, 1.2vh, 14px);
+  perspective: 900px;
 }
 
-/* Static at rest; subtle lift & gentle paper sway on hover */
-.try-it-now-stopmotion-btn {
+/* Natural soft paper shadow on the surface */
+.try-it-now-ambient-shadow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 86%;
+  height: 18px;
+  background: radial-gradient(ellipse at center, rgba(20, 16, 12, 0.65) 0%, rgba(20, 16, 12, 0.25) 55%, transparent 75%);
+  transform: translateX(-50%);
+  filter: blur(6px);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.55;
+  transition: opacity 0.3s ease, filter 0.3s ease, transform 0.2s ease;
+}
+
+/* Vintage Paper Ticket / Label Badge */
+.try-it-now-vintage-ticket {
   position: relative;
-  display: block;
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 34px;
+  min-width: clamp(230px, 24vw, 290px);
+  height: 52px;
+  box-sizing: border-box;
+
+  /* Authentic aged manila / tea-stained kraft paper palette */
+  background: radial-gradient(ellipse at 50% 50%, #dfccae 0%, #d4bc97 65%, #c2a77f 100%);
+  border: 1.5px solid #4a3726;
+  border-radius: 14px;
   text-decoration: none;
-  transform: translateY(0) scale(1);
-  filter: drop-shadow(0 8px 18px rgba(12, 16, 10, 0.7));
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), filter 0.28s ease;
-}
+  cursor: pointer;
+  z-index: 2;
 
-@keyframes tryItNowGentleHover {
-  0%, 100% {
-    transform: rotate(0deg) translateY(0);
-  }
-  50% {
-    transform: rotate(-1.2deg) translateY(-2.5px);
-  }
-}
+  /* Realistic matte paper shadow — NO neon, NO gloss glow */
+  box-shadow: 
+    0 4px 12px rgba(16, 12, 8, 0.45),
+    0 1px 3px rgba(16, 12, 8, 0.35),
+    inset 0 0 14px rgba(100, 75, 45, 0.25);
 
-.try-it-now-stopmotion-btn:hover,
-.try-it-now-stopmotion-btn:focus-visible {
-  transform: translateY(-4px) scale(1.05);
-  filter: drop-shadow(0 14px 26px rgba(10, 14, 8, 0.85));
-}
-
-.try-it-now-stopmotion-btn:hover .torn-paper-banner,
-.try-it-now-stopmotion-btn:focus-visible .torn-paper-banner {
-  animation: tryItNowGentleHover 1.8s ease-in-out infinite;
-}
-
-.try-it-now-stopmotion-btn:active {
-  transform: translateY(-1px) scale(0.98);
-}
-
-.torn-paper-banner {
-  position: relative;
-  width: clamp(220px, 22vw, 300px);
-  height: auto;
+  transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1);
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease;
   will-change: transform;
 }
 
-.torn-paper-img {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: contain;
+/* Inner thin printed postal/ticket line */
+.vintage-ticket-inner-border {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(74, 55, 38, 0.55);
+  border-radius: 9px;
+  pointer-events: none;
+}
+
+/* Hover state: natural paper lift and shadow depth */
+.try-it-now-vintage-ticket:hover {
+  border-color: #382718;
+  box-shadow: 
+    0 8px 20px rgba(14, 10, 6, 0.55),
+    0 2px 6px rgba(14, 10, 6, 0.4),
+    inset 0 0 16px rgba(90, 65, 38, 0.3);
+}
+
+.try-it-now-vintage-ticket:hover .vintage-ticket-inner-border {
+  border-color: rgba(56, 39, 24, 0.75);
+}
+
+/* Active click state: gentle paper compression */
+.try-it-now-vintage-ticket:active {
+  transform: perspective(900px) rotateX(0deg) rotateY(0deg) translateY(1px) scale(0.99) !important;
+  box-shadow: 
+    0 2px 6px rgba(14, 10, 6, 0.4),
+    inset 0 0 18px rgba(80, 55, 30, 0.35);
+}
+
+/* Typewriter ink label */
+.vintage-ticket-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Special Elite', 'IM Fell English', monospace, Georgia, serif;
+  font-size: clamp(17px, 1.9vw, 21px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #241a12;
+  text-shadow: 0 1px 0 rgba(255, 245, 228, 0.4);
+  line-height: 1;
+}
+
+/* Simple stamped arrow with subtle hover glide */
+.vintage-ticket-arrow {
+  display: inline-block;
+  font-family: 'Special Elite', 'IM Fell English', monospace, serif;
+  font-size: 1.15em;
+  color: #241a12;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.try-it-now-vintage-ticket:hover .vintage-ticket-arrow {
+  transform: translateX(4px);
 }
 
 /* ==========================================================================

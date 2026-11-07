@@ -19,12 +19,12 @@ export interface BetweenLettersLandingProps {
 }
 
 const BACKGROUNDS = {
-  meadow: "/images/nova-ui/chamomile-meadow-bg.jpg",
   sunset: "/images/nova-ui/sunset-trees-bg.jpg",
+  meadow: "/images/nova-ui/chamomile-meadow-bg.jpg",
 };
 
 export function BetweenLettersLanding({
-  initialBackground = "meadow",
+  initialBackground = "sunset",
   eyebrow = "A PLACE FOR THINGS WORTH REMEMBERING",
   title = "BETWEEN LETTERS",
   flourish = "✦",
@@ -32,12 +32,21 @@ export function BetweenLettersLanding({
   ctaLabel = "TRY IT NOW",
   className = "",
 }: BetweenLettersLandingProps) {
-  const [activeTheme, setActiveTheme] = useState<"meadow" | "sunset">(initialBackground);
+  const [activeTheme, setActiveTheme] = useState<"sunset" | "meadow">("sunset");
   const heroRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLElement>(null);
   const journalRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLAnchorElement>(null);
+
+  // Automatically cycle between the two backgrounds every 15 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveTheme((prev) => (prev === "sunset" ? "meadow" : "sunset"));
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !heroRef.current) return;
@@ -87,7 +96,7 @@ export function BetweenLettersLanding({
         );
       }
 
-      // 4. Try it now stopmotion button entrance
+      // 4. Try it now interactive button entrance
       if (btn) {
         tl.fromTo(
           btn,
@@ -113,30 +122,10 @@ export function BetweenLettersLanding({
         } as React.CSSProperties
       }
     >
-      {/* 1. Cinematic Background Layer */}
-      <LandingBackground ref={bgRef} imageUrl={currentBgUrl} />
+      {/* 1. Cinematic Background Layer with Smooth 15s Cross-Fading */}
+      <LandingBackground ref={bgRef} activeTheme={activeTheme} />
 
-      {/* 2. Atmosphere / Scene Mood Switcher (Meadow / Sunset) */}
-      <div className="hero-atmosphere-switch" aria-label="Toggle scenery atmosphere">
-        <button
-          type="button"
-          className={`atmosphere-pill ${activeTheme === "meadow" ? "atmosphere-pill--active" : ""}`}
-          onClick={() => setActiveTheme("meadow")}
-          title="Chamomile Meadow Mode"
-        >
-          <span>Chamomile</span>
-        </button>
-        <button
-          type="button"
-          className={`atmosphere-pill ${activeTheme === "sunset" ? "atmosphere-pill--active" : ""}`}
-          onClick={() => setActiveTheme("sunset")}
-          title="Forest Sunset Mode"
-        >
-          <span>Sunset</span>
-        </button>
-      </div>
-
-      {/* 3. Hand-Drawn Sketched Title */}
+      {/* 2. Hand-Drawn Sketched Title */}
       <LandingTitle
         ref={titleRef}
         eyebrow={eyebrow}
@@ -144,10 +133,10 @@ export function BetweenLettersLanding({
         flourish={flourish}
       />
 
-      {/* 4. Notebooks Demonstration Showcase (Cycles every 5 seconds) */}
+      {/* 3. Notebooks Demonstration Showcase (Cycles every 5 seconds) */}
       <NotebookDisplay ref={journalRef} />
 
-      {/* 5. Stop-Motion Paper Collage "TRY IT NOW" Button */}
+      {/* 4. Tactile 3D Interactive "TRY IT NOW" Button */}
       <TryItNowButton ref={btnRef} href={ctaHref} label={ctaLabel} />
     </main>
   );

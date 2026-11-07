@@ -17,12 +17,15 @@ export const metadata: Metadata = {
 
 const themeInitScript = `(function() {
   try {
-    var stored = localStorage.getItem('entre-cartas:theme');
-    var theme = stored;
-    if (!theme) {
-      theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    var isHome = window.location.pathname === '/' || window.location.pathname === '';
+    if (isHome) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('entre-cartas:theme', 'dark');
+    } else {
+      var stored = localStorage.getItem('entre-cartas:theme');
+      var theme = stored || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
     }
-    document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
@@ -46,4 +49,3 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     </html>
   );
 }
-

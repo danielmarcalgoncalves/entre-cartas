@@ -4542,6 +4542,10 @@ body,
 /* ==================================================================== */
 /* ETAPA 3 — TACTILE INTERACTIVE GALLERY (EDITORIAL PLATES)              */
 /* ==================================================================== */
+.interactive-gallery-section:empty {
+  display: none;
+}
+
 .interactive-gallery-section {
   position: relative;
   width: 100%;
@@ -5149,7 +5153,11 @@ body,
 }
 
 @media (max-width: 600px) {
-  .interactive-gallery-section {
+  .interactive-gallery-section:empty {
+  display: none;
+}
+
+.interactive-gallery-section {
     padding: 80px 16px 60px;
   }
 
