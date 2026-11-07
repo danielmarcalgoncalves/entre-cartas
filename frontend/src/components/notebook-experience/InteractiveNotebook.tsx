@@ -23,6 +23,7 @@ import {
   ColophonSanctuaryPage,
 } from "./NotebookPage";
 import { NotebookControls } from "./NotebookControls";
+import { NotebookVideoBackground } from "./NotebookVideoBackground";
 import "./notebook-experience.css";
 
 type BookState = "closed" | "opening" | "open" | "closing";
@@ -89,10 +90,29 @@ export function InteractiveNotebook() {
 
   // Synchronous animation lock to prevent simultaneous page turns
   const isAnimatingRef = useRef(false);
+  const videoBusyRef = useRef(false);
+  const busyCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const spreadIndexRef = useRef(0);
   const bookStateRef = useRef<BookState>("closed");
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+
+  const setVideoBusy = useCallback((busy: boolean) => {
+    if (busyCooldownTimerRef.current) {
+      clearTimeout(busyCooldownTimerRef.current);
+      busyCooldownTimerRef.current = null;
+    }
+    if (busy) {
+      videoBusyRef.current = true;
+    } else {
+      busyCooldownTimerRef.current = setTimeout(() => {
+        videoBusyRef.current = false;
+        busyCooldownTimerRef.current = null;
+      }, 1800);
+    }
+  }, []);
 
   // 3D DOM Refs
   const bookRigRef = useRef<HTMLDivElement | null>(null);
@@ -142,6 +162,9 @@ export function InteractiveNotebook() {
     mq.addEventListener("change", onMqChange);
 
     return () => {
+      if (busyCooldownTimerRef.current) {
+        clearTimeout(busyCooldownTimerRef.current);
+      }
       document.documentElement.style.overflow = prevHtmlOverflow;
       document.body.style.overflow = prevBodyOverflow;
       document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
@@ -240,6 +263,7 @@ export function InteractiveNotebook() {
     if (isAnimatingRef.current || bookStateRef.current !== "closed") return;
 
     isAnimatingRef.current = true;
+    setVideoBusy(true);
     setIsAnimating(true);
     setBookState("opening");
 
@@ -247,8 +271,9 @@ export function InteractiveNotebook() {
       setBookState("open");
       isAnimatingRef.current = false;
       setIsAnimating(false);
+      setVideoBusy(false);
     });
-  }, [runOpeningSequence]);
+  }, [runOpeningSequence, setVideoBusy]);
 
   // Optional close back to physical closed cover (when on first spread)
   const handleCloseNotebook = useCallback(() => {
@@ -261,6 +286,7 @@ export function InteractiveNotebook() {
     }
 
     isAnimatingRef.current = true;
+    setVideoBusy(true);
     setIsAnimating(true);
     setHoverSide(null);
     setBookState("closing");
@@ -269,8 +295,9 @@ export function InteractiveNotebook() {
       setBookState("closed");
       isAnimatingRef.current = false;
       setIsAnimating(false);
+      setVideoBusy(false);
     });
-  }, [runClosingSequence]);
+  }, [runClosingSequence, setVideoBusy]);
 
   // Core physical 3D page turn engine
   const animateLeafTurn = useCallback(
@@ -281,6 +308,7 @@ export function InteractiveNotebook() {
       if (!leafEl) return;
 
       isAnimatingRef.current = true;
+      setVideoBusy(true);
       setIsAnimating(true);
       setHoverSide(null);
 
@@ -353,10 +381,11 @@ export function InteractiveNotebook() {
 
           isAnimatingRef.current = false;
           setIsAnimating(false);
+          setVideoBusy(false);
         },
       });
     },
-    [prefersReducedMotion]
+    [prefersReducedMotion, setVideoBusy]
   );
 
   const handleTurnNext = useCallback(() => {
@@ -430,8 +459,8 @@ export function InteractiveNotebook() {
       className="nb-experience-viewport"
       aria-label="Between Letters interactive notebook presentation"
     >
-      {/* Subtle warm cream paper grain & ambient radial vignette */}
-      <div className="nb-experience-backdrop" aria-hidden="true" />
+      {/* Dreamy 35mm / Super 8 blurred video background with translucent cream veil */}
+      <NotebookVideoBackground isBusyRef={videoBusyRef} />
 
       {/* Central 3D Notebook Stage */}
       <div

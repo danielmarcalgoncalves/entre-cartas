@@ -115,3 +115,10 @@ volumes:
   mariadb_data:
   redis_data:
   minio_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.82.2.0/24

@@ -35,6 +35,7 @@ try {
 const { securityHeaders, csrfProtection } = require('./src/middlewares/security');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Headers de segurança e proteção HTTP
 app.use(securityHeaders);
