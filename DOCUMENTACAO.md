@@ -6,7 +6,7 @@
 > **Contexto:** Encerramento da série de atividades (*agenda → catálogo → login → RBAC → logs → perfil → premium*). Esta documentação foi elaborada sob a perspectiva de um engenheiro de software que herda um sistema legado em produção e realiza a engenharia reversa completa de sua arquitetura, regras de negócio e modelo de dados sem alterar linhas de código.
 
 ---
-
+---
 ## 📑 Sumário
 
 1. [Especificação Funcional (Visão do Usuário e Operador)](#1-especificação-funcional)
