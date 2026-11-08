@@ -43,6 +43,7 @@ export type JournalEntry = {
   selo_carta?: string;
   pasta_id?: string;
   pasta_nome?: string;
+  tema_carta?: string;
 };
 
 export interface NotebookPage {
@@ -223,11 +224,32 @@ export const SEAL_OPTIONS: PostalSeal[] = [
   { id: "historica", label: "Historical", code: "VI. HS", color: "#6A5432", postmark: "PERMANENT ARCHIVE" },
 ];
 
+export const LETTER_THEMES = [
+  "Love",
+  "Longing",
+  "Friendship",
+  "Memories",
+  "Gratitude",
+  "Dreams",
+  "Family",
+  "Personal",
+  "Unsent Letters",
+] as const;
+
+export type LetterTheme = typeof LETTER_THEMES[number];
+
 export const PAPER_OPTIONS = [
-  { id: "marfim", name: "Cotton & Ivory", color: "#FCFBF7" },
-  { id: "pergaminho", name: "Mellow Parchment", color: "#F7F3EA" },
-  { id: "kraft", name: "Noble Raw Linen", color: "#EFE8DA" },
-  { id: "branco", name: "Classic Letter Paper", color: "#FAF9F5" },
+  { id: "ivory", name: "Ivory", color: "#FCFBF7" },
+  { id: "cream", name: "Cream", color: "#F6EEDB" },
+  { id: "antique-white", name: "Antique White", color: "#FAF6EE" },
+  { id: "warm-beige", name: "Warm Beige", color: "#EFE5D3" },
+  { id: "dusty-rose", name: "Dusty Rose", color: "#F3E5E3" },
+  { id: "muted-sage", name: "Muted Sage", color: "#E6EDE6" },
+  // Backwards compatibility aliases
+  { id: "marfim", name: "Ivory", color: "#FCFBF7" },
+  { id: "pergaminho", name: "Cream", color: "#F6EEDB" },
+  { id: "kraft", name: "Warm Beige", color: "#EFE5D3" },
+  { id: "branco", name: "Antique White", color: "#FAF6EE" },
 ];
 
 export const INK_OPTIONS = [
@@ -238,10 +260,12 @@ export const INK_OPTIONS = [
 ];
 
 export const FONT_OPTIONS = [
-  { id: "caveat", name: "Fountain Pen Script", styleFamily: "'Caveat', cursive" },
-  { id: "literary", name: "Literary Italic", styleFamily: "var(--literary-italic, 'EB Garamond', Georgia, serif)" },
-  { id: "garamond", name: "Classic Serif", styleFamily: "var(--serif, 'EB Garamond', serif)" },
-  { id: "typewriter", name: "Historical Typewriter", styleFamily: "'Special Elite', monospace" },
+  { id: "caveat", name: "Caveat", previewText: "Fountain pen script", styleFamily: "'Caveat', cursive" },
+  { id: "garamond", name: "EB Garamond", previewText: "Classic literary serif", styleFamily: "var(--serif, 'EB Garamond', serif)" },
+  { id: "cormorant", name: "Cormorant", previewText: "Poetic display serif", styleFamily: "var(--serif-title, 'Cormorant Garamond', Georgia, serif)" },
+  { id: "typewriter", name: "Special Elite", previewText: "Vintage typewriter", styleFamily: "'Special Elite', monospace" },
+  // Backward compatibility alias
+  { id: "literary", name: "EB Garamond Italic", previewText: "Literary italic", styleFamily: "var(--literary-italic, 'EB Garamond', Georgia, serif)" },
 ];
 
 export const PROMPTS = [
@@ -632,4 +656,106 @@ export function saveLetterFolders(folders: LetterFolder[], source?: string) {
     window.localStorage.setItem(LETTER_FOLDERS_STORAGE_KEY, JSON.stringify(folders));
   } catch {}
   dispatchJournalUpdated(source);
+}
+
+export function saveAllLetters(letters: JournalEntry[], source?: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SAVED_ENTRIES_KEY, JSON.stringify(letters));
+  } catch {}
+  dispatchJournalUpdated(source);
+}
+
+export function createLetterFolder(
+  nome: string,
+  cor: string = "marrom",
+  userId?: number | string | null
+): LetterFolder {
+  const existing = loadLetterFolders(userId);
+  const newFolder: LetterFolder = {
+    id: "folder-" + Date.now(),
+    nome: nome.trim(),
+    cor,
+    criadoEm: new Date().toISOString(),
+    ownerId: userId || undefined,
+  };
+  saveLetterFolders([...existing, newFolder]);
+  return newFolder;
+}
+
+export function renameLetterFolder(
+  folderId: string,
+  novoNome: string,
+  userId?: number | string | null
+) {
+  const trimmed = novoNome.trim();
+  if (!trimmed) return;
+  const existing = loadLetterFolders(userId);
+  const updated = existing.map((f) =>
+    f.id === folderId ? { ...f, nome: trimmed } : f
+  );
+  saveLetterFolders(updated);
+
+  // Update in saved letters
+  const allLetters = loadSavedLetters(userId);
+  let changed = false;
+  const updatedLetters = allLetters.map((l) => {
+    if (l.pasta_id === folderId) {
+      changed = true;
+      return { ...l, pasta_nome: trimmed };
+    }
+    return l;
+  });
+  if (changed) {
+    saveAllLetters(updatedLetters);
+  }
+}
+
+export function deleteLetterFolder(
+  folderId: string,
+  userId?: number | string | null
+) {
+  const existing = loadLetterFolders(userId);
+  const remaining = existing.filter((f) => f.id !== folderId);
+  saveLetterFolders(remaining);
+
+  // Safeguard: reassign letters in this folder to the first remaining folder or unfiled, so no letters are ever deleted
+  const fallback = remaining[0];
+  const allLetters = loadSavedLetters(userId);
+  let changed = false;
+  const updatedLetters = allLetters.map((l) => {
+    if (l.pasta_id === folderId) {
+      changed = true;
+      return {
+        ...l,
+        pasta_id: fallback ? fallback.id : undefined,
+        pasta_nome: fallback ? fallback.nome : undefined,
+      };
+    }
+    return l;
+  });
+  if (changed) {
+    saveAllLetters(updatedLetters);
+  }
+}
+
+export function moveLetterToFolder(
+  letterId: string,
+  targetFolderId: string,
+  targetFolderName: string,
+  userId?: number | string | null
+) {
+  const allLetters = loadSavedLetters(userId);
+  const updatedLetters = allLetters.map((l) => {
+    if (String(l.id) === String(letterId)) {
+      return {
+        ...l,
+        pasta_id: targetFolderId,
+        pasta_nome: targetFolderName,
+        atualizado_em: new Date().toISOString(),
+      };
+    }
+    return l;
+  });
+  saveAllLetters(updatedLetters);
 }

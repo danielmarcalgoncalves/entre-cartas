@@ -3,23 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { letters as archiveLetters, type Letter } from "@/lib/letters";
-import { Tape, Sticker } from "@/components/paper-kit";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ACTIVE_LETTER_EDIT_ID_KEY,
   ACTIVE_LETTER_FOLDER_ID_KEY,
-  FOLDER_COLOR_OPTIONS,
   FONT_OPTIONS,
   INK_OPTIONS,
   JOURNAL_UPDATED_EVENT,
+  LETTER_THEMES,
   PAPER_OPTIONS,
-  PINNED_THEME_STORAGE_KEY,
-  PROMPTS,
   SEAL_OPTIONS,
+  createLetterFolder,
   formatShortDate,
-  getFolderTheme,
   getFontFamilyById,
   getInkColorById,
   getPaperColorById,
@@ -27,17 +23,17 @@ import {
   loadLetterFolders,
   loadSavedLetters,
   playPaperSound,
-  saveLetterFolders,
   upsertUserLetter,
   type JournalEntry,
   type LetterFolder,
+  type LetterTheme,
   type PostalSeal,
 } from "@/lib/journal-storage";
 
 export default function LetterEditor() {
   const { user, isPro } = useAuth();
 
-  // Letter Editing State
+  // Letter State
   const [editingLetterId, setEditingLetterId] = useState<string | null>(null);
   const [editingRemoteId, setEditingRemoteId] = useState<number | string | undefined>(undefined);
   const [editingCreatedAt, setEditingCreatedAt] = useState<string | null>(null);
@@ -48,73 +44,62 @@ export default function LetterEditor() {
   const [cartaConteudo, setCartaConteudo] = useState("");
   const [cartaAssinatura, setCartaAssinatura] = useState("");
   const [cartaFavoritado, setCartaFavoritado] = useState(false);
+  const [letterTheme, setLetterTheme] = useState<LetterTheme>("Love");
   const [cartaSelo, setCartaSelo] = useState<PostalSeal>(SEAL_OPTIONS[0]);
 
   const [dataFormatada, setDataFormatada] = useState("");
 
-  // Saved Letters & Folders
+  // Folders & Letters State
   const [savedLetters, setSavedLetters] = useState<JournalEntry[]>([]);
   const [letterFolders, setLetterFolders] = useState<LetterFolder[]>([]);
-  const [activeLetterFolderId, setActiveLetterFolderId] = useState<string>("");
-  const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
-  const [savedLettersDrawerOpen, setSavedLettersDrawerOpen] = useState(false);
-  const [newFolderTitle, setNewFolderTitle] = useState("");
-  const [newFolderColor, setNewFolderColor] = useState<string>("marrom");
-  const [folderPromptNotice, setFolderPromptNotice] = useState<string | null>(null);
-  const [pendingActionAfterFolder, setPendingActionAfterFolder] = useState<"seal" | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("");
 
-  // Stationery Customization
-  const [customMenuOpen, setCustomMenuOpen] = useState(false);
-  const [sheetBgId, setSheetBgId] = useState("marfim");
+  // Minimal Customization State
+  const [sheetBgId, setSheetBgId] = useState("ivory");
   const [sheetBgColor, setSheetBgColor] = useState("#FCFBF7");
-  const [inkColorId, setInkColorId] = useState("nanquim");
-  const [inkColor, setInkColor] = useState("#262626");
   const [fontFamilyId, setFontFamilyId] = useState("caveat");
 
-  // Inspiration & Pinned Theme
-  const [temaSalvo, setTemaSalvo] = useState<string>("");
-  const [inspiracaoModal, setInspiracaoModal] = useState(false);
-  const [cartaInspiracao, setCartaInspiracao] = useState<Letter | null>(null);
-  const [promptTexto, setPromptTexto] = useState("");
+  // New Folder Modal
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newFolderInputName, setNewFolderInputName] = useState("");
 
-  // Feedback
-  const [salvando, setSalvando] = useState(false);
-  const [mensagemSucesso, setMensagemSucesso] = useState("");
+  // Feedback & Drafts Drawer
+  const [saving, setSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [draftsDrawerOpen, setDraftsDrawerOpen] = useState(false);
 
-  const menuRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const hasLoadedInitialEditRef = useRef(false);
 
-  const activeLetterFolder =
-    letterFolders.find((f) => f.id === activeLetterFolderId) ||
-    (letterFolders.length > 0 ? letterFolders[0] : null);
-
+  // Set today's date
   useEffect(() => {
-    const hoje = new Date();
-    const opcoes: Intl.DateTimeFormatOptions = {
+    const today = new Date();
+    const formatted = today.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
-    };
-    setDataFormatada(hoje.toLocaleDateString("en-US", opcoes));
-
-    try {
-      const storedTheme = window.localStorage.getItem(PINNED_THEME_STORAGE_KEY);
-      if (storedTheme) setTemaSalvo(storedTheme);
-    } catch {}
+    });
+    setDataFormatada(formatted);
   }, []);
 
+  // Sync seal when theme changes
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setCustomMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    const sealMap: Record<string, string> = {
+      Love: "amor",
+      Longing: "saudade",
+      Friendship: "desabafo",
+      Memories: "historica",
+      Gratitude: "amor",
+      Dreams: "silencio",
+      Family: "historica",
+      Personal: "desabafo",
+      "Unsent Letters": "nunca-enviada",
+    };
+    const sealId = sealMap[letterTheme] || "amor";
+    setCartaSelo(getSealByIdOrLabel(sealId));
+  }, [letterTheme]);
 
   const loadLetterIntoEditor = (entry: JournalEntry) => {
     setEditingLetterId(String(entry.id));
@@ -126,25 +111,31 @@ export default function LetterEditor() {
     setCartaConteudo(entry.conteudo || "");
     setCartaAssinatura(entry.assinatura || user?.nome || "");
     setCartaFavoritado(Boolean(entry.favoritado));
+
+    if (entry.tema_carta && LETTER_THEMES.includes(entry.tema_carta as LetterTheme)) {
+      setLetterTheme(entry.tema_carta as LetterTheme);
+    } else if (entry.selo_carta) {
+      const match = LETTER_THEMES.find(
+        (t) => t.toLowerCase() === entry.selo_carta?.toLowerCase()
+      );
+      if (match) setLetterTheme(match);
+    }
+
     setCartaSelo(getSealByIdOrLabel(entry.selo_carta || entry.humor));
 
-    const paperId = entry.tipo_papel || "marfim";
+    const paperId = entry.tipo_papel || "ivory";
     setSheetBgId(paperId);
     setSheetBgColor(getPaperColorById(paperId));
-
-    const inkId = entry.cor_tinta || "nanquim";
-    setInkColorId(inkId);
-    setInkColor(getInkColorById(inkId));
 
     const fontId = entry.fonte || "caveat";
     setFontFamilyId(fontId);
 
     if (entry.pasta_id) {
-      setActiveLetterFolderId(entry.pasta_id);
+      setSelectedFolderId(entry.pasta_id);
     }
   };
 
-  const carregarDadosCartas = (event?: any) => {
+  const refreshData = (event?: any) => {
     if (event?.detail?.source === "letter-editor") return;
 
     const loadedLetters = loadSavedLetters(user?.id);
@@ -159,49 +150,40 @@ export default function LetterEditor() {
         savedFolderId = window.localStorage.getItem(ACTIVE_LETTER_FOLDER_ID_KEY);
       } catch {}
       if (savedFolderId && loadedFolders.some((f) => f.id === savedFolderId)) {
-        setActiveLetterFolderId(savedFolderId);
-      } else if (!activeLetterFolderId) {
-        setActiveLetterFolderId(loadedFolders[0].id);
+        setSelectedFolderId(savedFolderId);
+      } else if (!selectedFolderId) {
+        setSelectedFolderId(loadedFolders[0].id);
       }
-    } else {
-      setActiveLetterFolderId("");
     }
 
+    // Check for edit query param
     if (!hasLoadedInitialEditRef.current && typeof window !== "undefined") {
       hasLoadedInitialEditRef.current = true;
-      let targetEditId: string | null = null;
       try {
         const params = new URLSearchParams(window.location.search);
-        targetEditId =
-          params.get("edit") ||
-          window.localStorage.getItem(ACTIVE_LETTER_EDIT_ID_KEY);
-        if (targetEditId) {
+        const editId = params.get("edit") || window.localStorage.getItem(ACTIVE_LETTER_EDIT_ID_KEY);
+        if (editId) {
           window.localStorage.removeItem(ACTIVE_LETTER_EDIT_ID_KEY);
+          const found = loadedLetters.find((l) => String(l.id) === String(editId));
+          if (found) {
+            loadLetterIntoEditor(found);
+          }
         }
       } catch {}
-
-      if (targetEditId) {
-        const found = loadedLetters.find(
-          (l) => String(l.id) === String(targetEditId)
-        );
-        if (found) {
-          loadLetterIntoEditor(found);
-        }
-      }
     }
   };
 
   useEffect(() => {
-    carregarDadosCartas();
-    window.addEventListener(JOURNAL_UPDATED_EVENT, carregarDadosCartas);
-    window.addEventListener("storage", carregarDadosCartas);
+    refreshData();
+    window.addEventListener(JOURNAL_UPDATED_EVENT, refreshData);
+    window.addEventListener("storage", refreshData);
     return () => {
-      window.removeEventListener(JOURNAL_UPDATED_EVENT, carregarDadosCartas);
-      window.removeEventListener("storage", carregarDadosCartas);
+      window.removeEventListener(JOURNAL_UPDATED_EVENT, refreshData);
+      window.removeEventListener("storage", refreshData);
     };
   }, [user?.id]);
 
-  const iniciarNovaCartaEmBranco = () => {
+  const handleStartNewLetter = () => {
     playPaperSound();
     setEditingLetterId(null);
     setEditingRemoteId(undefined);
@@ -212,46 +194,51 @@ export default function LetterEditor() {
     setCartaConteudo("");
     setCartaAssinatura(user?.nome || "");
     setCartaFavoritado(false);
+    setLetterTheme("Love");
     try {
       window.localStorage.removeItem(ACTIVE_LETTER_EDIT_ID_KEY);
     } catch {}
-    setTimeout(() => {
-      titleInputRef.current?.focus();
-    }, 80);
+    setToastMessage("Fresh stationery ready on your desk.");
+    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => titleInputRef.current?.focus(), 100);
   };
 
-  const salvarRascunhoCarta = () => {
+  const handleSaveDraft = () => {
     if (!cartaConteudo.trim() && !cartaTitulo.trim() && !cartaDestinatario.trim()) {
-      alert("Write a title, recipient, or a few words before saving a draft.");
+      alert("Please write a title, recipient, or a few words before saving a draft.");
       return;
     }
 
     playPaperSound();
     const nowIso = new Date().toISOString();
     const draftId = editingLetterId || "entry-" + Date.now();
-    const tituloFinal =
+    const finalTitle =
       cartaTitulo.trim() ||
       (cartaDestinatario.trim()
         ? `Draft to ${cartaDestinatario.trim()}`
-        : `Draft (${cartaSelo.label})`);
+        : `Draft (${letterTheme})`);
+
+    const currentFolder =
+      letterFolders.find((f) => f.id === selectedFolderId) || letterFolders[0];
 
     const draftEntry: JournalEntry = {
       id: draftId,
-      titulo: tituloFinal,
+      titulo: finalTitle,
       destinatario: cartaDestinatario.trim() || undefined,
       assinatura: cartaAssinatura.trim() || user?.nome || undefined,
       conteudo: cartaConteudo,
       humor: cartaSelo.id,
+      tema_carta: letterTheme,
       data_formatada: dataFormatada || "Today",
       criado_em: editingCreatedAt || nowIso,
       atualizado_em: nowIso,
       tipo_papel: sheetBgId,
-      cor_tinta: inkColorId,
+      cor_tinta: "nanquim",
       fonte: fontFamilyId,
       favoritado: cartaFavoritado,
       selo_carta: cartaSelo.label,
-      pasta_id: activeLetterFolder?.id,
-      pasta_nome: activeLetterFolder?.nome,
+      pasta_id: currentFolder?.id,
+      pasta_nome: currentFolder?.nome,
       status: "draft",
       usuario_id: user?.id,
       remote_id: editingRemoteId,
@@ -263,73 +250,59 @@ export default function LetterEditor() {
     setLetterStatus("draft");
     setSavedLetters(loadSavedLetters(user?.id));
 
-    setMensagemSucesso(`Draft "${tituloFinal}" saved to your stationery desk.`);
-    setTimeout(() => setMensagemSucesso(""), 3000);
+    setToastMessage(`Draft "${finalTitle}" saved to your archive.`);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const salvarCartaFinalizada = async (overrideFolder?: LetterFolder) => {
+  const handleSaveAndSeal = async () => {
     if (!cartaConteudo.trim() && !cartaTitulo.trim()) {
-      alert("Please write your letter before sealing and saving.");
+      alert("Please write your letter before sealing and preserving it.");
       return;
     }
 
-    const targetFolder = overrideFolder || activeLetterFolder;
-    if (!targetFolder) {
-      setFolderPromptNotice(
-        "Choose or create a correspondence folder to store your sealed letter."
-      );
-      setPendingActionAfterFolder("seal");
-      setFolderDrawerOpen(true);
-      playPaperSound();
-      return;
+    let targetFolder = letterFolders.find((f) => f.id === selectedFolderId);
+    if (!targetFolder && letterFolders.length > 0) {
+      targetFolder = letterFolders[0];
+    } else if (!targetFolder) {
+      targetFolder = createLetterFolder("General Correspondence", "marrom", user?.id);
+      setLetterFolders(loadLetterFolders(user?.id));
+      setSelectedFolderId(targetFolder.id);
     }
 
-    const limiteCartas = isPro ? 30 : 10;
-    const isUpdatingExisting = Boolean(
+    const limitLetters = isPro ? 30 : 10;
+    const isUpdating = Boolean(
       editingLetterId &&
         savedLetters.some((l) => String(l.id) === String(editingLetterId))
     );
 
-    if (!isUpdatingExisting && savedLetters.length >= limiteCartas) {
+    if (!isUpdating && savedLetters.length >= limitLetters) {
       alert(
         isPro
-          ? `You have reached the limit of ${limiteCartas} archived letters on the Premium Plan.`
-          : `You have reached the limit of ${limiteCartas} letters on the Standard Plan. Join Pro Club to write up to 30 letters!`
+          ? `You have reached the limit of ${limitLetters} letters on the Premium Plan.`
+          : `You have reached the limit of ${limitLetters} letters on the Standard Plan. Join the Pro Sender Club to write up to 30 letters!`
       );
       return;
     }
 
-    setSalvando(true);
+    setSaving(true);
     playPaperSound();
 
     const nowIso = new Date().toISOString();
     const letterId = editingLetterId || "entry-" + Date.now();
-    const tituloFinal =
+    const finalTitle =
       cartaTitulo.trim() ||
       (cartaDestinatario.trim()
         ? `Letter to ${cartaDestinatario.trim()}`
-        : `Letter: ${cartaSelo.label}`);
+        : `Letter: ${letterTheme}`);
 
     let remoteId = editingRemoteId;
 
-    // Sync with backend when possible
+    // Backend sync when available
     if (cartaConteudo.trim().length >= 5) {
       try {
         if (remoteId) {
           await api.cartas.atualizar(remoteId, {
-            titulo: tituloFinal,
-            conteudo: cartaConteudo.trim(),
-            destinatario_anonimo: cartaDestinatario.trim() || null,
-            categoria: cartaSelo.id,
-            tipo_papel: sheetBgId,
-          });
-        } else if (
-          editingLetterId &&
-          !String(editingLetterId).startsWith("entry-") &&
-          !Number.isNaN(Number(editingLetterId))
-        ) {
-          await api.cartas.atualizar(editingLetterId, {
-            titulo: tituloFinal,
+            titulo: finalTitle,
             conteudo: cartaConteudo.trim(),
             destinatario_anonimo: cartaDestinatario.trim() || null,
             categoria: cartaSelo.id,
@@ -337,10 +310,9 @@ export default function LetterEditor() {
           });
         } else {
           const res = await api.cartas.enviar({
-            titulo: tituloFinal,
+            titulo: finalTitle,
             conteudo: cartaConteudo.trim(),
-            remetente_anonimo:
-              cartaAssinatura.trim() || user?.nome || "Correspondent",
+            remetente_anonimo: cartaAssinatura.trim() || user?.nome || "Correspondent",
             destinatario_anonimo: cartaDestinatario.trim() || null,
             categoria: cartaSelo.id,
             tipo_papel: sheetBgId,
@@ -357,18 +329,19 @@ export default function LetterEditor() {
       }
     }
 
-    const finalEntry: JournalEntry = {
+    const completedEntry: JournalEntry = {
       id: letterId,
-      titulo: tituloFinal,
+      titulo: finalTitle,
       destinatario: cartaDestinatario.trim() || undefined,
       assinatura: cartaAssinatura.trim() || user?.nome || undefined,
       conteudo: cartaConteudo.trim(),
       humor: cartaSelo.id,
+      tema_carta: letterTheme,
       data_formatada: dataFormatada || "Today",
       criado_em: editingCreatedAt || nowIso,
       atualizado_em: nowIso,
       tipo_papel: sheetBgId,
-      cor_tinta: inkColorId,
+      cor_tinta: "nanquim",
       fonte: fontFamilyId,
       favoritado: cartaFavoritado,
       selo_carta: cartaSelo.label,
@@ -379,1157 +352,412 @@ export default function LetterEditor() {
       remote_id: remoteId,
     };
 
-    upsertUserLetter(finalEntry);
-    setSavedLetters(loadSavedLetters(user?.id));
+    upsertUserLetter(completedEntry, "letter-editor");
     setEditingLetterId(letterId);
     setEditingRemoteId(remoteId);
-    setEditingCreatedAt(finalEntry.criado_em);
     setLetterStatus("completed");
-    setCartaTitulo(tituloFinal);
+    setEditingCreatedAt(completedEntry.criado_em);
+    setSavedLetters(loadSavedLetters(user?.id));
+    setSaving(false);
 
-    setSalvando(false);
-    setMensagemSucesso(
-      isUpdatingExisting
-        ? `Changes saved to letter "${tituloFinal}" in folder "${targetFolder.nome}".`
-        : `Letter "${tituloFinal}" sealed and archived in folder "${targetFolder.nome}"!`
-    );
-    setTimeout(() => setMensagemSucesso(""), 3400);
+    setToastMessage(`Letter "${finalTitle}" sealed and filed in "${targetFolder.nome}".`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const criarNovaPasta = (e: React.FormEvent) => {
+  const handleCreateFolderInline = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFolderTitle.trim()) return;
+    if (!newFolderInputName.trim()) return;
 
-    const limitePastas = isPro ? 10 : 3;
-    if (letterFolders.length >= limitePastas) {
+    const limitFolders = isPro ? 10 : 3;
+    if (letterFolders.length >= limitFolders) {
       alert(
         isPro
-          ? `You have reached the limit of ${limitePastas} folders on the Premium Plan.`
-          : `You have reached the limit of ${limitePastas} folders on the Standard Plan. Join Pro Club to have up to 10 folders!`
+          ? `You have reached the limit of ${limitFolders} folders on the Premium Plan.`
+          : `You have reached the limit of ${limitFolders} folders on the Standard Plan. Join Pro Club for up to 10 folders!`
       );
       return;
     }
 
-    const chosenTheme = getFolderTheme(newFolderColor);
-    const nova: LetterFolder = {
-      id: "pasta-" + Date.now(),
-      nome: newFolderTitle.trim(),
-      cor: chosenTheme.corHex,
-      criadoEm: new Date().toISOString(),
-      ownerId: user?.id,
-    };
-
-    const atualizadas = [...letterFolders, nova];
-    setLetterFolders(atualizadas);
-    setActiveLetterFolderId(nova.id);
-    saveLetterFolders(atualizadas);
-    try {
-      window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, nova.id);
-    } catch {}
-
-    setNewFolderTitle("");
-    setNewFolderColor("marrom");
-    setFolderDrawerOpen(false);
-    setFolderPromptNotice(null);
+    const created = createLetterFolder(newFolderInputName.trim(), "marrom", user?.id);
+    const updated = loadLetterFolders(user?.id);
+    setLetterFolders(updated);
+    setSelectedFolderId(created.id);
+    setNewFolderInputName("");
+    setShowNewFolderModal(false);
     playPaperSound();
-
-    if (pendingActionAfterFolder === "seal") {
-      setPendingActionAfterFolder(null);
-      salvarCartaFinalizada(nova);
-    } else {
-      setMensagemSucesso(`Correspondence folder "${nova.nome}" created.`);
-      setTimeout(() => setMensagemSucesso(""), 2800);
-    }
+    setToastMessage(`Folder "${created.nome}" created and selected.`);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const sortearInspiracao = () => {
-    const carta =
-      archiveLetters[Math.floor(Math.random() * archiveLetters.length)];
-    const prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
-    setCartaInspiracao(carta);
-    setPromptTexto(prompt);
-    setInspiracaoModal(true);
-    playPaperSound();
-  };
-
-  const aplicarInspiracao = () => {
-    if (promptTexto) {
-      setTemaSalvo(promptTexto);
-      try {
-        window.localStorage.setItem(PINNED_THEME_STORAGE_KEY, promptTexto);
-      } catch {}
-    }
-    setInspiracaoModal(false);
-    playPaperSound();
-  };
-
-  const draftsList = savedLetters.filter((l) => l.status === "draft");
-  const completedList = savedLetters.filter((l) => l.status !== "draft");
+  const draftsCount = savedLetters.filter((l) => l.status === "draft").length;
 
   return (
-    <section
-      className="writing-desk-wrap letter-stationery-experience"
-      id="letter-writing-desk"
-      aria-label="Personal Letter Writing Desk"
-    >
-      {/* Meaningful Letters Empty State Banner when user has no letters yet */}
-      {savedLetters.length === 0 && !cartaConteudo && !cartaTitulo && (
-        <motion.div
-          className="architecture-empty-banner architecture-empty-banner--letters"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="architecture-empty-banner__art" aria-hidden="true">
-            <div className="envelope envelope--sealed">
-              <div className="envelope__flap" />
-              <div className="envelope__seal">✦</div>
-            </div>
-          </div>
-          <div className="architecture-empty-banner__copy">
-            <span className="section-kicker">PERSONAL CORRESPONDENCE DESK</span>
-            <h2>Some words are meant to be written.</h2>
-            <p>
-              Start writing a letter and preserve the words you want to remember.
-            </p>
-          </div>
-          <div className="architecture-empty-banner__actions">
-            <button
-              type="button"
-              className="sober-save-btn"
-              onClick={() => {
-                playPaperSound();
-                titleInputRef.current?.focus();
-              }}
-            >
-              Write a Letter
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      <div className="writing-desk-container is-mode-carta">
-        {/* Left Column: Physical Envelope Preview, Folder Filing, Postal Seals & Save Controls */}
-        <div className="desk-left-col">
-          <div className="carta-left-column-inner">
-            {/* Live Physical Envelope Preview */}
-            <div className="stationery-envelope-preview-card">
-              <div className="stationery-envelope-preview-top">
-                <span className="postal-folder-tag">ENVELOPE PREVIEW</span>
-                <span
-                  className="stamp-mark"
-                  style={{
-                    fontSize: "7.5px",
-                    padding: "2px 6px",
-                    borderColor: cartaSelo.color,
-                    color: "var(--color-pollen, #cfa96f)",
-                  }}
-                >
-                  {cartaSelo.code}
-                </span>
-              </div>
-
-              <div className="stationery-envelope-visual">
-                <div className="stationery-envelope-flap" />
-                <div
-                  className="stationery-envelope-wax"
-                  style={{ backgroundColor: cartaSelo.color }}
-                  title={`Wax seal: ${cartaSelo.label}`}
-                >
-                  ✦
-                </div>
-                <div className="stationery-envelope-lines">
-                  <span className="stationery-envelope-to">
-                    {cartaDestinatario.trim()
-                      ? `To: ${cartaDestinatario.trim()}`
-                      : "To: A cherished recipient"}
-                  </span>
-                  <span className="stationery-envelope-subject">
-                    {cartaTitulo.trim() || "Untitled Letter"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="stationery-envelope-status-row">
-                <span>
-                  {editingLetterId
-                    ? letterStatus === "draft"
-                      ? "Editing Saved Draft"
-                      : "Editing Saved Letter"
-                    : "New Correspondence"}
-                </span>
-                {editingLetterId && (
-                  <button
-                    type="button"
-                    className="stationery-reset-link"
-                    onClick={iniciarNovaCartaEmBranco}
-                    title="Start a brand new blank letter"
-                  >
-                    + New Letter
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Correspondence Folder Selector */}
-            {activeLetterFolder ? (
-              (() => {
-                const folderTheme = getFolderTheme(activeLetterFolder.cor);
-                return (
-                  <div
-                    className={`postal-folder-selector-card postal-folder-color--${folderTheme.id}`}
-                    onClick={() => {
-                      setFolderPromptNotice(null);
-                      setFolderDrawerOpen(true);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    title="Click to choose or create a correspondence folder"
-                  >
-                    <div className="postal-folder-selector-top">
-                      <span className="postal-folder-tag">FILE IN FOLDER</span>
-                      <span className="postal-folder-change-badge">Change ▾</span>
-                    </div>
-                    <div className="postal-folder-title-row">
-                      <div className="postal-folder-img-frame" aria-hidden="true">
-                        <img
-                          src={folderTheme.imagem}
-                          alt={activeLetterFolder.nome}
-                          className="postal-folder-svg-img"
-                        />
-                      </div>
-                      <div className="postal-folder-meta">
-                        <span
-                          className="postal-folder-name"
-                          title={activeLetterFolder.nome}
-                        >
-                          {activeLetterFolder.nome}
-                        </span>
-                        <span className="postal-folder-theme-tag">
-                          {folderTheme.nome} · {folderTheme.etiqueta}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="postal-folder-quota-line">
-                      {letterFolders.length}/{isPro ? 10 : 3} folders created (
-                      {isPro ? "Premium" : "Standard"})
-                    </div>
-                  </div>
-                );
-              })()
-            ) : (
-              <div
-                className="postal-folder-selector-card is-empty-state"
-                onClick={() => {
-                  setFolderPromptNotice(null);
-                  setFolderDrawerOpen(true);
-                }}
-                role="button"
-                tabIndex={0}
-                title="Click to create your first correspondence folder"
-              >
-                <div className="postal-folder-selector-top">
-                  <span className="postal-folder-tag">POSTAL ARCHIVE</span>
-                  <span className="postal-folder-change-badge">+ Create</span>
-                </div>
-                <div className="postal-folder-title-row">
-                  <div
-                    className="postal-folder-img-frame is-empty"
-                    aria-hidden="true"
-                  >
-                    <img
-                      src="/images/pastas/pasta-marrom.svg"
-                      alt="Create folder"
-                      className="postal-folder-svg-img is-ghost"
-                    />
-                  </div>
-                  <div className="postal-folder-meta">
-                    <span className="postal-folder-name">
-                      + Create Postal Folder
-                    </span>
-                    <span className="postal-folder-theme-tag">
-                      Physical letter folder
-                    </span>
-                  </div>
-                </div>
-                <div className="postal-folder-quota-line">
-                  0/{isPro ? 10 : 3} folders created (
-                  {isPro ? "Premium" : "Standard"})
-                </div>
-              </div>
-            )}
-
-            {/* Postage Stamp Selector */}
-            <div className="postal-seals-card">
-              <div className="postal-seals-header">
-                <span>POSTAGE STAMPS</span>
-                <small>Epistolary classification</small>
-              </div>
-              <div className="postal-seals-grid">
-                {SEAL_OPTIONS.map((seal) => (
-                  <button
-                    key={seal.id}
-                    type="button"
-                    className={`seal-choice-btn ${
-                      cartaSelo.id === seal.id ? "selected" : ""
-                    }`}
-                    style={{ "--seal-color": seal.color } as any}
-                    onClick={() => {
-                      setCartaSelo(seal);
-                      playPaperSound();
-                    }}
-                    title={`Apply ${seal.label} postage stamp`}
-                  >
-                    <span className="seal-choice-code">{seal.code}</span>
-                    <span className="seal-choice-label">{seal.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="desk-left-bottom"
-            style={{ display: "flex", flexDirection: "column", gap: "8px" }}
-          >
-            <button
-              type="button"
-              className="sober-save-btn"
-              onClick={() => salvarCartaFinalizada()}
-              disabled={salvando}
-              title="Seal and save this completed letter into your selected folder"
-            >
-              {salvando
-                ? "SEALING..."
-                : editingLetterId && letterStatus === "completed"
-                ? "UPDATE SEALED LETTER"
-                : "SAVE & SEAL LETTER"}
-            </button>
-
-            <button
-              type="button"
-              className="stationery-secondary-btn"
-              onClick={salvarRascunhoCarta}
-              title="Save this letter as a work-in-progress draft"
-            >
-              Save as Draft
-            </button>
-          </div>
-        </div>
-
-        {/* Center Column: Dedicated Vintage Stationery Sheet */}
-        <div className="desk-center-col">
-          <div className="notebook-tabs-container">
-            <div className="notebook-tab notebook-tab--carta active" aria-current="page">
-              {editingLetterId
-                ? letterStatus === "draft"
-                  ? "Correspondence · Draft"
-                  : "Correspondence · Editing Letter"
-                : "Personal Correspondence"}
-            </div>
-            <button
-              type="button"
-              className="notebook-tab"
-              style={{
-                background: "rgba(43, 34, 26, 0.78)",
-                color: "var(--color-pollen, #cfa96f)",
-                fontSize: "11px",
-              }}
-              onClick={() => {
-                setSavedLettersDrawerOpen(true);
-                playPaperSound();
-              }}
-              title="Open saved letters or drafts for editing"
-            >
-              Open Saved / Drafts ({savedLetters.length}) ▾
-            </button>
-          </div>
-
-          <div className="sheet-stage-wrapper">
-            <motion.div
-              key={editingLetterId || "new-letter-sheet"}
-              className="writing-sheet-card mode-carta stationery-letter-sheet"
-              style={{
-                backgroundColor: sheetBgColor,
-                color: inkColor,
-                fontFamily: getFontFamilyById(fontFamilyId),
-              }}
-              initial={{ opacity: 0.9, scale: 0.99 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.25 }}
-            >
-              <div className="carta-content-inner">
-                {/* Affixed Perforated Postage Stamp & Cancellation Postmark */}
-                <div
-                  className="affixed-postage-stamp"
-                  style={{ "--stamp-color": cartaSelo.color } as any}
-                >
-                  <div className="stamp-perforations">
-                    <span className="stamp-symbol">{cartaSelo.code}</span>
-                    <span className="stamp-text">{cartaSelo.label}</span>
-                    <span className="stamp-denomination">BL • POST</span>
-                  </div>
-                  <div className="postmark-circle" aria-hidden="true">
-                    <span>BETWEEN LETTERS</span>
-                    <small>{cartaSelo.postmark}</small>
-                  </div>
-                </div>
-
-                {/* Top Date & Epistolary Classification */}
-                <div className="carta-top-meta">
-                  <span className="carta-date">{dataFormatada || "Today"}</span>
-                  <span
-                    className="carta-sentiment-badge"
-                    style={{ color: cartaSelo.color }}
-                  >
-                    Stamp: {cartaSelo.label}
-                  </span>
-                  {editingLetterId && (
-                    <span className="stationery-mode-pill">
-                      {letterStatus === "draft" ? "DRAFT" : "SAVED LETTER"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Letter Title Input */}
-                <div className="stationery-field-row">
-                  <label
-                    htmlFor="letter-title-input"
-                    className="stationery-field-label"
-                  >
-                    Title:
-                  </label>
-                  <input
-                    id="letter-title-input"
-                    ref={titleInputRef}
-                    type="text"
-                    className="stationery-inline-input stationery-inline-input--title"
-                    value={cartaTitulo}
-                    onChange={(e) => setCartaTitulo(e.target.value)}
-                    placeholder="Title of this letter (e.g., Words Kept for Autumn)..."
-                  />
-                </div>
-
-                {/* Recipient Input */}
-                <div className="stationery-field-row">
-                  <label
-                    htmlFor="letter-recipient-input"
-                    className="stationery-field-label"
-                  >
-                    To:
-                  </label>
-                  <input
-                    id="letter-recipient-input"
-                    type="text"
-                    className="stationery-inline-input"
-                    value={cartaDestinatario}
-                    onChange={(e) => setCartaDestinatario(e.target.value)}
-                    placeholder="Recipient or salutation (optional — e.g., Dear Clara, My Future Self)..."
-                  />
-                </div>
-
-                {/* Main Unruled Letter Body */}
-                <textarea
-                  ref={bodyTextareaRef}
-                  className="carta-textarea-unruled"
-                  value={cartaConteudo}
-                  onChange={(e) => setCartaConteudo(e.target.value)}
-                  placeholder="Write your letter here... Take your time; every word will be preserved on this stationery."
-                  aria-label="Letter content"
-                  rows={13}
-                />
-
-                {/* Signature & Footer Meta */}
-                <div className="stationery-signature-row">
-                  <label
-                    htmlFor="letter-signature-input"
-                    className="stationery-field-label"
-                  >
-                    Signed:
-                  </label>
-                  <input
-                    id="letter-signature-input"
-                    type="text"
-                    className="stationery-signature-input"
-                    value={cartaAssinatura}
-                    onChange={(e) => setCartaAssinatura(e.target.value)}
-                    placeholder={
-                      user?.nome
-                        ? `With affection, ${user.nome}`
-                        : "Your signature (optional)..."
-                    }
-                  />
-                </div>
-
-                <div className="carta-footer-meta">
-                  <span className="carta-seal-status">
-                    Postage seal: <b>{cartaSelo.label}</b> · Paper:{" "}
-                    <b>
-                      {PAPER_OPTIONS.find((p) => p.id === sheetBgId)?.name ||
-                        "Cotton & Ivory"}
-                    </b>
-                  </span>
-                  <motion.button
-                    type="button"
-                    className={`classic-stamp-favorite ${
-                      cartaFavoritado ? "is-favorited" : ""
-                    }`}
-                    onClick={() => {
-                      playPaperSound();
-                      setCartaFavoritado(!cartaFavoritado);
-                    }}
-                    whileTap={{ scale: 0.95 }}
-                    title="Stamp letter as favorite"
-                  >
-                    {cartaFavoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
-        {/* Right Column: Stationery Menu, Inspiration, Saved Drafts & My Shelf Link */}
-        <div className="desk-right-col">
-          <div className="desk-right-tools">
-            <div className="vintage-menu-wrapper" ref={menuRef}>
-              <button
-                type="button"
-                className="vintage-menu-btn"
-                onClick={() => setCustomMenuOpen(!customMenuOpen)}
-                aria-expanded={customMenuOpen}
-                title="Customize stationery paper, ink color, and calligraphy"
-              >
-                <span>Stationery & Ink</span>
-                <span className="menu-caret">▾</span>
-              </button>
-
-              <AnimatePresence>
-                {customMenuOpen && (
-                  <motion.div
-                    className="floating-customization-menu"
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    transition={{ duration: 0.16 }}
-                  >
-                    {/* 1. Stationery Paper */}
-                    <div className="menu-group">
-                      <span className="menu-group-title">Stationery Paper</span>
-                      <div className="paper-swatches">
-                        {PAPER_OPTIONS.map((paper) => (
-                          <button
-                            key={paper.id}
-                            type="button"
-                            className={`paper-swatch ${
-                              sheetBgId === paper.id ? "active" : ""
-                            }`}
-                            style={{ backgroundColor: paper.color }}
-                            onClick={() => {
-                              setSheetBgId(paper.id);
-                              setSheetBgColor(paper.color);
-                            }}
-                            title={paper.name}
-                          >
-                            {sheetBgId === paper.id ? "✓" : ""}
-                          </button>
-                        ))}
-                      </div>
-                      <small className="swatch-name">
-                        {PAPER_OPTIONS.find((p) => p.id === sheetBgId)?.name}
-                      </small>
-                    </div>
-
-                    {/* 2. Ink Color */}
-                    <div className="menu-group">
-                      <span className="menu-group-title">Ink Color</span>
-                      <div className="ink-swatches">
-                        {INK_OPTIONS.map((ink) => (
-                          <button
-                            key={ink.id}
-                            type="button"
-                            className={`ink-swatch ${
-                              inkColorId === ink.id ? "active" : ""
-                            }`}
-                            style={{ backgroundColor: ink.color }}
-                            onClick={() => {
-                              setInkColorId(ink.id);
-                              setInkColor(ink.color);
-                            }}
-                            title={ink.name}
-                          >
-                            {inkColorId === ink.id ? "✓" : ""}
-                          </button>
-                        ))}
-                      </div>
-                      <small className="swatch-name">
-                        {INK_OPTIONS.find((i) => i.id === inkColorId)?.name}
-                      </small>
-                    </div>
-
-                    {/* 3. Typography & Calligraphy */}
-                    <div className="menu-group">
-                      <span className="menu-group-title">
-                        Script & Typography
-                      </span>
-                      <div className="font-options-list">
-                        {FONT_OPTIONS.map((font) => (
-                          <button
-                            key={font.id}
-                            type="button"
-                            className={`font-choice-btn ${
-                              fontFamilyId === font.id ? "active" : ""
-                            }`}
-                            style={{ fontFamily: font.styleFamily }}
-                            onClick={() => setFontFamilyId(font.id)}
-                          >
-                            <span>{font.name}</span>
-                            {fontFamilyId === font.id && (
-                              <span className="font-check">✓</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <button
-              type="button"
-              className="inspire-trigger-btn"
-              onClick={sortearInspiracao}
-              title="Pull an epistolary prompt from the archive"
-            >
-              <span>Pull Inspiration</span>
-            </button>
-
-            <button
-              type="button"
-              className="inspire-trigger-btn"
-              onClick={() => {
-                setSavedLettersDrawerOpen(true);
-                playPaperSound();
-              }}
-              title="Open drafts or saved letters to continue editing"
-            >
-              <span>Drafts & Letters ({savedLetters.length})</span>
-            </button>
-
-            <Link
-              href="/my-shelf?section=letters"
-              className="inspire-trigger-btn"
-              style={{ textDecoration: "none", justifyContent: "center" }}
-              title="View all folders and letters on My Shelf"
-            >
-              <span>My Shelf Letters ↗</span>
-            </Link>
-
-            {temaSalvo && (
-              <div className="pinned-theme-box">
-                <div className="pinned-theme-top">
-                  <span className="pinned-theme-label">EPISTOLARY PROMPT</span>
-                  <button
-                    type="button"
-                    className="pinned-theme-clear"
-                    onClick={() => {
-                      setTemaSalvo("");
-                      try {
-                        window.localStorage.removeItem(PINNED_THEME_STORAGE_KEY);
-                      } catch {}
-                    }}
-                    title="Remove prompt"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <p className="pinned-theme-phrase">“{temaSalvo}”</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Saved Letters & Drafts Drawer (Quick Reopen for Editing) */}
+    <div className="minimal-letter-desk">
+      {/* Toast Notification */}
       <AnimatePresence>
-        {savedLettersDrawerOpen && (
-          <div
-            className="notebook-drawer-backdrop"
-            onClick={() => setSavedLettersDrawerOpen(false)}
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="minimal-letter-toast"
+            role="status"
           >
-            <motion.div
-              className="notebook-drawer-sheet"
-              style={{ width: "min(540px, 94vw)" }}
-              onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.92, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 15 }}
-            >
-              <button
-                type="button"
-                className="drawer-close-btn"
-                onClick={() => setSavedLettersDrawerOpen(false)}
-                title="Close"
-              >
-                ✕
-              </button>
-              <h3 className="drawer-title">Saved Letters & Drafts</h3>
-              <p className="drawer-subtitle">
-                Select any draft or previously saved letter to open it on your stationery desk for editing.
-              </p>
-
-              <div className="notebooks-list" style={{ maxHeight: "340px" }}>
-                {savedLetters.length === 0 ? (
-                  <div className="drawer-empty-state-hint">
-                    <span className="empty-hint-title">
-                      Some words are meant to be written.
-                    </span>
-                    <p className="empty-hint-text">
-                      Your saved drafts and sealed letters will appear here so you can reopen and edit them anytime.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {draftsList.length > 0 && (
-                      <div style={{ marginBottom: "8px" }}>
-                        <span
-                          className="new-notebook-label"
-                          style={{ marginBottom: "6px" }}
-                        >
-                          DRAFTS ({draftsList.length})
-                        </span>
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "6px",
-                          }}
-                        >
-                          {draftsList.map((item) => (
-                            <div
-                              key={item.id}
-                              className={`notebook-item-card ${
-                                editingLetterId === String(item.id)
-                                  ? "is-active"
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                loadLetterIntoEditor(item);
-                                setSavedLettersDrawerOpen(false);
-                                playPaperSound();
-                              }}
-                            >
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <span className="notebook-item-name">
-                                  {item.titulo || "Untitled Draft"}
-                                </span>
-                                <div className="notebook-item-count">
-                                  {item.destinatario
-                                    ? `To: ${item.destinatario} · `
-                                    : ""}
-                                  Updated{" "}
-                                  {formatShortDate(
-                                    item.atualizado_em || item.criado_em
-                                  )}
-                                </div>
-                              </div>
-                              <span className="stamp-mark">DRAFT</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {completedList.length > 0 && (
-                      <div>
-                        <span
-                          className="new-notebook-label"
-                          style={{ marginBottom: "6px" }}
-                        >
-                          SEALED LETTERS ({completedList.length})
-                        </span>
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "6px",
-                          }}
-                        >
-                          {completedList.map((item) => (
-                            <div
-                              key={item.id}
-                              className={`notebook-item-card ${
-                                editingLetterId === String(item.id)
-                                  ? "is-active"
-                                  : ""
-                              }`}
-                              onClick={() => {
-                                loadLetterIntoEditor(item);
-                                setSavedLettersDrawerOpen(false);
-                                playPaperSound();
-                              }}
-                            >
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <span className="notebook-item-name">
-                                  {item.titulo || "Untitled Letter"}
-                                </span>
-                                <div className="notebook-item-count">
-                                  {item.destinatario
-                                    ? `To: ${item.destinatario} · `
-                                    : ""}
-                                  {item.selo_carta || "LETTER"} ·{" "}
-                                  {formatShortDate(
-                                    item.atualizado_em ||
-                                      item.criado_em ||
-                                      item.data_formatada
-                                  )}
-                                </div>
-                              </div>
-                              <span
-                                style={{
-                                  color: "var(--color-pollen, #cfa96f)",
-                                  fontSize: "11px",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Edit ✎
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingTop: "12px",
-                  borderTop: "1px dashed rgba(207, 169, 111, 0.25)",
-                }}
-              >
-                <button
-                  type="button"
-                  className="new-notebook-btn"
-                  onClick={() => {
-                    iniciarNovaCartaEmBranco();
-                    setSavedLettersDrawerOpen(false);
-                  }}
-                >
-                  + Start New Blank Letter
-                </button>
-                <Link
-                  href="/my-shelf?section=letters"
-                  className="text-link"
-                  onClick={() => setSavedLettersDrawerOpen(false)}
-                >
-                  Open My Shelf Archive ↗
-                </Link>
-              </div>
-            </motion.div>
-          </div>
+            <span className="toast-ornament">✦</span>
+            <span>{toastMessage}</span>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Correspondence Folder Drawer */}
-      <AnimatePresence>
-        {folderDrawerOpen && (
-          <div
-            className="notebook-drawer-backdrop"
-            onClick={() => {
-              setFolderDrawerOpen(false);
-              setFolderPromptNotice(null);
-              setPendingActionAfterFolder(null);
+      {/* Essential Customization Controls Bar */}
+      <header className="letter-essential-controls-bar" aria-label="Letter writing controls">
+        {/* 1. Paper Color Palette */}
+        <div className="control-group" title="Stationery Paper">
+          <span className="control-label">Paper</span>
+          <div className="paper-swatches-row">
+            {PAPER_OPTIONS.slice(0, 6).map((paper) => {
+              const isSelected = sheetBgId === paper.id;
+              return (
+                <button
+                  key={paper.id}
+                  type="button"
+                  className={`paper-circle-btn ${isSelected ? "is-selected" : ""}`}
+                  style={{ backgroundColor: paper.color }}
+                  onClick={() => {
+                    playPaperSound();
+                    setSheetBgId(paper.id);
+                    setSheetBgColor(paper.color);
+                  }}
+                  title={paper.name}
+                  aria-label={`Select paper ${paper.name}`}
+                >
+                  {isSelected && <span className="swatch-check">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="control-divider" aria-hidden="true" />
+
+        {/* 2. Typography Selector */}
+        <div className="control-group" title="Calligraphy & Font">
+          <span className="control-label">Typography</span>
+          <select
+            className="letter-minimal-select"
+            value={fontFamilyId}
+            onChange={(e) => {
+              playPaperSound();
+              setFontFamilyId(e.target.value);
             }}
+            aria-label="Select typography"
+          >
+            <option value="caveat">Caveat (Fountain Pen)</option>
+            <option value="garamond">EB Garamond (Classic Book)</option>
+            <option value="cormorant">Cormorant Garamond (Poetic Serif)</option>
+            <option value="typewriter">Special Elite (Typewriter)</option>
+          </select>
+        </div>
+
+        <div className="control-divider" aria-hidden="true" />
+
+        {/* 3. Folder Organization */}
+        <div className="control-group" title="Correspondence Folder">
+          <span className="control-label">Folder</span>
+          <div className="folder-select-wrap">
+            <select
+              className="letter-minimal-select"
+              value={selectedFolderId}
+              onChange={(e) => {
+                if (e.target.value === "__NEW__") {
+                  setShowNewFolderModal(true);
+                } else {
+                  playPaperSound();
+                  setSelectedFolderId(e.target.value);
+                  try {
+                    window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, e.target.value);
+                  } catch {}
+                }
+              }}
+              aria-label="Select correspondence folder"
+            >
+              {letterFolders.length === 0 ? (
+                <option value="">General Correspondence</option>
+              ) : (
+                letterFolders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    📁 {f.nome}
+                  </option>
+                ))
+              )}
+              <option value="__NEW__">+ Create New Folder...</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="control-divider" aria-hidden="true" />
+
+        {/* 4. Letter Theme */}
+        <div className="control-group" title="Letter Theme">
+          <span className="control-label">Theme</span>
+          <select
+            className="letter-minimal-select"
+            value={letterTheme}
+            onChange={(e) => {
+              playPaperSound();
+              setLetterTheme(e.target.value as LetterTheme);
+            }}
+            aria-label="Select letter theme"
+          >
+            {LETTER_THEMES.map((theme) => (
+              <option key={theme} value={theme}>
+                {theme}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Actions Cluster */}
+        <div className="control-actions-cluster">
+          {draftsCount > 0 && (
+            <button
+              type="button"
+              className="letter-drafts-counter-btn"
+              onClick={() => setDraftsDrawerOpen(true)}
+              title="View saved drafts"
+            >
+              Drafts ({draftsCount})
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="letter-action-subtle-btn"
+            onClick={handleStartNewLetter}
+            title="Start a blank letter"
+          >
+            New Letter
+          </button>
+
+          <button
+            type="button"
+            className="letter-action-draft-btn"
+            onClick={handleSaveDraft}
+            title="Save your work as a draft without sealing"
+          >
+            Save as Draft
+          </button>
+
+          <button
+            type="button"
+            className="letter-action-seal-btn"
+            onClick={handleSaveAndSeal}
+            disabled={saving}
+            title="Seal this letter and archive it in your correspondence folder"
+          >
+            {saving ? "Sealing..." : "Save & Seal Letter"}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Physical Letter Paper */}
+      <main className="letter-paper-stage">
+        <motion.article
+          className="letter-physical-sheet"
+          style={{
+            backgroundColor: sheetBgColor,
+            fontFamily: getFontFamilyById(fontFamilyId),
+            color: "#262626",
+          }}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* Top Stationery Header with Date & Postmark Seal */}
+          <div className="stationery-top-bar">
+            <div className="stationery-dateline">
+              <span className="stationery-date-text">{dataFormatada}</span>
+              {letterStatus === "draft" && (
+                <span className="stationery-draft-pill">Unsealed Draft</span>
+              )}
+            </div>
+
+            {/* Vintage Postmark Stamp */}
+            <div
+              className="stationery-postage-seal"
+              style={{ borderColor: cartaSelo.color }}
+              title={`Postal Stamp: ${cartaSelo.label} (${letterTheme})`}
+            >
+              <div className="stamp-inner" style={{ color: cartaSelo.color }}>
+                <span className="stamp-theme-label">{letterTheme.toUpperCase()}</span>
+                <span className="stamp-postmark">{cartaSelo.postmark}</span>
+                <span className="stamp-code">{cartaSelo.code}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Letter Title Input */}
+          <div className="stationery-field-group">
+            <input
+              ref={titleInputRef}
+              type="text"
+              className="letter-input-title"
+              value={cartaTitulo}
+              onChange={(e) => setCartaTitulo(e.target.value)}
+              placeholder="Title of this letter..."
+              aria-label="Letter title"
+            />
+          </div>
+
+          {/* Recipient Input */}
+          <div className="stationery-field-group recipient-group">
+            <span className="salutation-prefix">To:</span>
+            <input
+              type="text"
+              className="letter-input-recipient"
+              value={cartaDestinatario}
+              onChange={(e) => setCartaDestinatario(e.target.value)}
+              placeholder="Recipient (e.g., Dear Eleanor, My Future Self...)"
+              aria-label="Letter recipient"
+            />
+          </div>
+
+          {/* Unruled Writing Area */}
+          <div className="stationery-body-wrapper">
+            <textarea
+              ref={bodyTextareaRef}
+              className="letter-writing-textarea"
+              value={cartaConteudo}
+              onChange={(e) => setCartaConteudo(e.target.value)}
+              placeholder="Write your letter here... Take your time; these words are kept for as long as you wish."
+              aria-label="Letter content"
+              rows={16}
+            />
+          </div>
+
+          {/* Signature Line */}
+          <div className="stationery-signature-section">
+            <span className="signature-prefix">Signed:</span>
+            <input
+              type="text"
+              className="letter-input-signature"
+              value={cartaAssinatura}
+              onChange={(e) => setCartaAssinatura(e.target.value)}
+              placeholder={user?.nome ? user.nome : "Your signature..."}
+              aria-label="Letter signature"
+            />
+          </div>
+        </motion.article>
+      </main>
+
+      {/* New Folder Modal */}
+      <AnimatePresence>
+        {showNewFolderModal && (
+          <div
+            className="entry-modal-backdrop"
+            onClick={() => setShowNewFolderModal(false)}
           >
             <motion.div
-              className="notebook-drawer-sheet"
+              className="minimal-folder-modal"
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.92, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 15 }}
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
             >
-              <button
-                type="button"
-                className="drawer-close-btn"
-                onClick={() => {
-                  setFolderDrawerOpen(false);
-                  setFolderPromptNotice(null);
-                  setPendingActionAfterFolder(null);
-                }}
-                title="Close"
-              >
-                ✕
-              </button>
-              <h3 className="drawer-title">Correspondence Folders</h3>
-              <p className="drawer-subtitle">
-                Select which folder to file your letters in or create a new physical folder.
-                <br />
-                <span
-                  style={{
-                    display: "inline-block",
-                    marginTop: "4px",
-                    fontSize: "11px",
-                    letterSpacing: "0.06em",
-                    color: "var(--color-pollen, #cfa96f)",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Quota: {letterFolders.length}/{isPro ? 10 : 3} folders (
-                  {isPro ? "Premium Plan" : "Standard Plan"})
-                </span>
-              </p>
-
-              {folderPromptNotice && (
-                <div className="drawer-mandatory-alert">
-                  <span className="drawer-alert-icon">!</span>
-                  <div className="drawer-alert-body">
-                    <strong>Folder Required:</strong>
-                    <span>{folderPromptNotice}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="notebooks-list">
-                {letterFolders.length === 0 ? (
-                  <div className="drawer-empty-state-hint">
-                    <span className="empty-hint-title">
-                      No folders created yet.
-                    </span>
-                    <p className="empty-hint-text">
-                      Name your folder below and choose a color to archive your letters safely.
-                    </p>
-                  </div>
-                ) : (
-                  letterFolders.map((fld) => {
-                    const theme = getFolderTheme(fld.cor);
-                    const defaultId = letterFolders[0]?.id;
-                    const countInFolder = savedLetters.filter(
-                      (l) =>
-                        l.pasta_id === fld.id ||
-                        (!l.pasta_id && fld.id === defaultId)
-                    ).length;
-
-                    return (
-                      <div
-                        key={fld.id}
-                        className={`notebook-item-card ${
-                          activeLetterFolder?.id === fld.id ? "is-active" : ""
-                        }`}
-                        onClick={() => {
-                          setActiveLetterFolderId(fld.id);
-                          try {
-                            window.localStorage.setItem(
-                              ACTIVE_LETTER_FOLDER_ID_KEY,
-                              fld.id
-                            );
-                          } catch {}
-                          setFolderDrawerOpen(false);
-                          playPaperSound();
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            className="mini-folder-thumb-box"
-                            aria-hidden="true"
-                          >
-                            <img
-                              src={theme.imagem}
-                              alt={fld.nome}
-                              className="mini-folder-thumb-img"
-                            />
-                          </div>
-                          <div>
-                            <span className="notebook-item-name">
-                              {fld.nome}
-                            </span>
-                            <div className="notebook-item-count">
-                              {countInFolder}{" "}
-                              {countInFolder === 1
-                                ? "letter archived"
-                                : "letters archived"}{" "}
-                              · {theme.nome}
-                            </div>
-                          </div>
-                        </div>
-                        {activeLetterFolder?.id === fld.id && (
-                          <span
-                            style={{
-                              color: "var(--color-pollen, #cfa96f)",
-                              fontWeight: 700,
-                              fontSize: "12px",
-                            }}
-                          >
-                            ✓ Selected
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <form onSubmit={criarNovaPasta} className="new-notebook-form">
-                <label className="new-notebook-label">FOLDER TITLE</label>
+              <h3>Create Correspondence Folder</h3>
+              <p>Organize your letters into dedicated physical folders.</p>
+              <form onSubmit={handleCreateFolderInline}>
                 <input
                   type="text"
-                  className="new-notebook-input"
-                  placeholder="Name of new folder (e.g., Confessions, Unsent Notes)..."
-                  value={newFolderTitle}
-                  onChange={(e) => setNewFolderTitle(e.target.value)}
-                  maxLength={40}
                   autoFocus
+                  className="letter-minimal-input"
+                  value={newFolderInputName}
+                  onChange={(e) => setNewFolderInputName(e.target.value)}
+                  placeholder="Folder name (e.g., Letters to Family, Autumn Notes)..."
+                  maxLength={40}
                 />
-
-                <label
-                  className="new-notebook-label"
-                  style={{ marginTop: "14px" }}
-                >
-                  CHOOSE FOLDER COLOR
-                </label>
-                <div className="notebook-color-picker-grid">
-                  {FOLDER_COLOR_OPTIONS.map((opt) => {
-                    const isSelected = newFolderColor === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        className={`notebook-color-option-card ${
-                          isSelected ? "is-selected" : ""
-                        }`}
-                        onClick={() => {
-                          setNewFolderColor(opt.id);
-                          playPaperSound();
-                        }}
-                      >
-                        <div
-                          className="folder-color-swatch-box"
-                          style={{
-                            background: opt.cardGradient,
-                            borderColor: opt.cardBorder,
-                          }}
-                        >
-                          <img
-                            src={opt.imagem}
-                            alt={opt.nome}
-                            className="swatch-folder-img"
-                          />
-                          {isSelected && (
-                            <span className="notebook-color-check-badge">✓</span>
-                          )}
-                        </div>
-                        <span className="notebook-color-opt-name">
-                          {opt.nome}
-                        </span>
-                        <small className="notebook-color-opt-sub">
-                          {opt.etiqueta}
-                        </small>
-                      </button>
-                    );
-                  })}
+                <div className="modal-actions-row">
+                  <button
+                    type="button"
+                    className="modal-cancel-btn"
+                    onClick={() => setShowNewFolderModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="modal-confirm-btn">
+                    Create Folder
+                  </button>
                 </div>
-
-                <button
-                  type="submit"
-                  className="new-notebook-btn"
-                  style={{ marginTop: "14px" }}
-                >
-                  + Create Folder
-                </button>
               </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Writing Inspiration Modal */}
+      {/* Saved Drafts Drawer */}
       <AnimatePresence>
-        {inspiracaoModal && cartaInspiracao && (
+        {draftsDrawerOpen && (
           <div
-            className="inspiration-modal-backdrop"
-            onClick={() => setInspiracaoModal(false)}
+            className="entry-modal-backdrop"
+            onClick={() => setDraftsDrawerOpen(false)}
           >
             <motion.div
-              className="inspiration-modal-sheet"
+              className="drafts-drawer-panel"
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "tween", duration: 0.25 }}
             >
-              <Tape className="modal-tape" />
-              <div className="modal-top">
-                <span className="modal-kicker">EPISTOLARY INSPIRATION</span>
+              <div className="drawer-panel-header">
+                <h3>Saved Drafts</h3>
                 <button
                   type="button"
-                  className="modal-close-btn"
-                  onClick={() => setInspiracaoModal(false)}
+                  className="drawer-close-btn"
+                  onClick={() => setDraftsDrawerOpen(false)}
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="inspiration-prompt-box">
-                <small className="prompt-label">LETTER PROMPT</small>
-                <p className="prompt-text">“{promptTexto}”</p>
-              </div>
-
-              <div className="inspiration-letter-excerpt">
-                <span className="excerpt-label">
-                  Excerpt from “{cartaInspiracao.title}”:
-                </span>
-                <blockquote>“{cartaInspiracao.excerpt}”</blockquote>
-                <span className="excerpt-author">
-                  — {cartaInspiracao.sender}
-                </span>
-              </div>
-
-              <div className="inspiration-modal-actions">
-                <button
-                  type="button"
-                  className="btn-shuffle-inspire"
-                  onClick={sortearInspiracao}
-                >
-                  Pull another letter
-                </button>
-
-                <button
-                  type="button"
-                  className="primary-cta"
-                  onClick={aplicarInspiracao}
-                >
-                  <span>Pin this prompt</span>
-                </button>
+              <div className="drawer-panel-list">
+                {savedLetters
+                  .filter((l) => l.status === "draft")
+                  .map((draft) => (
+                    <article
+                      key={draft.id}
+                      className="draft-item-card"
+                      onClick={() => {
+                        loadLetterIntoEditor(draft);
+                        setDraftsDrawerOpen(false);
+                        playPaperSound();
+                        setToastMessage(`Draft "${draft.titulo}" loaded.`);
+                        setTimeout(() => setToastMessage(null), 3000);
+                      }}
+                    >
+                      <div className="draft-item-top">
+                        <span className="draft-item-theme">
+                          {draft.tema_carta || draft.selo_carta || "Draft"}
+                        </span>
+                        <span className="draft-item-date">
+                          {formatShortDate(draft.atualizado_em || draft.criado_em)}
+                        </span>
+                      </div>
+                      <h4 className="draft-item-title">{draft.titulo || "Untitled"}</h4>
+                      {draft.destinatario && (
+                        <span className="draft-item-to">To: {draft.destinatario}</span>
+                      )}
+                      <p className="draft-item-snippet">
+                        {draft.conteudo ? draft.conteudo.slice(0, 90) + "…" : "Empty draft"}
+                      </p>
+                    </article>
+                  ))}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
-      {/* Toast Feedback */}
-      <AnimatePresence>
-        {mensagemSucesso && (
-          <motion.div
-            className="journal-feedback-toast"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <Sticker>{mensagemSucesso}</Sticker>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </section>
+    </div>
   );
 }
