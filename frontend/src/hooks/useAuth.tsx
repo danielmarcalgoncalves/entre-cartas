@@ -9,6 +9,7 @@ export interface User {
   email: string;
   papel: string;
   role?: string;
+  auth_provider?: string;
   foto_url?: string | null;
   bio?: string | null;
 }
@@ -18,8 +19,9 @@ interface AuthContextType {
   loading: boolean;
   isPro: boolean;
   isAdmin: boolean;
-  login: (email: string, senha: string) => Promise<any>;
+  login: (email: string, senha: string, rememberMe?: boolean) => Promise<any>;
   register: (nome: string, email: string, senha: string) => Promise<any>;
+  applyTokenSession: (token: string, persist?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -31,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   login: async () => {},
   register: async () => {},
+  applyTokenSession: async () => {},
   logout: async () => {},
   refreshUser: async () => {},
 });
@@ -58,10 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, []);
 
-  const login = async (email: string, senha: string) => {
-    const res = await api.auth.login(email, senha);
+  const login = async (email: string, senha: string, rememberMe = true) => {
+    const res = await api.auth.login(email, senha, rememberMe);
     if (res.token) {
-      setSession(res.token);
+      setSession(res.token, rememberMe);
     }
     if (res.usuario) {
       setUser(res.usuario);
@@ -72,7 +75,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (nome: string, email: string, senha: string) => {
-    return await api.auth.register(nome, email, senha);
+    const res = await api.auth.register(nome, email, senha);
+    if (res.token && !res.requireVerification) {
+      setSession(res.token, true);
+      if (res.usuario) {
+        setUser(res.usuario);
+      } else {
+        await refreshUser();
+      }
+    }
+    return res;
+  };
+
+  const applyTokenSession = async (token: string, persist = true) => {
+    setSession(token, persist);
+    await refreshUser();
   };
 
   const logout = async () => {
@@ -87,7 +104,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.papel === "admin";
 
   return (
-    <AuthContext.Provider value={{ user, loading, isPro, isAdmin, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isPro,
+        isAdmin,
+        login,
+        register,
+        applyTokenSession,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

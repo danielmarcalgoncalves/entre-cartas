@@ -30,21 +30,29 @@ export function BetweenLettersLanding({
   eyebrow = "A PLACE FOR THINGS WORTH REMEMBERING",
   title = "BETWEEN LETTERS",
   flourish = "✦",
-  ctaHref = "/my-desk",
+  ctaHref = "/login",
   ctaLabel = "TRY IT NOW",
   className = "",
 }: BetweenLettersLandingProps) {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [activeTheme, setActiveTheme] = useState<"sunset" | "meadow">("sunset");
+  const [activeTheme, setActiveTheme] = useState<"sunset" | "meadow">(initialBackground);
   const heroRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLElement>(null);
   const journalRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLAnchorElement>(null);
 
-  // If the user is already authenticated and accesses the entry route, redirect directly to My Desk
+  // Support legacy password reset links (?token=...) or redirect authenticated users to My Desk
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const resetToken = params.get("token");
+      if (resetToken) {
+        router.replace(`/login?mode=reset&token=${encodeURIComponent(resetToken)}`);
+        return;
+      }
+    }
     if (!loading && user) {
       router.replace("/my-desk");
     }
@@ -122,6 +130,7 @@ export function BetweenLettersLanding({
   }, []);
 
   const currentBgUrl = BACKGROUNDS[activeTheme];
+  const resolvedHref = user ? "/my-desk" : ctaHref;
 
   return (
     <main
@@ -148,7 +157,7 @@ export function BetweenLettersLanding({
       <NotebookDisplay ref={journalRef} />
 
       {/* 4. Tactile 3D Interactive "TRY IT NOW" Button */}
-      <TryItNowButton ref={btnRef} href={ctaHref} label={ctaLabel} />
+      <TryItNowButton ref={btnRef} href={resolvedHref} label={ctaLabel} />
     </main>
   );
 }

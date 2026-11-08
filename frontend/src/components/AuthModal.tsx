@@ -1,5 +1,6 @@
 "use client";
 
+import React, { Suspense } from "react";
 import AuthCard from "@/components/AuthCard";
 
 interface AuthModalProps {
@@ -8,7 +9,7 @@ interface AuthModalProps {
   initialMode?: "choice" | "login" | "register";
 }
 
-export default function AuthModal({ isOpen, onClose, initialMode = "choice" }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, initialMode = "login" }: AuthModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -19,20 +20,23 @@ export default function AuthModal({ isOpen, onClose, initialMode = "choice" }: A
         zIndex: 9999,
         display: "grid",
         placeItems: "center",
-        backgroundColor: "rgba(43, 35, 25, 0.65)",
-        backdropFilter: "blur(4px)",
-        padding: "16px",
+        backgroundColor: "rgba(32, 24, 16, 0.68)",
+        backdropFilter: "blur(5px)",
+        padding: "24px 16px",
+        overflowY: "auto",
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "460px" }}>
-        <AuthCard
-          onClose={onClose}
-          onSuccess={onClose}
-          initialMode={initialMode}
-        />
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: "576px" }}>
+        <Suspense fallback={null}>
+          <AuthCard
+            onClose={onClose}
+            onSuccess={onClose}
+            initialMode={initialMode}
+          />
+        </Suspense>
       </div>
     </div>
   );

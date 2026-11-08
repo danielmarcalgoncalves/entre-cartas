@@ -1836,3 +1836,459 @@
     animation: none;
   }
 }
+
+
+/* ==========================================================================
+ * DYNAMIC COVER COLOR THEMES (BROWN, GREEN, WINE, BLACK) — USER CUSTOMIZATION
+ * ========================================================================== */
+
+/* Perimeter Edge Saddle Stitching */
+.nb-leather-cover__edge-stitch {
+  position: absolute;
+  inset: 5px;
+  border-radius: 2px 7px 7px 2px;
+  border: 1px dashed rgba(224, 185, 120, 0.42);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 1. Rustic Brown Theme (#42220b) */
+.nb-leather-cover--marrom {
+  border-color: rgba(94, 55, 24, 0.85);
+  background:
+    radial-gradient(
+      ellipse 85% 75% at 54% 42%,
+      rgba(96, 53, 21, 0.42) 0%,
+      rgba(66, 34, 11, 0.12) 55%,
+      rgba(34, 16, 5, 0.52) 100%
+    ),
+    linear-gradient(138deg, #4e290f 0%, #42220b 50%, #2d1506 100%);
+}
+.nb-back-board--marrom {
+  background: linear-gradient(145deg, #49260d 0%, #381b07 60%, #291304 100%);
+}
+.nb-open-left-board--marrom {
+  background: linear-gradient(145deg, #49260d 0%, #381b07 60%, #291304 100%);
+}
+.nb-silk-ribbon--marrom {
+  background: linear-gradient(180deg, #b88a32 0%, #a47824 60%, #8a6218 100%);
+}
+
+/* 2. Botanical Green Theme (#163321) */
+.nb-leather-cover--verde {
+  border-color: rgba(28, 64, 42, 0.88);
+  background:
+    radial-gradient(
+      ellipse 85% 75% at 54% 42%,
+      rgba(36, 82, 54, 0.45) 0%,
+      rgba(22, 51, 33, 0.15) 55%,
+      rgba(11, 26, 17, 0.6) 100%
+    ),
+    linear-gradient(138deg, #224d32 0%, #163321 50%, #0d2015 100%);
+}
+.nb-back-board--verde {
+  background: linear-gradient(145deg, #1c3e29 0%, #15301f 60%, #0b1a11 100%);
+  box-shadow:
+    0 24px 52px rgba(2, 6, 4, 0.76),
+    0 6px 16px rgba(2, 6, 4, 0.54),
+    inset 0 0 0 1px rgba(160, 205, 170, 0.28);
+}
+.nb-open-left-board--verde {
+  background: linear-gradient(145deg, #1c3e29 0%, #15301f 60%, #0b1a11 100%);
+}
+.nb-leather-cover--verde .nb-leather-cover__spine-band {
+  background: linear-gradient(
+    90deg,
+    rgba(10, 24, 15, 0.72) 0%,
+    rgba(34, 76, 50, 0.38) 36%,
+    rgba(12, 28, 18, 0.65) 84%,
+    rgba(180, 215, 175, 0.16) 94%,
+    transparent 100%
+  );
+}
+.nb-leather-cover--verde .nb-spine-rib {
+  background: linear-gradient(
+    180deg,
+    rgba(180, 215, 175, 0.32) 0%,
+    rgba(22, 51, 33, 0.85) 55%,
+    rgba(8, 20, 13, 0.95) 100%
+  );
+}
+.nb-leather-cover--verde .nb-leather-cover__gold-frame {
+  box-shadow:
+    inset 0 0 0 3px #132b1c,
+    inset 0 0 0 4px rgba(214, 174, 106, 0.42),
+    0 1px 1px rgba(6, 14, 9, 0.65);
+}
+.nb-silk-ribbon--verde {
+  background: linear-gradient(180deg, #7a946b 0%, #688059 60%, #526646 100%);
+}
+
+/* 3. Noble Burgundy / Wine Theme (#3a0f18) */
+.nb-leather-cover--vinho {
+  border-color: rgba(77, 21, 33, 0.88);
+  background:
+    radial-gradient(
+      ellipse 85% 75% at 54% 42%,
+      rgba(95, 26, 40, 0.48) 0%,
+      rgba(58, 15, 24, 0.15) 55%,
+      rgba(24, 6, 10, 0.62) 100%
+    ),
+    linear-gradient(138deg, #521623 0%, #3a0f18 50%, #22080e 100%);
+}
+.nb-back-board--vinho {
+  background: linear-gradient(145deg, #44131d 0%, #320c14 60%, #1e050b 100%);
+  box-shadow:
+    0 24px 52px rgba(6, 2, 3, 0.76),
+    0 6px 16px rgba(6, 2, 3, 0.54),
+    inset 0 0 0 1px rgba(220, 155, 170, 0.28);
+}
+.nb-open-left-board--vinho {
+  background: linear-gradient(145deg, #44131d 0%, #320c14 60%, #1e050b 100%);
+}
+.nb-leather-cover--vinho .nb-leather-cover__spine-band {
+  background: linear-gradient(
+    90deg,
+    rgba(26, 6, 11, 0.72) 0%,
+    rgba(80, 22, 34, 0.38) 36%,
+    rgba(30, 8, 13, 0.65) 84%,
+    rgba(220, 160, 175, 0.16) 94%,
+    transparent 100%
+  );
+}
+.nb-leather-cover--vinho .nb-spine-rib {
+  background: linear-gradient(
+    180deg,
+    rgba(220, 160, 175, 0.32) 0%,
+    rgba(58, 15, 24, 0.85) 55%,
+    rgba(20, 4, 8, 0.95) 100%
+  );
+}
+.nb-leather-cover--vinho .nb-leather-cover__gold-frame {
+  box-shadow:
+    inset 0 0 0 3px #2d0b13,
+    inset 0 0 0 4px rgba(214, 174, 106, 0.42),
+    0 1px 1px rgba(16, 4, 7, 0.65);
+}
+.nb-silk-ribbon--vinho {
+  background: linear-gradient(180deg, #8c2232 0%, #761a29 60%, #5d121f 100%);
+}
+
+/* 4. Obsidian Black Theme (#181818) */
+.nb-leather-cover--preto {
+  border-color: rgba(45, 45, 45, 0.88);
+  background:
+    radial-gradient(
+      ellipse 85% 75% at 54% 42%,
+      rgba(48, 48, 48, 0.45) 0%,
+      rgba(24, 24, 24, 0.15) 55%,
+      rgba(8, 8, 8, 0.7) 100%
+    ),
+    linear-gradient(138deg, #272727 0%, #181818 50%, #0d0d0d 100%);
+}
+.nb-back-board--preto {
+  background: linear-gradient(145deg, #222222 0%, #161616 60%, #0b0b0b 100%);
+  box-shadow:
+    0 24px 52px rgba(0, 0, 0, 0.85),
+    0 6px 16px rgba(0, 0, 0, 0.65),
+    inset 0 0 0 1px rgba(200, 200, 200, 0.22);
+}
+.nb-open-left-board--preto {
+  background: linear-gradient(145deg, #222222 0%, #161616 60%, #0b0b0b 100%);
+}
+.nb-leather-cover--preto .nb-leather-cover__spine-band {
+  background: linear-gradient(
+    90deg,
+    rgba(8, 8, 8, 0.78) 0%,
+    rgba(40, 40, 40, 0.4) 36%,
+    rgba(14, 14, 14, 0.7) 84%,
+    rgba(180, 180, 180, 0.16) 94%,
+    transparent 100%
+  );
+}
+.nb-leather-cover--preto .nb-spine-rib {
+  background: linear-gradient(
+    180deg,
+    rgba(180, 180, 180, 0.28) 0%,
+    rgba(28, 28, 28, 0.88) 55%,
+    rgba(6, 6, 6, 0.98) 100%
+  );
+}
+.nb-leather-cover--preto .nb-leather-cover__gold-frame {
+  box-shadow:
+    inset 0 0 0 3px #141414,
+    inset 0 0 0 4px rgba(214, 174, 106, 0.42),
+    0 1px 1px rgba(0, 0, 0, 0.75);
+}
+.nb-silk-ribbon--preto {
+  background: linear-gradient(180deg, #444444 0%, #333333 60%, #222222 100%);
+}
+
+/* ==========================================================================
+ * TOPBAR NAVIGATION BAR (/notebook)
+ * ========================================================================== */
+.nb-topbar-nav {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 12;
+  pointer-events: auto;
+}
+
+.nb-topbar-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(18, 14, 10, 0.72);
+  border: 1px solid rgba(214, 174, 106, 0.35);
+  color: #eeddbb;
+  font-family: var(--serif, 'EB Garamond', serif);
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.nb-topbar-back-btn:hover {
+  background: rgba(30, 23, 16, 0.9);
+  border-color: rgba(226, 189, 124, 0.65);
+  color: #fff6e3;
+  transform: translateX(-2px);
+}
+
+.nb-topbar-meta-title {
+  font-family: var(--serif, 'EB Garamond', serif);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(230, 214, 184, 0.68);
+  display: none;
+}
+@media (min-width: 680px) {
+  .nb-topbar-meta-title {
+    display: inline-block;
+  }
+}
+
+.nb-topbar-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(214, 174, 106, 0.14);
+  border: 1px solid rgba(214, 174, 106, 0.45);
+  color: #eeddbb;
+  font-family: var(--serif, 'EB Garamond', serif);
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.nb-topbar-edit-btn:hover {
+  background: rgba(214, 174, 106, 0.28);
+  border-color: rgba(238, 205, 148, 0.8);
+  color: #fff8eb;
+  transform: translateY(-1px);
+}
+
+/* Closed state row with return button */
+.nb-controls__closed-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ==========================================================================
+ * REAL USER PAGE RENDERER STYLES
+ * ========================================================================== */
+.nb-user-entry-page {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 24px 28px 20px 28px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.nb-user-ruled-lines {
+  position: absolute;
+  top: 64px;
+  left: 24px;
+  right: 24px;
+  bottom: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  opacity: 0.42;
+  z-index: 1;
+}
+
+.nb-user-rule-line {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background-color: rgba(160, 140, 110, 0.32);
+}
+
+.nb-user-entry-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.nb-user-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(160, 140, 110, 0.36);
+  margin-bottom: 10px;
+}
+
+.nb-user-entry-date {
+  font-family: var(--serif, 'EB Garamond', Georgia, serif);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.nb-user-favorite-stamp {
+  font-family: var(--serif, 'EB Garamond', Georgia, serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ad3d2f;
+  border: 1px solid rgba(173, 61, 47, 0.5);
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: rgba(173, 61, 47, 0.06);
+}
+
+.nb-user-entry-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0 0 10px 0;
+  line-height: 1.25;
+}
+
+.nb-user-entry-body {
+  flex: 1 1 auto;
+  font-size: 15.5px;
+  line-height: 28px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.nb-user-entry-empty {
+  font-family: var(--serif, 'EB Garamond', Georgia, serif);
+  font-style: italic;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.nb-user-entry-footer {
+  margin-top: auto;
+  padding-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(160, 140, 110, 0.22);
+  font-family: var(--serif, 'EB Garamond', Georgia, serif);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+}
+
+.nb-user-volume-tag {
+  text-transform: uppercase;
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nb-user-page-folio {
+  font-weight: 600;
+}
+
+/* User polaroid floating wrap */
+.nb-user-polaroid-wrap {
+  float: right;
+  margin: 2px 0 10px 14px;
+  max-width: 135px;
+}
+.nb-user-polaroid--left {
+  float: left;
+  margin: 2px 14px 10px 0;
+}
+
+/* Colophon buttons */
+.nb-colophon-actions-row {
+  margin-top: 24px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.nb-colophon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: var(--serif, 'EB Garamond', Georgia, serif);
+  font-size: 12.5px;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  cursor: pointer;
+  background: rgba(66, 34, 11, 0.08);
+  border: 1px solid rgba(66, 34, 11, 0.32);
+  color: #3d2310;
+  transition: all 0.2s ease;
+}
+
+.nb-colophon-btn:hover {
+  background: rgba(66, 34, 11, 0.16);
+  border-color: rgba(66, 34, 11, 0.55);
+  transform: translateY(-1px);
+}
+
+.nb-colophon-btn--primary {
+  background: #3d2310;
+  border-color: #271408;
+  color: #fbf6ec;
+}
+
+.nb-colophon-btn--primary:hover {
+  background: #271408;
+  color: #ffffff;
+}

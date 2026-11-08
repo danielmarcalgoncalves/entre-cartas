@@ -69,7 +69,7 @@ export interface Notebook {
   ownerId?: number | string;
 }
 
-export type NotebookCoverColor = "marrom" | "verde" | "vinho";
+export type NotebookCoverColor = "marrom" | "verde" | "vinho" | "preto";
 
 export interface NotebookColorOption {
   id: NotebookCoverColor;
@@ -117,29 +117,62 @@ export const NOTEBOOK_COLOR_OPTIONS: NotebookColorOption[] = [
     cardGradient: "linear-gradient(135deg, #3a0f18 0%, #260a10 58%, #150508 100%)",
     ribbonColor: "#8c2232",
   },
+  {
+    id: "preto",
+    nome: "Black",
+    etiqueta: "Obsidian Leather",
+    corHex: "#181818",
+    shelfBg: "#121212",
+    shelfSpine1: "#0d0d0d",
+    shelfSpine2: "#080808",
+    cardGradient: "linear-gradient(135deg, #222222 0%, #151515 58%, #0a0a0a 100%)",
+    ribbonColor: "#3a3a3a",
+  },
 ];
 
 export const getNotebookTheme = (corCapa?: string): NotebookColorOption => {
+  const normalized = (corCapa || "").toLowerCase().trim();
   if (
-    corCapa === "verde" ||
-    corCapa === "#163321" ||
-    corCapa === "#223826" ||
-    corCapa === "#1e3323" ||
-    corCapa === "#1c3224"
+    normalized === "verde" ||
+    normalized === "green" ||
+    normalized === "#163321" ||
+    normalized === "#223826" ||
+    normalized === "#1e3323" ||
+    normalized === "#1c3224"
   ) {
     return NOTEBOOK_COLOR_OPTIONS[1];
   }
   if (
-    corCapa === "vinho" ||
-    corCapa === "#3a0f18" ||
-    corCapa === "#441a24" ||
-    corCapa === "#3b161e" ||
-    corCapa === "#451a24"
+    normalized === "vinho" ||
+    normalized === "wine" ||
+    normalized === "burgundy" ||
+    normalized === "#3a0f18" ||
+    normalized === "#441a24" ||
+    normalized === "#3b161e" ||
+    normalized === "#451a24"
   ) {
     return NOTEBOOK_COLOR_OPTIONS[2];
   }
+  if (
+    normalized === "preto" ||
+    normalized === "black" ||
+    normalized === "obsidian" ||
+    normalized === "#181818" ||
+    normalized === "#1a1a1a" ||
+    normalized === "#1c1c1c" ||
+    normalized === "#222222" ||
+    normalized === "#111111"
+  ) {
+    return NOTEBOOK_COLOR_OPTIONS[3];
+  }
   return NOTEBOOK_COLOR_OPTIONS[0];
 };
+
+export function getNotebookById(notebookId?: string | null): Notebook | null {
+  if (!notebookId || typeof window === "undefined") return null;
+  const all = loadAllRawNotebooks();
+  return all.find((n) => n.id === notebookId) || null;
+}
 
 export interface FolderColorOption {
   id: string;

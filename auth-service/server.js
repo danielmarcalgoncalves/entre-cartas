@@ -18,7 +18,7 @@ const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.trim().leng
   : JWT_STRONG_FALLBACK;
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
-  console.warn('[SEGURANÇA] JWT_SECRET não configurado ou menor que 32 caracteres. Utilizando segredo aleatório seguro de 70 caracteres.');
+  console.warn('[SECURITY] JWT_SECRET not configured or shorter than 32 characters. Using secure 70-character fallback.');
 }
 
 const LOG_SERVICE_URL = process.env.LOG_SERVICE_URL || 'http://log-service:3000';
@@ -72,13 +72,13 @@ function sendLog(acao, req = null, detalhes = {}) {
       .then(() => clearTimeout(timeoutId))
       .catch(() => clearTimeout(timeoutId));
   } catch (err) {
-    // Silencioso para não interromper fluxos
+    // Silent to avoid interrupting auth flows
   }
 }
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'mariadb',
-  port: process.env.DB_PORT || 3306,
+  port: parseInt(process.env.DB_PORT || '3306', 10),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'root_password',
   database: process.env.DB_NAME || 'filmes_db',
@@ -87,24 +87,360 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+// Safe schema migration on startup so auth-service columns are always available
+async function ensureAuthSchema() {
+  try {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS usuarios (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          nome VARCHAR(100) NOT NULL,
+          email VARCHAR(150) UNIQUE NOT NULL,
+          senha_hash VARCHAR(255) NOT NULL,
+          papel VARCHAR(50) DEFAULT 'usuario',
+          email_verificado BOOLEAN DEFAULT FALSE,
+          foto_url VARCHAR(500) DEFAULT NULL,
+          bio TEXT DEFAULT NULL,
+          auth_provider VARCHAR(50) DEFAULT 'local',
+          google_id VARCHAR(255) DEFAULT NULL,
+          ultimo_login TIMESTAMP NULL DEFAULT NULL,
+          status_conta VARCHAR(30) DEFAULT 'ativo',
+          criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS reset_tokens (
+          token VARCHAR(255) PRIMARY KEY,
+          usuario_id INT NOT NULL,
+          criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          expira_em TIMESTAMP NOT NULL,
+          usado BOOLEAN DEFAULT FALSE,
+          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS codigos_verificacao (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          email VARCHAR(150) NOT NULL,
+          codigo VARCHAR(10) NOT NULL,
+          expira_em DATETIME NOT NULL,
+          usado BOOLEAN DEFAULT FALSE,
+          criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_email_codigo (email, codigo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
+      const alterQueries = [
+        `ALTER TABLE usuarios ADD COLUMN papel VARCHAR(50) DEFAULT 'usuario'`,
+        `ALTER TABLE usuarios ADD COLUMN email_verificado BOOLEAN DEFAULT FALSE`,
+        `ALTER TABLE usuarios ADD COLUMN foto_url VARCHAR(500) DEFAULT NULL`,
+        `ALTER TABLE usuarios ADD COLUMN bio TEXT DEFAULT NULL`,
+        `ALTER TABLE usuarios ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'local'`,
+        `ALTER TABLE usuarios ADD COLUMN google_id VARCHAR(255) DEFAULT NULL`,
+        `ALTER TABLE usuarios ADD COLUMN ultimo_login TIMESTAMP NULL DEFAULT NULL`,
+        `ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo'`
+      ];
+
+      for (const q of alterQueries) {
+        try {
+          await conn.query(q);
+        } catch (e) {
+          // Column already exists
+        }
+      }
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.warn('[Auth-Service] Schema initialization deferred:', err.message);
+  }
+}
+
+ensureAuthSchema();
+
 const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST || "smtp-relay.brevo.com",
+  host: process.env.MAIL_HOST || 'smtp-relay.brevo.com',
   port: parseInt(process.env.MAIL_PORT, 10) || 587,
-  secure: process.env.MAIL_PORT == 465, // true para SSL 465, false para TLS 587
+  secure: String(process.env.MAIL_PORT) === '465',
   auth: {
-    user: process.env.MAIL_USER || "fake_user",
-    pass: process.env.MAIL_PASS || "fake_pass"
+    user: process.env.MAIL_USER || 'fake_user',
+    pass: process.env.MAIL_PASS || 'fake_pass'
   },
   tls: {
     rejectUnauthorized: false
   }
 });
 
-// Armazenamento em memória para Rate Limiting no auth-service
+// Helper to parse sender email & name from env variables
+function resolveSenderIdentity() {
+  const senderName = process.env.BREVO_SENDER_NAME || 'Between Letters';
+  let senderEmail = process.env.BREVO_SENDER_EMAIL || '';
+
+  if (!senderEmail && process.env.MAIL_FROM) {
+    const match = process.env.MAIL_FROM.match(/<([^>]+)>/);
+    if (match && match[1]) {
+      senderEmail = match[1].trim();
+    } else if (process.env.MAIL_FROM.includes('@')) {
+      senderEmail = process.env.MAIL_FROM.trim();
+    }
+  }
+
+  if (!senderEmail && process.env.MAIL_USER && process.env.MAIL_USER.includes('@')) {
+    senderEmail = process.env.MAIL_USER.trim();
+  }
+
+  if (!senderEmail) {
+    senderEmail = 'no-reply@betweenletters.app';
+  }
+
+  return {
+    name: senderName,
+    email: senderEmail,
+    formattedFrom: `"${senderName}" <${senderEmail}>`
+  };
+}
+
+/**
+ * Unified Brevo Transactional Email Dispatcher
+ * Supports both Brevo v3 HTTP API (BREVO_API_KEY) and Brevo SMTP Relay (MAIL_HOST / MAIL_USER / MAIL_PASS).
+ */
+async function sendTransactionalEmail({ toEmail, toName, subject, htmlContent, textContent }) {
+  const sender = resolveSenderIdentity();
+  const brevoApiKey = (process.env.BREVO_API_KEY || '').trim();
+
+  // 1. Try Brevo Official v3 HTTP Transactional API if BREVO_API_KEY is configured
+  if (brevoApiKey && !brevoApiKey.startsWith('sua_') && !brevoApiKey.startsWith('your_')) {
+    try {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': brevoApiKey,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: sender.name, email: sender.email },
+          to: [{ email: toEmail, name: toName || toEmail }],
+          subject,
+          htmlContent,
+          textContent
+        })
+      });
+
+      if (response.ok) {
+        return { delivered: true, transport: 'brevo-api' };
+      }
+      const errBody = await response.text().catch(() => '');
+      console.warn(`[Brevo API] Non-200 status (${response.status}), falling back to SMTP:`, errBody);
+    } catch (apiErr) {
+      console.warn('[Brevo API] Request error, falling back to SMTP:', apiErr.message);
+    }
+  }
+
+  // 2. Send via Brevo SMTP Relay (nodemailer)
+  await transporter.sendMail({
+    from: sender.formattedFrom,
+    to: toEmail,
+    subject,
+    html: htmlContent,
+    text: textContent
+  });
+
+  return { delivered: true, transport: 'brevo-smtp' };
+}
+
+/**
+ * Shared warm stationery HTML wrapper for Between Letters emails
+ */
+function buildStationeryEmailLayout({ preheader, bodyHtml }) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Between Letters</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #e8dfd1; font-family: Georgia, 'Times New Roman', Times, serif; color: #2d2319; -webkit-font-smoothing: antialiased;">
+  <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
+    ${preheader || 'Between Letters — A place for things worth remembering.'}
+  </div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #e8dfd1; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Kraft Tape Accent -->
+        <div style="width: 110px; height: 26px; background-color: #b89867; margin: 0 auto -13px auto; position: relative; z-index: 2; box-shadow: 0 2px 6px rgba(45, 35, 25, 0.16); border: 1px solid rgba(140, 110, 68, 0.35);"></div>
+        <!-- Aged Paper Sheet -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 540px; background-color: #f9f3e8; border: 1px solid #dfd3be; box-shadow: 0 14px 36px rgba(45, 35, 25, 0.12); padding: 48px 42px 40px 42px; text-align: left;">
+          <tr>
+            <td>
+              <div style="text-align: center; margin-bottom: 32px; border-bottom: 1px solid #e5dac6; padding-bottom: 18px;">
+                <span style="font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #8c775c; display: block; margin-bottom: 6px;">
+                  ✦ EPISTOLARY ARCHIVE ✦
+                </span>
+                <span style="font-size: 22px; font-weight: normal; letter-spacing: 1.5px; color: #2d2319; font-family: Georgia, 'Times New Roman', serif;">
+                  BETWEEN LETTERS
+                </span>
+              </div>
+              ${bodyHtml}
+              <div style="margin-top: 38px; padding-top: 20px; border-top: 1px solid #e5dac6; text-align: center; font-size: 12px; color: #8c775c; line-height: 1.6;">
+                Between Letters &bull; For everything that still finds words.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * 1. Welcome Email (Brevo)
+ */
+async function sendWelcomeEmail(email, nome) {
+  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const deskUrl = `${appUrl}/my-desk`;
+  const safeName = (nome || 'Reader').trim();
+
+  const bodyHtml = `
+    <p style="font-size: 17px; line-height: 1.7; color: #2d2319; margin: 0 0 18px 0;">
+      Dear <strong>${safeName}</strong>,
+    </p>
+    <p style="font-size: 16px; line-height: 1.75; color: #433526; margin: 0 0 18px 0; font-style: italic;">
+      Some thoughts deserve a place to stay.
+    </p>
+    <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 18px 0;">
+      Welcome to <strong>Between Letters</strong> — a quiet space created for your memories, reflections, letters, and stories.
+    </p>
+    <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 18px 0;">
+      Your personal journal is ready whenever you are.
+    </p>
+    <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 28px 0;">
+      Take your time. Write freely. Keep what matters.
+    </p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${deskUrl}" style="display: inline-block; background-color: #5c4328; color: #f9f3e8; text-decoration: none; padding: 13px 30px; font-size: 14px; letter-spacing: 1px; border: 1px solid #47321b; border-radius: 2px;">
+        Open My Desk &rarr;
+      </a>
+    </div>
+    <p style="font-size: 15px; line-height: 1.7; color: #2d2319; margin: 28px 0 0 0;">
+      With warmth,<br />
+      <em>Between Letters</em>
+    </p>
+  `;
+
+  const textContent = `Dear ${safeName},\n\nSome thoughts deserve a place to stay.\n\nWelcome to Between Letters — a quiet space created for your memories, reflections, letters, and stories.\n\nYour personal journal is ready whenever you are.\n\nTake your time. Write freely. Keep what matters.\n\nOpen your desk: ${deskUrl}\n\nWith warmth,\nBetween Letters`;
+
+  return sendTransactionalEmail({
+    toEmail: email,
+    toName: safeName,
+    subject: 'Welcome to Between Letters',
+    htmlContent: buildStationeryEmailLayout({
+      preheader: 'Some thoughts deserve a place to stay. Welcome to Between Letters.',
+      bodyHtml
+    }),
+    textContent
+  });
+}
+
+/**
+ * 2. Password Recovery Email (Brevo)
+ */
+async function sendPasswordRecoveryEmail(email, nome, resetLink) {
+  const safeName = (nome || 'Reader').trim();
+
+  const bodyHtml = `
+    <p style="font-size: 17px; line-height: 1.7; color: #2d2319; margin: 0 0 18px 0;">
+      Dear <strong>${safeName}</strong>,
+    </p>
+    <p style="font-size: 16px; line-height: 1.75; color: #433526; margin: 0 0 18px 0; font-style: italic;">
+      Sometimes we lose the key to a place that matters.
+    </p>
+    <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 26px 0;">
+      You can create a new password and return to your personal space using the button below.
+    </p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${resetLink}" style="display: inline-block; background-color: #5c4328; color: #f9f3e8; text-decoration: none; padding: 13px 30px; font-size: 14px; letter-spacing: 1px; border: 1px solid #47321b; border-radius: 2px;">
+        Reset My Password
+      </a>
+    </div>
+    <p style="font-size: 13px; line-height: 1.65; color: #6e5c46; margin: 0 0 18px 0;">
+      This link is temporary and can only be used once. If the button above does not open, copy and paste this address into your browser:<br />
+      <a href="${resetLink}" style="color: #7c562e; word-break: break-all;">${resetLink}</a>
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; color: #2d2319; margin: 28px 0 0 0;">
+      With warmth,<br />
+      <em>Between Letters</em>
+    </p>
+  `;
+
+  const textContent = `Dear ${safeName},\n\nSometimes we lose the key to a place that matters.\n\nYou can create a new password and return to your personal space using the link below:\n\n${resetLink}\n\nThis link is temporary and can only be used once.\n\nWith warmth,\nBetween Letters`;
+
+  return sendTransactionalEmail({
+    toEmail: email,
+    toName: safeName,
+    subject: 'Reset your Between Letters password',
+    htmlContent: buildStationeryEmailLayout({
+      preheader: 'Create a new password and return to your personal space in Between Letters.',
+      bodyHtml
+    }),
+    textContent
+  });
+}
+
+/**
+ * 3. Email Verification Code (OTP) Email (Brevo)
+ */
+async function sendVerificationEmail(email, nome, codigo) {
+  const safeName = (nome || 'Reader').trim();
+
+  const bodyHtml = `
+    <p style="font-size: 17px; line-height: 1.7; color: #2d2319; margin: 0 0 18px 0;">
+      Dear <strong>${safeName}</strong>,
+    </p>
+    <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 22px 0;">
+      Thank you for beginning your story with <strong>Between Letters</strong>. Please enter the verification code below to confirm your email address:
+    </p>
+    <div style="text-align: center; margin: 30px 0;">
+      <div style="display: inline-block; background-color: #f1e7d6; border: 1px solid #c8b496; padding: 14px 32px; letter-spacing: 8px; font-size: 28px; font-weight: bold; color: #47321b; font-family: 'Courier New', Courier, monospace;">
+        ${codigo}
+      </div>
+      <p style="color: #7c6850; font-size: 12px; margin-top: 10px;">
+        Valid for 15 minutes
+      </p>
+    </div>
+    <p style="font-size: 13px; line-height: 1.6; color: #6e5c46; margin: 0 0 18px 0;">
+      If you did not request this code, you may safely disregard this letter.
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; color: #2d2319; margin: 24px 0 0 0;">
+      With warmth,<br />
+      <em>Between Letters</em>
+    </p>
+  `;
+
+  const textContent = `Dear ${safeName},\n\nYour Between Letters verification code is: ${codigo}\n\nValid for 15 minutes.\n\nWith warmth,\nBetween Letters`;
+
+  return sendTransactionalEmail({
+    toEmail: email,
+    toName: safeName,
+    subject: `Your verification code: ${codigo} — Between Letters`,
+    htmlContent: buildStationeryEmailLayout({
+      preheader: `Your Between Letters verification code is ${codigo}`,
+      bodyHtml
+    }),
+    textContent
+  });
+}
+
+// In-memory rate limiting in auth-service
 const authRateLimitMap = new Map();
 function rateLimit(windowMs, maxReqs, customMsg) {
   return (req, res, next) => {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection.remoteAddress || 'ip';
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection?.remoteAddress || 'ip';
     const key = `${req.path}:${ip}`;
     const now = Date.now();
     let item = authRateLimitMap.get(key);
@@ -115,14 +451,18 @@ function rateLimit(windowMs, maxReqs, customMsg) {
       item.count++;
     }
     if (item.count > maxReqs) {
-      return res.status(429).json({ error: customMsg || 'Muitas tentativas. Aguarde alguns minutos.' });
+      return res.status(429).json({ error: customMsg || 'Too many attempts. Please wait a few minutes and try again.' });
     }
     next();
   };
 }
 
-// Rastreamento de tentativas falhas de verificação de código por e-mail (Prevenção contra Brute Force de OTP)
+// Track failed OTP verification attempts (anti-brute-force)
 const failedVerifyAttempts = new Map();
+
+function hashRecoveryToken(rawToken) {
+  return crypto.createHash('sha256').update(String(rawToken).trim()).digest('hex');
+}
 
 const authMiddleware = async (req, res, next) => {
   let token = null;
@@ -136,18 +476,17 @@ const authMiddleware = async (req, res, next) => {
     token = req.cookies.access_token;
   }
 
-  if (!token) return res.status(401).json({ error: 'Token não fornecido.' });
+  if (!token) return res.status(401).json({ error: 'Authentication token not provided.' });
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (!decoded || !decoded.id) {
-      return res.status(401).json({ error: 'Token inválido.' });
+      return res.status(401).json({ error: 'Invalid authentication token.' });
     }
 
-    // Consulta MariaDB em tempo real: elimina IDOR e falsificação de papel
-    const [users] = await pool.query('SELECT id, nome, email, papel, email_verificado FROM usuarios WHERE id = ?', [decoded.id]);
+    const [users] = await pool.query('SELECT id, nome, email, papel, email_verificado, foto_url, bio, auth_provider FROM usuarios WHERE id = ?', [decoded.id]);
     if (users.length === 0) {
-      return res.status(401).json({ error: 'Usuário não encontrado ou revogado.' });
+      return res.status(401).json({ error: 'User account not found or revoked.' });
     }
 
     const usuarioDb = users[0];
@@ -161,133 +500,162 @@ const authMiddleware = async (req, res, next) => {
     };
     return next();
   } catch (err) {
-    return res.status(401).json({ error: 'Token inválido ou expirado.' });
+    return res.status(401).json({ error: 'Invalid or expired authentication token.' });
   }
 };
 
-// Função auxiliar para envio de e-mail com código de confirmação (OTP) via Brevo SMTP
-async function sendVerificationEmail(email, nome, codigo) {
-  const mailSender = process.env.MAIL_FROM || `"Catálogo Tom Hanks" <${process.env.MAIL_USER}>`;
-
-  await transporter.sendMail({
-    from: mailSender,
-    to: email,
-    subject: `Seu Código de Confirmação: ${codigo} - Catálogo Tom Hanks`,
-    html: `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #334155; border-radius: 12px; background-color: #0f172a; color: #f8fafc;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #f59e0b; margin: 0 0 6px 0; font-size: 1.5rem;">🎬 Catálogo Tom Hanks</h2>
-          <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">Confirmação de Criação de Conta</p>
-        </div>
-        <p>Olá, <strong>${nome || 'Cineasta'}</strong>!</p>
-        <p style="color: #cbd5e1; line-height: 1.5;">Obrigado por se registrar. Para garantir a segurança da sua conta e validar que este e-mail realmente pertence a você, digite o código de verificação abaixo:</p>
-        
-        <div style="text-align: center; margin: 28px 0;">
-          <div style="display: inline-block; background: #1e293b; border: 2px solid #f59e0b; border-radius: 10px; padding: 14px 32px; letter-spacing: 8px; font-size: 2rem; font-weight: 800; color: #fbbf24; font-family: monospace;">
-            ${codigo}
-          </div>
-          <p style="color: #f59e0b; font-size: 0.85rem; margin-top: 10px; font-weight: 500;">⏱️ Válido por 15 minutos</p>
-        </div>
-
-        <p style="color: #94a3b8; font-size: 0.85rem; line-height: 1.4;">Se você não solicitou este cadastro, pode ignorar esta mensagem com segurança. Nenhuma conta será ativada sem este código.</p>
-        
-        <hr style="border: none; border-top: 1px solid #334155; margin: 24px 0 16px 0;" />
-        <p style="color: #64748b; font-size: 0.75rem; text-align: center; margin: 0;">
-          Catálogo Tom Hanks &bull; Computação em Nuvem &bull; Prof. @siriani
-        </p>
-      </div>
-    `
-  });
-}
-
-app.post('/register', rateLimit(15 * 60 * 1000, 5, 'Limite de cadastros por IP atingido. Aguarde 15 minutos.'), async (req, res) => {
+// =========================================================================
+// 1. USER REGISTRATION (/register)
+// =========================================================================
+app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached for this address. Please wait 15 minutes.'), async (req, res) => {
   try {
     const { nome, email, senha } = req.body;
-    if (!nome || !email || !senha) return res.status(400).json({ error: 'Nome, e-mail e senha obrigatórios.' });
-    if (senha.length < 6) return res.status(400).json({ error: 'Senha deve ter no mínimo 6 caracteres.' });
-
-    // Bloqueia termos ofensivos / slurs
-    const blockedTerms = ['nigga', 'nigger', 'admin', 'root'];
-    const lowerName = nome.trim().toLowerCase();
-    if (blockedTerms.some(t => lowerName.includes(t))) {
-      return res.status(400).json({ error: 'Nome de usuário inválido.' });
+    if (!nome || !email || !senha) {
+      return res.status(400).json({ error: 'Full name, email address, and password are required.' });
+    }
+    if (String(senha).length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     }
 
-    // Blindagem rigorosa de segurança:
-    // Qualquer parâmetro 'papel' enviado pelo cliente é estritamente ignorado.
-    // Todo novo registro é criado como usuário comum ('usuario') e com email_verificado = FALSE.
-    const papelFinal = 'usuario';
+    const trimmedName = String(nome).trim();
+    if (trimmedName.length < 2 || trimmedName.length > 80) {
+      return res.status(400).json({ error: 'Full name must be between 2 and 80 characters.' });
+    }
 
-    const emailTrimmed = email.trim().toLowerCase();
+    const blockedTerms = ['nigga', 'nigger', 'admin', 'root', 'administrator'];
+    const lowerName = trimmedName.toLowerCase();
+    if (blockedTerms.some(t => lowerName.includes(t))) {
+      return res.status(400).json({ error: 'This name is restricted or invalid.' });
+    }
+
+    const emailTrimmed = String(email).trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const papelFinal = 'usuario';
+    const requireOtpFlow = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+
     const [existing] = await pool.query('SELECT id, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
-    
+
     if (existing.length > 0) {
-      // Se o e-mail já existe mas ainda não foi verificado, reenviamos um código para ele conseguir validar
-      if (existing[0].email_verificado === 0 || existing[0].email_verificado === false) {
+      if (requireOtpFlow && (existing[0].email_verificado === 0 || existing[0].email_verificado === false)) {
         const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiraEm = new Date(Date.now() + 15 * 60000); // 15 minutos
+        const expiraEm = new Date(Date.now() + 15 * 60000);
 
         await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
         await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
 
-        await sendVerificationEmail(emailTrimmed, nome.trim(), codigo);
+        sendVerificationEmail(emailTrimmed, trimmedName, codigo).catch(err => {
+          console.warn('[Auth-Service] Failed to send verification email:', err.message);
+        });
 
         return res.status(200).json({
-          message: 'Cadastro pendente encontrado. Um novo código de verificação foi enviado para seu e-mail.',
+          message: 'A pending registration was found. A new verification code has been sent to your email.',
           requireVerification: true,
           email: emailTrimmed
         });
       }
-      return res.status(409).json({ error: 'E-mail já cadastrado.' });
+      return res.status(409).json({ error: 'An account with this email address already exists.' });
     }
 
-    const senhaHash = await bcrypt.hash(senha, 10);
-    await pool.query(
-      'INSERT INTO usuarios (nome, email, senha_hash, papel, email_verificado) VALUES (?, ?, ?, ?, FALSE)',
-      [nome.trim(), emailTrimmed, senhaHash, papelFinal]
+    const senhaHash = await bcrypt.hash(String(senha), 10);
+
+    if (requireOtpFlow) {
+      await pool.query(
+        `INSERT INTO usuarios (nome, email, senha_hash, papel, email_verificado, auth_provider, status_conta)
+         VALUES (?, ?, ?, ?, FALSE, 'local', 'ativo')`,
+        [trimmedName, emailTrimmed, senhaHash, papelFinal]
+      );
+
+      const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiraEm = new Date(Date.now() + 15 * 60000);
+
+      await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
+
+      sendVerificationEmail(emailTrimmed, trimmedName, codigo).catch(err => {
+        console.warn('[Auth-Service] Failed to send verification email:', err.message);
+      });
+
+      return res.status(201).json({
+        message: 'Verification code sent to your email.',
+        requireVerification: true,
+        email: emailTrimmed
+      });
+    }
+
+    // Standard registration flow: persist user, establish session, and send Brevo welcome email
+    const [insertResult] = await pool.query(
+      `INSERT INTO usuarios (nome, email, senha_hash, papel, email_verificado, auth_provider, ultimo_login, status_conta)
+       VALUES (?, ?, ?, ?, TRUE, 'local', CURRENT_TIMESTAMP, 'ativo')`,
+      [trimmedName, emailTrimmed, senhaHash, papelFinal]
     );
 
-    // Gera o código numérico de 6 dígitos (OTP) válido por 15 minutos
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiraEm = new Date(Date.now() + 15 * 60000); // 15 minutos
+    const newUserId = insertResult.insertId;
+    const token = jwt.sign(
+      { id: newUserId, nome: trimmedName, email: emailTrimmed, papel: papelFinal },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
-    await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
+    sendLog('REGISTRO_SUCESSO', req, {
+      usuario_id: newUserId,
+      email: emailTrimmed,
+      auth_provider: 'local'
+    });
 
-    // Envia o e-mail pelo Brevo SMTP
-    await sendVerificationEmail(emailTrimmed, nome.trim(), codigo);
+    // Send Welcome Email via Brevo asynchronously so email latency/errors never invalidate registration
+    sendWelcomeEmail(emailTrimmed, trimmedName)
+      .then((info) => {
+        console.log(`[Brevo] Welcome email sent to ${emailTrimmed} (${info.transport})`);
+      })
+      .catch((emailErr) => {
+        console.warn(`[Brevo] Welcome email could not be delivered to ${emailTrimmed}:`, emailErr.message);
+      });
 
     return res.status(201).json({
-      message: 'Código de verificação enviado para o seu e-mail.',
-      requireVerification: true,
-      email: emailTrimmed
+      message: 'Welcome to Between Letters! Your account has been created.',
+      requireVerification: false,
+      token,
+      usuario: {
+        id: newUserId,
+        nome: trimmedName,
+        email: emailTrimmed,
+        papel: papelFinal,
+        role: papelFinal,
+        auth_provider: 'local',
+        foto_url: null,
+        bio: null
+      }
     });
   } catch (error) {
     console.error('[REGISTER ERROR]:', error);
-    res.status(500).json({ error: `Erro no cadastro: ${error.message || 'Erro interno.'}` });
+    res.status(500).json({ error: `Registration error: ${error.message || 'Internal server error.'}` });
   }
 });
 
-// Validação do código de 6 dígitos recebido por e-mail
-app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Muitas tentativas de verificação. Aguarde 10 minutos.'), async (req, res) => {
+// =========================================================================
+// 2. OTP EMAIL VERIFICATION (/verify-code & /verify-email)
+// =========================================================================
+async function handleVerifyCode(req, res) {
   try {
     const { email, codigo } = req.body;
     if (!email || !codigo) {
-      return res.status(400).json({ error: 'E-mail e código de 6 dígitos são obrigatórios.' });
+      return res.status(400).json({ error: 'Email address and 6-digit verification code are required.' });
     }
 
-    const emailTrimmed = email.trim().toLowerCase();
-    const codigoTrimmed = codigo.toString().trim();
+    const emailTrimmed = String(email).trim().toLowerCase();
+    const codigoTrimmed = String(codigo).trim();
 
-    // Verificação de tentativas falhas (Proteção anti-bruteforce)
     const attempts = failedVerifyAttempts.get(emailTrimmed) || 0;
     if (attempts >= 5) {
       await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
       return res.status(429).json({
-        error: 'Número excessivo de tentativas incorretas. O código foi invalidado por segurança. Solicite um novo código.'
+        error: 'Too many incorrect attempts. This code has been invalidated for security. Please request a new code.'
       });
     }
 
-    // Busca o código mais recente não utilizado para este e-mail
     const [codigos] = await pool.query(
       'SELECT * FROM codigos_verificacao WHERE email = ? AND codigo = ? AND usado = FALSE ORDER BY id DESC LIMIT 1',
       [emailTrimmed, codigoTrimmed]
@@ -296,24 +664,22 @@ app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Muitas tentativas de veri
     if (codigos.length === 0) {
       failedVerifyAttempts.set(emailTrimmed, attempts + 1);
       return res.status(400).json({
-        error: `Código de verificação incorreto ou já utilizado. Tentativas restantes: ${Math.max(0, 5 - (attempts + 1))}`
+        error: `Invalid or already used verification code. Remaining attempts: ${Math.max(0, 5 - (attempts + 1))}`
       });
     }
 
-    // Limpa histórico de tentativas falhas em caso de sucesso
     failedVerifyAttempts.delete(emailTrimmed);
 
     const regCodigo = codigos[0];
     if (new Date() > new Date(regCodigo.expira_em)) {
-      return res.status(400).json({ error: 'Este código expirou (limite de 15 minutos excedido). Solicite um novo código.' });
+      return res.status(400).json({ error: 'This verification code has expired (15-minute limit). Please request a new code.' });
     }
 
-    // Marca o código como usado e ativa o usuário no banco
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
       await conn.query('UPDATE codigos_verificacao SET usado = TRUE WHERE id = ?', [regCodigo.id]);
-      await conn.query('UPDATE usuarios SET email_verificado = TRUE WHERE email = ?', [emailTrimmed]);
+      await conn.query('UPDATE usuarios SET email_verificado = TRUE, ultimo_login = CURRENT_TIMESTAMP WHERE email = ?', [emailTrimmed]);
       await conn.commit();
     } catch (err) {
       await conn.rollback();
@@ -322,10 +688,9 @@ app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Muitas tentativas de veri
       conn.release();
     }
 
-    // Busca usuário ativado para gerar o token e logar automaticamente
-    const [users] = await pool.query('SELECT id, nome, email, papel FROM usuarios WHERE email = ?', [emailTrimmed]);
+    const [users] = await pool.query('SELECT id, nome, email, papel, foto_url, bio FROM usuarios WHERE email = ?', [emailTrimmed]);
     if (users.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+      return res.status(404).json({ error: 'User account not found.' });
     }
 
     const usuario = users[0];
@@ -335,8 +700,13 @@ app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Muitas tentativas de veri
       { expiresIn: '7d' }
     );
 
+    // Send Welcome Email after verification
+    sendWelcomeEmail(usuario.email, usuario.nome).catch(err => {
+      console.warn('[Brevo] Welcome email could not be delivered after OTP:', err.message);
+    });
+
     return res.json({
-      message: 'E-mail verificado com sucesso!',
+      message: 'Email verified successfully!',
       token,
       usuario: {
         id: usuario.id,
@@ -350,77 +720,91 @@ app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Muitas tentativas de veri
     });
   } catch (error) {
     console.error('[VERIFY-CODE ERROR]:', error);
-    res.status(500).json({ error: 'Erro interno ao verificar código.' });
+    res.status(500).json({ error: 'Internal error while verifying code.' });
   }
-});
+}
 
-// Reenvio de novo código de verificação
-app.post('/resend-code', async (req, res) => {
+app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Too many verification attempts. Please wait 10 minutes.'), handleVerifyCode);
+app.post('/verify-email', rateLimit(10 * 60 * 1000, 8, 'Too many verification attempts. Please wait 10 minutes.'), handleVerifyCode);
+
+// Resend verification code
+async function handleResendCode(req, res) {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'E-mail obrigatório.' });
+    if (!email) return res.status(400).json({ error: 'Email address is required.' });
 
-    const emailTrimmed = email.trim().toLowerCase();
+    const emailTrimmed = String(email).trim().toLowerCase();
     const [users] = await pool.query('SELECT id, nome, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
 
     if (users.length === 0) {
-      return res.status(404).json({ error: 'Conta não encontrada para este e-mail.' });
+      return res.status(404).json({ error: 'No account found for this email address.' });
     }
 
     if (users[0].email_verificado === 1 || users[0].email_verificado === true) {
-      return res.status(400).json({ error: 'Este e-mail já foi verificado anteriormente. Você já pode fazer login.' });
+      return res.status(400).json({ error: 'This email address is already verified. You may sign in.' });
     }
 
-    // Invalida códigos anteriores
     await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
 
-    // Gera novo código
     const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiraEm = new Date(Date.now() + 15 * 60000); // 15 minutos
+    const expiraEm = new Date(Date.now() + 15 * 60000);
 
     await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
 
-    // Envia novo e-mail pelo Brevo
     await sendVerificationEmail(emailTrimmed, users[0].nome, codigo);
 
-    return res.json({ message: 'Novo código de verificação enviado para o seu e-mail!' });
+    return res.json({ message: 'A new verification code has been sent to your email.' });
   } catch (error) {
     console.error('[RESEND-CODE ERROR]:', error);
-    res.status(500).json({ error: `Erro ao reenviar código: ${error.message || 'Erro interno.'}` });
+    res.status(500).json({ error: `Failed to resend verification code: ${error.message || 'Internal error.'}` });
   }
-});
+}
 
+app.post('/resend-code', handleResendCode);
+app.post('/resend-verification', handleResendCode);
+
+// =========================================================================
+// 3. USER LOGIN (/login)
+// =========================================================================
 app.post('/login', async (req, res) => {
   try {
-    const { email, senha } = req.body;
-    if (!email || !senha) return res.status(400).json({ error: 'E-mail e senha obrigatórios.' });
+    const { email, senha, rememberMe } = req.body;
+    if (!email || !senha) {
+      return res.status(400).json({ error: 'Email address and password are required.' });
+    }
 
-    const emailTrimmed = email.trim().toLowerCase();
+    const emailTrimmed = String(email).trim().toLowerCase();
     const [users] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [emailTrimmed]);
     if (users.length === 0) {
-      sendLog('LOGIN_FALHA', req, { email: emailTrimmed, motivo: 'Usuário não cadastrado' });
-      return res.status(401).json({ error: 'Credenciais inválidas.' });
+      sendLog('LOGIN_FALHA', req, { email: emailTrimmed, motivo: 'User not found' });
+      return res.status(401).json({ error: 'Invalid email address or password.' });
     }
 
     const usuario = users[0];
-    const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
+    const senhaValida = await bcrypt.compare(String(senha), usuario.senha_hash);
     if (!senhaValida) {
-      sendLog('LOGIN_FALHA', req, { email: emailTrimmed, usuario_id: usuario.id, motivo: 'Senha incorreta' });
-      return res.status(401).json({ error: 'Credenciais inválidas.' });
+      sendLog('LOGIN_FALHA', req, { email: emailTrimmed, usuario_id: usuario.id, motivo: 'Incorrect password' });
+      return res.status(401).json({ error: 'Invalid email address or password.' });
     }
 
-    // Bloqueia caso o e-mail ainda não tenha sido verificado
     if (usuario.email_verificado === 0 || usuario.email_verificado === false) {
       sendLog('BLOQUEIO_EMAIL_NAO_VERIFICADO_403', req, { email: usuario.email, usuario_id: usuario.id });
       return res.status(403).json({
-        error: 'Seu e-mail ainda não foi confirmado. Digite o código de 6 dígitos enviado para sua caixa de entrada.',
+        error: 'Your email address has not been confirmed yet. Please enter the 6-digit verification code sent to your inbox.',
         requireVerification: true,
         email: usuario.email
       });
     }
 
+    await pool.query('UPDATE usuarios SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?', [usuario.id]).catch(() => {});
+
     const papelFinal = usuario.papel || 'usuario';
-    const token = jwt.sign({ id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal }, JWT_SECRET, { expiresIn: '7d' });
+    const expiresIn = rememberMe ? '30d' : '7d';
+    const token = jwt.sign(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal },
+      JWT_SECRET,
+      { expiresIn }
+    );
 
     sendLog('LOGIN_SUCESSO', req, {
       usuario_id: usuario.id,
@@ -429,7 +813,7 @@ app.post('/login', async (req, res) => {
     });
 
     res.json({
-      message: 'Login ok!',
+      message: 'Signed in successfully!',
       token,
       usuario: {
         id: usuario.id,
@@ -437,20 +821,138 @@ app.post('/login', async (req, res) => {
         email: usuario.email,
         papel: papelFinal,
         role: papelFinal,
+        auth_provider: usuario.auth_provider || 'local',
         foto_url: usuario.foto_url || null,
         bio: usuario.bio || null
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro interno.' });
+    console.error('[LOGIN ERROR]:', error);
+    res.status(500).json({ error: 'Internal server error during sign in.' });
   }
 });
 
+// =========================================================================
+// 4. GOOGLE OAUTH 2.0 ACCOUNT CREATION & LINKING (/oauth/google)
+// =========================================================================
+app.post('/oauth/google', async (req, res) => {
+  try {
+    const { googleId, email, nome, fotoUrl, emailVerified } = req.body;
+
+    if (!googleId || !email) {
+      return res.status(400).json({ error: 'Verified Google account details are required.' });
+    }
+
+    if (emailVerified === false) {
+      return res.status(403).json({ error: 'Your Google email address must be verified to sign in.' });
+    }
+
+    const emailTrimmed = String(email).trim().toLowerCase();
+    const displayName = (nome && String(nome).trim()) || emailTrimmed.split('@')[0];
+
+    // Check by google_id or email to support seamless account linking without duplicates
+    const [existingUsers] = await pool.query(
+      'SELECT * FROM usuarios WHERE google_id = ? OR email = ? LIMIT 1',
+      [String(googleId), emailTrimmed]
+    );
+
+    let usuario = null;
+    let isNewUser = false;
+
+    if (existingUsers.length > 0) {
+      // Link/update existing account
+      usuario = existingUsers[0];
+      const updatedFoto = usuario.foto_url || fotoUrl || null;
+      await pool.query(
+        `UPDATE usuarios
+         SET google_id = COALESCE(google_id, ?),
+             foto_url = ?,
+             email_verificado = TRUE,
+             ultimo_login = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [String(googleId), updatedFoto, usuario.id]
+      );
+      usuario.google_id = usuario.google_id || String(googleId);
+      usuario.foto_url = updatedFoto;
+      usuario.email_verificado = true;
+    } else {
+      // Create new verified user for first-time Google authentication
+      isNewUser = true;
+      const randomSecret = crypto.randomBytes(32).toString('hex');
+      const senhaHash = await bcrypt.hash(randomSecret, 10);
+      const papelFinal = 'usuario';
+
+      const [insertResult] = await pool.query(
+        `INSERT INTO usuarios (nome, email, senha_hash, papel, email_verificado, foto_url, auth_provider, google_id, ultimo_login, status_conta)
+         VALUES (?, ?, ?, ?, TRUE, ?, 'google', ?, CURRENT_TIMESTAMP, 'ativo')`,
+        [displayName.slice(0, 100), emailTrimmed, senhaHash, papelFinal, fotoUrl || null, String(googleId)]
+      );
+
+      usuario = {
+        id: insertResult.insertId,
+        nome: displayName.slice(0, 100),
+        email: emailTrimmed,
+        papel: papelFinal,
+        foto_url: fotoUrl || null,
+        bio: null,
+        auth_provider: 'google',
+        google_id: String(googleId)
+      };
+
+      // Send Welcome Email via Brevo asynchronously for new Google users
+      sendWelcomeEmail(emailTrimmed, usuario.nome)
+        .then((info) => {
+          console.log(`[Brevo] Welcome email sent to new Google user ${emailTrimmed} (${info.transport})`);
+        })
+        .catch((err) => {
+          console.warn(`[Brevo] Welcome email could not be delivered to ${emailTrimmed}:`, err.message);
+        });
+    }
+
+    const papelFinal = usuario.papel || 'usuario';
+    const token = jwt.sign(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    sendLog(isNewUser ? 'REGISTRO_GOOGLE_SUCESSO' : 'LOGIN_GOOGLE_SUCESSO', req, {
+      usuario_id: usuario.id,
+      email: usuario.email,
+      isNewUser
+    });
+
+    return res.status(isNewUser ? 201 : 200).json({
+      message: isNewUser ? 'Welcome to Between Letters!' : 'Signed in with Google.',
+      isNewUser,
+      token,
+      usuario: {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        papel: papelFinal,
+        role: papelFinal,
+        auth_provider: usuario.auth_provider || 'google',
+        foto_url: usuario.foto_url || null,
+        bio: usuario.bio || null
+      }
+    });
+  } catch (error) {
+    console.error('[GOOGLE OAUTH ERROR]:', error);
+    return res.status(500).json({ error: 'Failed to authenticate with Google.' });
+  }
+});
+
+// =========================================================================
+// 5. SESSION & PROFILE (/me)
+// =========================================================================
 app.get('/me', authMiddleware, async (req, res) => {
   try {
-    const [users] = await pool.query('SELECT id, nome, email, papel, foto_url, bio, criado_em FROM usuarios WHERE id = ?', [req.usuarioId]);
-    if (users.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    const [users] = await pool.query(
+      'SELECT id, nome, email, papel, foto_url, bio, auth_provider, ultimo_login, criado_em FROM usuarios WHERE id = ?',
+      [req.usuarioId]
+    );
+    if (users.length === 0) return res.status(404).json({ error: 'User not found.' });
     const usuario = users[0];
     const papelFinal = usuario.papel || 'usuario';
     res.json({
@@ -463,185 +965,251 @@ app.get('/me', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno.' });
+    res.status(500).json({ error: 'Internal server error.' });
   }
 });
 
-// Endpoint exclusivo de administração: Listar todos os usuários (RBAC Admin)
+// =========================================================================
+// 6. RBAC ADMIN ENDPOINTS (/users)
+// =========================================================================
 app.get('/users', authMiddleware, async (req, res) => {
   try {
     const [currentUser] = await pool.query('SELECT papel FROM usuarios WHERE id = ?', [req.usuarioId]);
     if (currentUser.length === 0 || currentUser[0].papel !== 'admin') {
       sendLog('BLOQUEIO_RBAC_ADMIN_403', req, { rota: '/users', papelAtual: currentUser[0]?.papel });
-      return res.status(403).json({ error: 'Acesso proibido (403 Forbidden). Apenas administradores podem listar usuários.' });
+      return res.status(403).json({ error: 'Access forbidden (403). Only administrators may list users.' });
     }
 
     const [users] = await pool.query('SELECT id, nome, email, papel, criado_em FROM usuarios ORDER BY criado_em DESC');
     res.json({ usuarios: users });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Erro interno ao listar usuários.' });
+    res.status(500).json({ error: 'Internal error while listing users.' });
   }
 });
 
-// Endpoint exclusivo de administração: Alterar papel/role de um usuário (promover/rebaixar)
 app.patch('/users/:id/role', authMiddleware, async (req, res) => {
   try {
     const [currentUser] = await pool.query('SELECT papel FROM usuarios WHERE id = ?', [req.usuarioId]);
     if (currentUser.length === 0 || currentUser[0].papel !== 'admin') {
       sendLog('BLOQUEIO_RBAC_ADMIN_403', req, { rota: `/users/${req.params.id}/role`, papelAtual: currentUser[0]?.papel });
-      return res.status(403).json({ error: 'Acesso proibido (403 Forbidden). Apenas administradores podem alterar papéis.' });
+      return res.status(403).json({ error: 'Access forbidden (403). Only administrators may change user roles.' });
     }
 
     const targetId = req.params.id;
     const { papel } = req.body;
     const papeisValidos = ['usuario', 'premium', 'admin'];
 
-    // Prevenção de auto-despromoção ou IDOR acidental
     if (Number(req.usuarioId) === Number(targetId) && papel !== 'admin') {
-      return res.status(400).json({ error: 'Por segurança, você não pode revogar seu próprio papel de administrador.' });
+      return res.status(400).json({ error: 'For security reasons, you cannot revoke your own administrator role.' });
     }
 
     if (!papeisValidos.includes(papel)) {
-      return res.status(400).json({ error: `Papel inválido. Opções válidas: ${papeisValidos.join(', ')}` });
+      return res.status(400).json({ error: `Invalid role. Valid options: ${papeisValidos.join(', ')}` });
     }
 
     const [result] = await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papel, targetId]);
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+      return res.status(404).json({ error: 'User not found.' });
     }
 
     sendLog('ALTERAR_PAPEL_USUARIO', req, { targetId, novoPapel: papel });
 
-    res.json({ message: `Papel do usuário ${targetId} alterado com sucesso para "${papel}".` });
+    res.json({ message: `Role for user ${targetId} updated to "${papel}".` });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Erro interno ao alterar papel do usuário.' });
+    res.status(500).json({ error: 'Internal error while updating user role.' });
   }
 });
 
-// Endpoint exclusivo de administração: Deletar usuário (seja ADM, PREMIUM ou Comum)
 app.delete('/users/:id', authMiddleware, async (req, res) => {
   try {
     const [currentUser] = await pool.query('SELECT papel FROM usuarios WHERE id = ?', [req.usuarioId]);
     if (currentUser.length === 0 || currentUser[0].papel !== 'admin') {
       sendLog('BLOQUEIO_RBAC_ADMIN_403', req, { rota: `/users/${req.params.id}`, papelAtual: currentUser[0]?.papel });
-      return res.status(403).json({ error: 'Acesso proibido (403 Forbidden). Apenas administradores podem excluir usuários.' });
+      return res.status(403).json({ error: 'Access forbidden (403). Only administrators may delete users.' });
     }
 
     const targetId = req.params.id;
-
-    // Localizar o usuário a ser deletado
     const [targetUsers] = await pool.query('SELECT id, nome, email, papel FROM usuarios WHERE id = ?', [targetId]);
     if (targetUsers.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+      return res.status(404).json({ error: 'User not found.' });
     }
 
     const targetUser = targetUsers[0];
-
-    // Limpeza preventiva de eventuais códigos pendentes de verificação
     if (targetUser.email) {
       await pool.query('DELETE FROM codigos_verificacao WHERE email = ?', [targetUser.email]).catch(() => {});
     }
+    await pool.query('DELETE FROM reset_tokens WHERE usuario_id = ?', [targetId]).catch(() => {});
+    if (false) {
+    }
 
-    // Exclusão do usuário (as tabelas filhas com FK ON DELETE CASCADE removem favoritos, comentários, listas e tokens automaticamente)
     const [result] = await pool.query('DELETE FROM usuarios WHERE id = ?', [targetId]);
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+      return res.status(404).json({ error: 'User not found.' });
     }
 
     sendLog('EXCLUIR_USUARIO', req, { targetId, targetEmail: targetUser.email, targetNome: targetUser.nome });
 
     res.json({
-      message: `Usuário "${targetUser.nome}" (${targetUser.email}) com papel [${targetUser.papel}] foi excluído com sucesso.`
+      message: `User "${targetUser.nome}" (${targetUser.email}) with role [${targetUser.papel}] was deleted.`
     });
   } catch (error) {
-    console.error('Erro ao excluir usuário:', error);
-    res.status(500).json({ error: 'Erro interno ao excluir usuário.' });
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Internal error while deleting user.' });
   }
 });
 
-app.post('/forgot-password', async (req, res) => {
+// =========================================================================
+// 7. PASSWORD RECOVERY & RESET (/forgot-password, /validate-reset-token, /reset-password)
+// =========================================================================
+const GENERIC_RECOVERY_MESSAGE = "If an account is associated with that email address, we've sent a link to create a new password.";
+
+app.post('/forgot-password', rateLimit(15 * 60 * 1000, 5, 'Too many password recovery requests. Please wait a few minutes.'), async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'E-mail obrigatório.' });
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Please provide your email address.' });
+    }
 
-    const [users] = await pool.query('SELECT id, nome FROM usuarios WHERE email = ?', [email.trim().toLowerCase()]);
-    if (users.length === 0) return res.json({ message: 'Se o e-mail existir, um link de recuperação foi enviado.' });
+    const emailTrimmed = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const [users] = await pool.query('SELECT id, nome, email FROM usuarios WHERE email = ?', [emailTrimmed]);
+    if (users.length === 0) {
+      // Prevent account enumeration by returning the exact same response
+      return res.json({ message: GENERIC_RECOVERY_MESSAGE });
+    }
 
     const usuario = users[0];
-    const token = crypto.randomBytes(20).toString('hex');
-    const expiraEm = new Date(Date.now() + 30 * 60000); // 30 minutos
 
-    await pool.query('INSERT INTO reset_tokens (token, usuario_id, expira_em) VALUES (?, ?, ?)', [token, usuario.id, expiraEm]);
+    // Invalidate any previous unused recovery tokens for this user
+    await pool.query('UPDATE reset_tokens SET usado = TRUE WHERE usuario_id = ? AND usado = FALSE', [usuario.id]);
 
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
-    const resetLink = `${appUrl}/?token=${token}`;
-    const mailSender = process.env.MAIL_FROM || `"Catálogo Tom Hanks" <${process.env.MAIL_USER}>`;
+    // Generate cryptographically secure 32-byte token and store ONLY its SHA-256 hash in the database
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashRecoveryToken(rawToken);
+    const expiraEm = new Date(Date.now() + 30 * 60000); // 30 minutes
 
-    await transporter.sendMail({
-      from: mailSender,
-      to: email,
-      subject: 'Recuperação de Senha - Catálogo Tom Hanks',
-      html: `
-        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; color: #1e293b;">
-          <h2 style="color: #d97706; margin-top: 0;">Recuperação de Senha</h2>
-          <p>Olá <strong>${usuario.nome}</strong>,</p>
-          <p>Você solicitou a redefinição de senha da sua conta no <strong>Catálogo de Filmes Tom Hanks</strong>.</p>
-          <p style="margin: 24px 0;">
-            <a href="${resetLink}" style="background-color: #f59e0b; color: #0f172a; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-              Redefinir Minha Senha
-            </a>
-          </p>
-          <p style="color: #64748b; font-size: 0.85rem;">Ou copie e cole o link no seu navegador:<br><a href="${resetLink}" style="color: #3b82f6;">${resetLink}</a></p>
-          <p style="color: #94a3b8; font-size: 0.8rem; margin-top: 20px;">Este link expira em 30 minutos. Se você não solicitou, pode ignorar esta mensagem.</p>
-        </div>
-      `
-    });
+    await pool.query(
+      'INSERT INTO reset_tokens (token, usuario_id, expira_em, usado) VALUES (?, ?, ?, FALSE)',
+      [tokenHash, usuario.id, expiraEm]
+    );
 
-    res.json({ message: 'Se o e-mail existir, um link de recuperação foi enviado.' });
+    const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const resetLink = `${appUrl}/login?mode=reset&token=${rawToken}`;
+
+    sendPasswordRecoveryEmail(usuario.email, usuario.nome, resetLink)
+      .then((info) => {
+        console.log(`[Brevo] Password recovery email sent to ${usuario.email} (${info.transport})`);
+      })
+      .catch((emailErr) => {
+        console.warn(`[Brevo] Could not send password recovery email to ${usuario.email}:`, emailErr.message);
+      });
+
+    sendLog('SOLICITAR_RECUPERACAO_SENHA', req, { usuario_id: usuario.id, email: usuario.email });
+
+    return res.json({ message: GENERIC_RECOVERY_MESSAGE });
   } catch (error) {
     console.error('[FORGOT-PASSWORD ERROR]:', error);
-    res.status(500).json({ error: `Falha ao enviar e-mail: ${error.message || 'Erro interno.'}` });
+    res.status(500).json({ error: 'Unable to process password recovery request at this moment.' });
   }
 });
 
-app.post('/reset-password', async (req, res) => {
+// Validate a recovery token before showing the reset form
+app.get('/validate-reset-token', async (req, res) => {
   try {
-    const { token, novaSenha } = req.body;
-    if (!token || !novaSenha || novaSenha.length < 4) return res.status(400).json({ error: 'Dados inválidos.' });
+    const rawToken = req.query.token ? String(req.query.token).trim() : '';
+    if (!rawToken) {
+      return res.status(400).json({ valid: false, error: 'Recovery token is missing.' });
+    }
 
-    const [tokens] = await pool.query('SELECT * FROM reset_tokens WHERE token = ?', [token]);
-    if (tokens.length === 0) return res.status(400).json({ error: 'Token inválido ou expirado.' });
+    const tokenHash = hashRecoveryToken(rawToken);
+    const [tokens] = await pool.query(
+      'SELECT usuario_id, expira_em, usado FROM reset_tokens WHERE token = ? OR token = ? LIMIT 1',
+      [tokenHash, rawToken]
+    );
+
+    if (tokens.length === 0) {
+      return res.status(400).json({ valid: false, error: 'This password recovery link is invalid.' });
+    }
 
     const resetRequest = tokens[0];
-    if (resetRequest.usado) return res.status(400).json({ error: 'Token já utilizado.' });
-    if (new Date() > new Date(resetRequest.expira_em)) return res.status(400).json({ error: 'Token expirado.' });
+    if (resetRequest.usado) {
+      return res.status(400).json({ valid: false, error: 'This password recovery link has already been used.' });
+    }
 
-    const senhaHash = await bcrypt.hash(novaSenha, 10);
-    
+    if (new Date() > new Date(resetRequest.expira_em)) {
+      return res.status(400).json({ valid: false, error: 'This password recovery link has expired. Please request a new one.' });
+    }
+
+    return res.json({ valid: true });
+  } catch (error) {
+    console.error('[VALIDATE-RESET-TOKEN ERROR]:', error);
+    return res.status(500).json({ valid: false, error: 'Unable to validate recovery token.' });
+  }
+});
+
+app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password reset attempts. Please wait a few minutes.'), async (req, res) => {
+  try {
+    const { token, novaSenha } = req.body;
+    if (!token || !novaSenha || String(novaSenha).length < 6) {
+      return res.status(400).json({ error: 'A valid recovery token and a new password of at least 6 characters are required.' });
+    }
+
+    const rawToken = String(token).trim();
+    const tokenHash = hashRecoveryToken(rawToken);
+
+    const [tokens] = await pool.query(
+      'SELECT * FROM reset_tokens WHERE token = ? OR token = ? LIMIT 1',
+      [tokenHash, rawToken]
+    );
+    if (tokens.length === 0) {
+      return res.status(400).json({ error: 'This password recovery link is invalid.' });
+    }
+
+    const resetRequest = tokens[0];
+    if (resetRequest.usado) {
+      return res.status(400).json({ error: 'This password recovery link has already been used.' });
+    }
+    if (new Date() > new Date(resetRequest.expira_em)) {
+      return res.status(400).json({ error: 'This password recovery link has expired. Please request a new one.' });
+    }
+
+    const senhaHash = await bcrypt.hash(String(novaSenha), 10);
+
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      await conn.query('UPDATE usuarios SET senha_hash = ? WHERE id = ?', [senhaHash, resetRequest.usuario_id]);
-      await conn.query('UPDATE reset_tokens SET usado = TRUE WHERE token = ?', [token]);
+      await conn.query(
+        'UPDATE usuarios SET senha_hash = ?, email_verificado = TRUE WHERE id = ?',
+        [senhaHash, resetRequest.usuario_id]
+      );
+      await conn.query(
+        'UPDATE reset_tokens SET usado = TRUE WHERE usuario_id = ?',
+        [resetRequest.usuario_id]
+      );
       await conn.commit();
-      res.json({ message: 'Senha atualizada com sucesso!' });
+
+      sendLog('REDEFINIR_SENHA_SUCESSO', req, { usuario_id: resetRequest.usuario_id });
+
+      return res.json({ message: 'Your password has been updated. You may now sign in with your new password.' });
     } catch (err) {
       await conn.rollback();
       throw err;
     } finally {
       conn.release();
     }
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erro interno.' });
+    console.error('[RESET-PASSWORD ERROR]:', error);
+    res.status(500).json({ error: 'Internal error while resetting password.' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Auth-service rodando na porta ${PORT}`);
+  console.log(`Auth-service running on port ${PORT}`);
 });
-

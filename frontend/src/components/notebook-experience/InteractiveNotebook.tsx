@@ -5,7 +5,10 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import gsap from "gsap";
 import { ClosedNotebook } from "./ClosedNotebook";
 import { useNotebookOpening } from "./NotebookOpening";
@@ -13,66 +16,137 @@ import {
   NotebookPage,
   CANONICAL_PAGE_WIDTH,
   CANONICAL_PAGE_HEIGHT,
-  FrontispiecePage,
-  MorningWindowPage,
-  PressedBotanicalsPage,
-  SecretCorrespondencePage,
-  DuskReflectionsPage,
-  MeadowKeepsakePage,
-  AwaitingYourHandPage,
-  ColophonSanctuaryPage,
+  JournalUserPage,
+  JournalFrontispiecePage,
+  JournalColophonPage,
+  JournalEmptyPromptPage,
 } from "./NotebookPage";
 import { NotebookControls } from "./NotebookControls";
 import { NotebookVideoBackground } from "./NotebookVideoBackground";
+import {
+  type Notebook,
+  ACTIVE_NOTEBOOK_ID_KEY,
+  JOURNAL_UPDATED_EVENT,
+  filterWrittenPages,
+  getNotebookById,
+  getNotebookTheme,
+  loadAllRawNotebooks,
+  playPaperSound,
+} from "@/lib/journal-storage";
 import "./notebook-experience.css";
 
 type BookState = "closed" | "opening" | "open" | "closing";
 
-const TOTAL_SPREADS = 4;
-const INNER_RIGHT_Z = [6.6, 4.6, 2.6] as const;
-const INNER_LEFT_Z = [2.8, 4.8, 6.8] as const;
-
-interface InnerLeafConfig {
-  id: string;
-  frontNumber: string;
-  frontVariant: "ruled" | "parchment" | "linen" | "endpaper";
-  FrontContent: React.ComponentType;
-  backNumber: string;
-  backVariant: "ruled" | "parchment" | "linen" | "endpaper";
-  BackContent: React.ComponentType;
-}
-
-const INNER_LEAVES: InnerLeafConfig[] = [
-  {
-    id: "leaf-1",
-    frontNumber: "01",
-    frontVariant: "ruled",
-    FrontContent: MorningWindowPage,
-    backNumber: "02",
-    backVariant: "parchment",
-    BackContent: PressedBotanicalsPage,
-  },
-  {
-    id: "leaf-2",
-    frontNumber: "03",
-    frontVariant: "linen",
-    FrontContent: SecretCorrespondencePage,
-    backNumber: "04",
-    backVariant: "parchment",
-    BackContent: DuskReflectionsPage,
-  },
-  {
-    id: "leaf-3",
-    frontNumber: "05",
-    frontVariant: "ruled",
-    FrontContent: MeadowKeepsakePage,
-    backNumber: "06",
-    backVariant: "ruled",
-    BackContent: AwaitingYourHandPage,
-  },
-];
-
 export function InteractiveNotebook() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedNotebookId = searchParams ? searchParams.get("id") || searchParams.get("notebook") : null;
+
+  // Active Notebook resolution from real persistent storage
+  const [activeNotebook, setActiveNotebook] = useState<Notebook>(() => {
+    if (typeof window !== "undefined") {
+      if (requestedNotebookId) {
+        const found = getNotebookById(requestedNotebookId);
+        if (found) return found;
+      }
+      const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
+      if (activeId) {
+        const found = getNotebookById(activeId);
+        if (found) return found;
+      }
+      const all = loadAllRawNotebooks();
+      if (all.length > 0) return all[0];
+    }
+    return {
+      id: requestedNotebookId || "default-journal",
+      nome: "My Journal",
+      corCapa: "marrom",
+      paginas: [],
+      criadoEm: new Date().toISOString(),
+    };
+  });
+
+  // Sync with persistent storage on storage / custom update events
+  useEffect(() => {
+    const handleSync = () => {
+      if (requestedNotebookId) {
+        const found = getNotebookById(requestedNotebookId);
+        if (found) {
+          setActiveNotebook(found);
+          return;
+        }
+      }
+      const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
+      if (activeId) {
+        const found = getNotebookById(activeId);
+        if (found) {
+          setActiveNotebook(found);
+          return;
+        }
+      }
+      const all = loadAllRawNotebooks();
+      if (all.length > 0) {
+        setActiveNotebook(all[0]);
+      }
+    };
+
+    window.addEventListener(JOURNAL_UPDATED_EVENT, handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener(JOURNAL_UPDATED_EVENT, handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, [requestedNotebookId]);
+
+  // Derive theme from active journal's cover color (Brown, Green, Wine, Black)
+  const theme = useMemo(
+    () => getNotebookTheme(activeNotebook.corCapa),
+    [activeNotebook.corCapa]
+  );
+
+  // Extract real written pages
+  const writtenPages = useMemo(
+    () => filterWrittenPages(activeNotebook.paginas),
+    [activeNotebook.paginas]
+  );
+
+  // Dynamic leaf calculation: 2 pages per leaf
+  const leavesData = useMemo(() => {
+    if (writtenPages.length === 0) {
+      return [
+        {
+          id: "empty-leaf-0",
+          frontPage: null,
+          frontNumber: "01",
+          backPage: null,
+          backNumber: "02",
+        },
+      ];
+    }
+
+    const count = Math.ceil(writtenPages.length / 2);
+    return Array.from({ length: count }).map((_, i) => ({
+      id: `user-leaf-${i}`,
+      frontPage: writtenPages[2 * i] || null,
+      frontNumber: String(2 * i + 1).padStart(2, "0"),
+      backPage: writtenPages[2 * i + 1] || null,
+      backNumber: String(2 * i + 2).padStart(2, "0"),
+    }));
+  }, [writtenPages]);
+
+  const totalLeaves = leavesData.length;
+  const totalSpreads = totalLeaves + 1;
+
+  // Dynamic Z coordinates based on leaves count
+  const getRightZ = useCallback(
+    (idx: number) => 2.0 + (totalLeaves - 1 - idx) * (5.0 / Math.max(totalLeaves, 1)),
+    [totalLeaves]
+  );
+  const getLeftZ = useCallback(
+    (idx: number) => 2.0 + idx * (5.0 / Math.max(totalLeaves, 1)),
+    [totalLeaves]
+  );
+
   const [bookState, setBookState] = useState<BookState>("closed");
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -88,12 +162,9 @@ export function InteractiveNotebook() {
     ready: false,
   });
 
-  // Synchronous animation lock to prevent simultaneous page turns
   const isAnimatingRef = useRef(false);
   const videoBusyRef = useRef(false);
-  const busyCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const busyCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spreadIndexRef = useRef(0);
   const bookStateRef = useRef<BookState>("closed");
   const touchStartXRef = useRef<number | null>(null);
@@ -122,17 +193,9 @@ export function InteractiveNotebook() {
   const firstPageCastRef = useRef<HTMLDivElement | null>(null);
   const deskShadowRef = useRef<HTMLDivElement | null>(null);
 
-  const innerLeafRefs = useRef<(HTMLDivElement | null)[]>([null, null, null]);
-  const innerFrontShadeRefs = useRef<(HTMLDivElement | null)[]>([
-    null,
-    null,
-    null,
-  ]);
-  const innerBackShadeRefs = useRef<(HTMLDivElement | null)[]>([
-    null,
-    null,
-    null,
-  ]);
+  const innerLeafRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const innerFrontShadeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const innerBackShadeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const leftSpreadCastRef = useRef<HTMLDivElement | null>(null);
   const rightSpreadCastRef = useRef<HTMLDivElement | null>(null);
 
@@ -144,12 +207,11 @@ export function InteractiveNotebook() {
     bookStateRef.current = bookState;
   }, [bookState]);
 
-  // Strict zero-scroll viewport lock while on /notebook
+  // Viewport lock
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow;
     const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverscroll =
-      document.documentElement.style.overscrollBehavior;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
 
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
@@ -157,8 +219,7 @@ export function InteractiveNotebook() {
 
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mq.matches);
-    const onMqChange = (e: MediaQueryListEvent) =>
-      setPrefersReducedMotion(e.matches);
+    const onMqChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     mq.addEventListener("change", onMqChange);
 
     return () => {
@@ -172,7 +233,7 @@ export function InteractiveNotebook() {
     };
   }, []);
 
-  // Compute responsive page dimensions so closed book, open 2-page spread, and button always fit 100%
+  // Responsive sizing
   useEffect(() => {
     const computeSize = () => {
       const vw = window.innerWidth;
@@ -192,8 +253,7 @@ export function InteractiveNotebook() {
       pageHeight = Math.round(pageHeight);
 
       const scale = pageWidth / CANONICAL_PAGE_WIDTH;
-      const closedScale =
-        vw < 580 ? Math.min(1.26, Math.max(1, (vw - 68) / pageWidth)) : 1;
+      const closedScale = vw < 580 ? Math.min(1.26, Math.max(1, (vw - 68) / pageWidth)) : 1;
 
       setMetrics({
         pageWidth,
@@ -228,21 +288,20 @@ export function InteractiveNotebook() {
     prefersReducedMotion,
   });
 
-  // Sync resting transforms whenever viewport metrics update (when not mid-animation)
+  // Sync resting transforms when metrics update
   useEffect(() => {
     if (!metrics.ready || isAnimatingRef.current) return;
 
     const isOpen = bookStateRef.current === "open";
     applyPostureImmediate(isOpen);
 
-    // Sync inner leaves resting Z & rotation according to current spreadIndex
-    INNER_LEAVES.forEach((_, idx) => {
+    leavesData.forEach((_, idx) => {
       const leafEl = innerLeafRefs.current[idx];
       if (!leafEl) return;
       const isTurnedLeft = idx < spreadIndexRef.current;
       gsap.set(leafEl, {
         rotationY: isTurnedLeft ? -180 : 0,
-        z: isTurnedLeft ? INNER_LEFT_Z[idx] : INNER_RIGHT_Z[idx],
+        z: isTurnedLeft ? getLeftZ(idx) : getRightZ(idx),
       });
       const fShade = innerFrontShadeRefs.current[idx];
       const bShade = innerBackShadeRefs.current[idx];
@@ -250,18 +309,15 @@ export function InteractiveNotebook() {
       if (bShade) gsap.set(bShade, { opacity: 0 });
     });
 
-    if (leftSpreadCastRef.current) {
-      gsap.set(leftSpreadCastRef.current, { opacity: 0 });
-    }
-    if (rightSpreadCastRef.current) {
-      gsap.set(rightSpreadCastRef.current, { opacity: 0 });
-    }
-  }, [metrics, applyPostureImmediate]);
+    if (leftSpreadCastRef.current) gsap.set(leftSpreadCastRef.current, { opacity: 0 });
+    if (rightSpreadCastRef.current) gsap.set(rightSpreadCastRef.current, { opacity: 0 });
+  }, [metrics, leavesData, applyPostureImmediate, getLeftZ, getRightZ]);
 
-  // Open the closed notebook
+  // Open notebook
   const handleOpenNotebook = useCallback(() => {
     if (isAnimatingRef.current || bookStateRef.current !== "closed") return;
 
+    playPaperSound();
     isAnimatingRef.current = true;
     setVideoBusy(true);
     setIsAnimating(true);
@@ -275,7 +331,7 @@ export function InteractiveNotebook() {
     });
   }, [runOpeningSequence, setVideoBusy]);
 
-  // Optional close back to physical closed cover (when on first spread)
+  // Close back to cover
   const handleCloseNotebook = useCallback(() => {
     if (
       isAnimatingRef.current ||
@@ -285,6 +341,7 @@ export function InteractiveNotebook() {
       return;
     }
 
+    playPaperSound();
     isAnimatingRef.current = true;
     setVideoBusy(true);
     setIsAnimating(true);
@@ -299,7 +356,7 @@ export function InteractiveNotebook() {
     });
   }, [runClosingSequence, setVideoBusy]);
 
-  // Core physical 3D page turn engine
+  // Page turning physics
   const animateLeafTurn = useCallback(
     (leafIdx: number, direction: "forward" | "backward") => {
       if (isAnimatingRef.current || bookStateRef.current !== "open") return;
@@ -307,6 +364,7 @@ export function InteractiveNotebook() {
       const leafEl = innerLeafRefs.current[leafIdx];
       if (!leafEl) return;
 
+      playPaperSound();
       isAnimatingRef.current = true;
       setVideoBusy(true);
       setIsAnimating(true);
@@ -327,10 +385,10 @@ export function InteractiveNotebook() {
         duration,
         ease: "power2.inOut",
         onUpdate: () => {
-          const p = proxy.p; // 0 = flat right (0deg), 1 = flat left (-180deg)
+          const p = proxy.p;
           const angle = -180 * p;
-          const zStart = INNER_RIGHT_Z[leafIdx];
-          const zEnd = INNER_LEFT_Z[leafIdx];
+          const zStart = getRightZ(leafIdx);
+          const zEnd = getLeftZ(leafIdx);
           const zLinear = zStart + (zEnd - zStart) * p;
           const zArc = prefersReducedMotion ? 0 : Math.sin(p * Math.PI) * 9.5;
 
@@ -339,45 +397,49 @@ export function InteractiveNotebook() {
             z: zLinear + zArc,
           });
 
-          // Self-shading on the rotating sheet
-          const arcSin = Math.sin(p * Math.PI);
           if (frontShade) {
-            gsap.set(frontShade, {
-              opacity: p < 0.52 ? arcSin * 0.34 : 0,
-            });
-          }
-          if (backShade) {
-            gsap.set(backShade, {
-              opacity: p >= 0.48 ? arcSin * 0.34 : 0,
-            });
+            const frontOpacity = Math.sin(p * Math.PI) * 0.44 * (1 - p * 0.3);
+            gsap.set(frontShade, { opacity: frontOpacity });
           }
 
-          // Dynamic cast shadows on underlying right and left page stacks
-          if (rightCast) {
-            const rightOpacity = p < 0.65 ? Math.sin((p / 0.65) * Math.PI) * 0.34 : 0;
-            gsap.set(rightCast, { opacity: rightOpacity });
+          if (backShade) {
+            const backOpacity = Math.sin(p * Math.PI) * 0.48 * (0.3 + p * 0.7);
+            gsap.set(backShade, { opacity: backOpacity });
           }
-          if (leftCast) {
-            const leftOpacity =
-              p > 0.35 ? Math.sin(((p - 0.35) / 0.65) * Math.PI) * 0.34 : 0;
-            gsap.set(leftCast, { opacity: leftOpacity });
+
+          if (direction === "forward") {
+            if (rightCast) {
+              const rOpacity = Math.sin(p * Math.PI * 0.8) * 0.28 * (1 - p);
+              gsap.set(rightCast, { opacity: rOpacity });
+            }
+            if (leftCast && p > 0.45) {
+              const lOpacity = Math.sin((p - 0.45) * 1.8) * 0.32;
+              gsap.set(leftCast, { opacity: lOpacity });
+            }
+          } else {
+            if (leftCast) {
+              const lOpacity = Math.sin((1 - p) * Math.PI * 0.8) * 0.28 * p;
+              gsap.set(leftCast, { opacity: lOpacity });
+            }
+            if (rightCast && p < 0.55) {
+              const rOpacity = Math.sin((0.55 - p) * 1.8) * 0.32;
+              gsap.set(rightCast, { opacity: rOpacity });
+            }
           }
         },
         onComplete: () => {
-          const finalTurned = direction === "forward";
+          const newIndex = direction === "forward" ? leafIdx + 1 : leafIdx;
+          setSpreadIndex(newIndex);
+          spreadIndexRef.current = newIndex;
+
           gsap.set(leafEl, {
-            rotationY: finalTurned ? -180 : 0,
-            z: finalTurned ? INNER_LEFT_Z[leafIdx] : INNER_RIGHT_Z[leafIdx],
+            rotationY: direction === "forward" ? -180 : 0,
+            z: direction === "forward" ? getLeftZ(leafIdx) : getRightZ(leafIdx),
           });
           if (frontShade) gsap.set(frontShade, { opacity: 0 });
           if (backShade) gsap.set(backShade, { opacity: 0 });
           if (leftCast) gsap.set(leftCast, { opacity: 0 });
           if (rightCast) gsap.set(rightCast, { opacity: 0 });
-
-          const nextSpread =
-            direction === "forward" ? leafIdx + 1 : leafIdx;
-          spreadIndexRef.current = nextSpread;
-          setSpreadIndex(nextSpread);
 
           isAnimatingRef.current = false;
           setIsAnimating(false);
@@ -385,93 +447,139 @@ export function InteractiveNotebook() {
         },
       });
     },
-    [prefersReducedMotion, setVideoBusy]
+    [prefersReducedMotion, setVideoBusy, getRightZ, getLeftZ]
   );
 
   const handleTurnNext = useCallback(() => {
-    if (isAnimatingRef.current || bookStateRef.current !== "open") return;
-    const current = spreadIndexRef.current;
-    if (current >= TOTAL_SPREADS - 1) return;
-    animateLeafTurn(current, "forward");
-  }, [animateLeafTurn]);
+    if (spreadIndexRef.current < totalSpreads - 1) {
+      animateLeafTurn(spreadIndexRef.current, "forward");
+    }
+  }, [animateLeafTurn, totalSpreads]);
 
   const handleTurnPrev = useCallback(() => {
-    if (isAnimatingRef.current || bookStateRef.current !== "open") return;
-    const current = spreadIndexRef.current;
-    if (current <= 0) return;
-    animateLeafTurn(current - 1, "backward");
+    if (spreadIndexRef.current > 0) {
+      animateLeafTurn(spreadIndexRef.current - 1, "backward");
+    }
   }, [animateLeafTurn]);
 
-  // Keyboard navigation support (ArrowRight / ArrowLeft)
+  // Keyboard navigation
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isAnimatingRef.current) return;
-      if (bookStateRef.current === "open") {
-        if (e.key === "ArrowRight") {
-          e.preventDefault();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea") return;
+
+      if (e.key === "ArrowRight" || e.key === " ") {
+        e.preventDefault();
+        if (bookStateRef.current === "closed") {
+          handleOpenNotebook();
+        } else if (bookStateRef.current === "open") {
           handleTurnNext();
-        } else if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          handleTurnPrev();
+        }
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (bookStateRef.current === "open") {
+          if (spreadIndexRef.current === 0) {
+            handleCloseNotebook();
+          } else {
+            handleTurnPrev();
+          }
+        }
+      } else if (e.key === "Escape") {
+        if (bookStateRef.current === "open" && spreadIndexRef.current === 0) {
+          handleCloseNotebook();
+        } else {
+          router.push("/my-shelf");
         }
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleTurnNext, handleTurnPrev]);
 
-  // Touch swipe navigation on open spread
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (bookState !== "open" || isAnimating) return;
-    touchStartXRef.current = e.touches[0].clientX;
-    touchStartYRef.current = e.touches[0].clientY;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleOpenNotebook, handleTurnNext, handleTurnPrev, handleCloseNotebook, router]);
+
+  // Touch swipe support
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartXRef.current = e.touches[0].clientX;
+      touchStartYRef.current = e.touches[0].clientY;
+    }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (
-      bookState !== "open" ||
-      isAnimating ||
-      touchStartXRef.current === null ||
-      touchStartYRef.current === null
-    ) {
-      return;
-    }
-
-    const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-    const dy = e.changedTouches[0].clientY - touchStartYRef.current;
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
     touchStartXRef.current = null;
     touchStartYRef.current = null;
 
-    if (Math.abs(dx) > 42 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      if (dx < 0) {
-        handleTurnNext();
+    if (Math.abs(deltaX) > 42 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      if (deltaX < 0) {
+        if (bookState === "closed") handleOpenNotebook();
+        else handleTurnNext();
       } else {
-        handleTurnPrev();
+        if (bookState === "open") {
+          if (spreadIndex === 0) handleCloseNotebook();
+          else handleTurnPrev();
+        }
       }
     }
   };
 
   const canGoPrev = bookState === "open" && spreadIndex > 0;
-  const canGoNext = bookState === "open" && spreadIndex < TOTAL_SPREADS - 1;
+  const canGoNext = bookState === "open" && spreadIndex < totalSpreads - 1;
+
+  const navigateToEditor = () => {
+    try {
+      window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, activeNotebook.id);
+    } catch {}
+    router.push(`/journal?notebook=${encodeURIComponent(activeNotebook.id)}`);
+  };
+
+  const navigateToShelf = () => {
+    router.push("/my-shelf");
+  };
 
   return (
     <section
       className="nb-experience-viewport"
-      aria-label="Between Letters interactive notebook presentation"
+      aria-label={`Realistic 3D journal: ${activeNotebook.nome}`}
     >
-      {/* Dreamy 35mm / Super 8 blurred video background with translucent cream veil */}
+      {/* Topbar Navigation Bar */}
+      <nav className="nb-topbar-nav" aria-label="Viewer navigation">
+        <button
+          type="button"
+          className="nb-topbar-back-btn"
+          onClick={navigateToShelf}
+          title="Return to My Shelf archive"
+        >
+          <span>← Back to My Shelf</span>
+        </button>
+
+        <span className="nb-topbar-meta-title">
+          {activeNotebook.nome} · {theme.nome} Leather
+        </span>
+
+        <button
+          type="button"
+          className="nb-topbar-edit-btn"
+          onClick={navigateToEditor}
+          title="Open this journal in writing desk"
+        >
+          <span>✎ Edit in Desk</span>
+        </button>
+      </nav>
+
+      {/* Dreamy 35mm / Super 8 cinematic background video layer */}
       <NotebookVideoBackground isBusyRef={videoBusyRef} />
 
       {/* Central 3D Notebook Stage */}
       <div
         className="nb-stage"
-        style={{
-          opacity: metrics.ready ? 1 : 0,
-        }}
+        style={{ opacity: metrics.ready ? 1 : 0 }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Dynamic soft desk shadow anchored beneath the notebook */}
+        {/* Dynamic floor shadow */}
         <div
           ref={deskShadowRef}
           className="nb-desk-shadow"
@@ -482,7 +590,7 @@ export function InteractiveNotebook() {
           aria-hidden="true"
         />
 
-        {/* 3D Perspective Wrapper */}
+        {/* 3D Perspective Rig */}
         <div className="nb-perspective-camera">
           <div
             ref={bookRigRef}
@@ -492,11 +600,10 @@ export function InteractiveNotebook() {
               height: `${metrics.pageHeight}px`,
             }}
           >
-            {/* Back Hardcover Leather Board (Rustic Brown overhang) */}
-            <div className="nb-back-board" aria-hidden="true">
-              {/* Left open-board overhang visible once cover opens */}
+            {/* Back Hardcover Board in matching leather theme */}
+            <div className={`nb-back-board nb-back-board--${theme.id}`} aria-hidden="true">
               <div
-                className={`nb-open-left-board ${
+                className={`nb-open-left-board nb-open-left-board--${theme.id} ${
                   bookState === "open" || bookState === "opening"
                     ? "nb-open-left-board--visible"
                     : ""
@@ -504,32 +611,31 @@ export function InteractiveNotebook() {
               />
             </div>
 
-            {/* 3D Physical Spine Ridge along x = 0 */}
+            {/* 3D Physical Spine Hinge */}
             <div className="nb-spine-hinge" aria-hidden="true" />
 
-            {/* 3D Cream Page-Block Thickness (Fore-edge & Bottom Edge) */}
+            {/* 3D Page Stacks */}
             <div className="nb-page-stack-right" aria-hidden="true" />
             <div className="nb-page-stack-bottom" aria-hidden="true" />
 
-            {/* Fixed Right Base Page (Page 07 — Colophon Sanctuary) */}
-            <div
-              className="nb-base-page"
-              style={{ transform: "translateZ(0.8px)" }}
-            >
+            {/* Fixed Right Base Page (Colophon Sanctuary Plate) */}
+            <div className="nb-base-page" style={{ transform: "translateZ(0.8px)" }}>
               <NotebookPage
                 side="right"
-                pageNumber="07"
+                pageNumber={String(totalLeaves * 2 + 1).padStart(2, "0")}
                 variant="endpaper"
                 scale={metrics.scale}
               >
-                <ColophonSanctuaryPage />
+                <JournalColophonPage
+                  notebook={activeNotebook}
+                  onContinueWriting={navigateToEditor}
+                  onBackToShelf={navigateToShelf}
+                />
               </NotebookPage>
             </div>
 
-            {/* Inner Flippable Leaves (Leaves 1, 2, 3) */}
-            {INNER_LEAVES.map((leaf, idx) => {
-              const FrontComp = leaf.FrontContent;
-              const BackComp = leaf.BackContent;
+            {/* Dynamic Flippable Leaves with Real User Content */}
+            {leavesData.map((leaf, idx) => {
               const isFirstInnerLeaf = idx === 0;
               const showRightCurl =
                 hoverSide === "right" &&
@@ -552,7 +658,7 @@ export function InteractiveNotebook() {
                     showRightCurl ? "nb-leaf--peek-right" : ""
                   } ${showLeftCurl ? "nb-leaf--peek-left" : ""}`}
                   style={{
-                    transform: `translateZ(${INNER_RIGHT_Z[idx]}px) rotateY(0deg)`,
+                    transform: `translateZ(${getRightZ(idx)}px) rotateY(0deg)`,
                   }}
                 >
                   {/* Front Face (Odd Right-Hand Page) */}
@@ -560,13 +666,24 @@ export function InteractiveNotebook() {
                     <NotebookPage
                       side="right"
                       pageNumber={leaf.frontNumber}
-                      variant={leaf.frontVariant}
+                      variant={leaf.frontPage?.tipoPapel === "cream" ? "parchment" : "ruled"}
                       scale={metrics.scale}
                     >
-                      <FrontComp />
+                      {leaf.frontPage ? (
+                        <JournalUserPage
+                          page={leaf.frontPage}
+                          pageNumber={leaf.frontNumber}
+                          side="right"
+                          notebookName={activeNotebook.nome}
+                        />
+                      ) : (
+                        <JournalEmptyPromptPage
+                          notebook={activeNotebook}
+                          onContinueWriting={navigateToEditor}
+                        />
+                      )}
                     </NotebookPage>
 
-                    {/* Cover cast shadow during initial opening on Page 01 */}
                     {isFirstInnerLeaf && (
                       <div
                         ref={firstPageCastRef}
@@ -575,7 +692,6 @@ export function InteractiveNotebook() {
                       />
                     )}
 
-                    {/* Dynamic page-turn light/shadow overlay */}
                     <div
                       ref={(el) => {
                         innerFrontShadeRefs.current[idx] = el;
@@ -590,10 +706,23 @@ export function InteractiveNotebook() {
                     <NotebookPage
                       side="left"
                       pageNumber={leaf.backNumber}
-                      variant={leaf.backVariant}
+                      variant={leaf.backPage?.tipoPapel === "cream" ? "parchment" : "ruled"}
                       scale={metrics.scale}
                     >
-                      <BackComp />
+                      {leaf.backPage ? (
+                        <JournalUserPage
+                          page={leaf.backPage}
+                          pageNumber={leaf.backNumber}
+                          side="left"
+                          notebookName={activeNotebook.nome}
+                        />
+                      ) : (
+                        <JournalColophonPage
+                          notebook={activeNotebook}
+                          onContinueWriting={navigateToEditor}
+                          onBackToShelf={navigateToShelf}
+                        />
+                      )}
                     </NotebookPage>
 
                     <div
@@ -608,7 +737,7 @@ export function InteractiveNotebook() {
               );
             })}
 
-            {/* Leaf 0: Physical Front Hardcover (Exterior Leather + Inside Ex-Libris) */}
+            {/* Front Hardcover Leaf (Closed Cover on Front / Ex-Libris on Back) */}
             <div
               ref={coverLeafRef}
               className="nb-leaf nb-leaf--cover"
@@ -617,13 +746,17 @@ export function InteractiveNotebook() {
                 pointerEvents: bookState === "closed" ? "auto" : "none",
               }}
             >
-              {/* Front Face: Pure CSS Rustic Leather Cover */}
+              {/* Front Face: Pure CSS Leather Cover in Selected User Color */}
               <div className="nb-leaf__face nb-leaf__face--front nb-leaf__face--cover-front">
                 <ClosedNotebook
                   isClosed={bookState === "closed"}
                   isAnimating={isAnimating}
                   onOpen={handleOpenNotebook}
                   onHoverTilt={animateClosedHover}
+                  notebookTitle={activeNotebook.nome}
+                  notebookColor={activeNotebook.corCapa}
+                  theme={theme}
+                  totalPages={writtenPages.length}
                 />
                 <div
                   ref={coverFrontShadeRef}
@@ -632,14 +765,14 @@ export function InteractiveNotebook() {
                 />
               </div>
 
-              {/* Back Face: Inside Front Cover (Ex-Libris Frontispiece) */}
+              {/* Back Face: Inside Front Cover (Personalized Ex-Libris Frontispiece) */}
               <div className="nb-leaf__face nb-leaf__face--back nb-leaf__face--cover-back">
                 <NotebookPage
                   side="left"
                   variant="endpaper"
                   scale={metrics.scale}
                 >
-                  <FrontispiecePage />
+                  <JournalFrontispiecePage notebook={activeNotebook} />
                 </NotebookPage>
                 <div
                   ref={coverBackShadeRef}
@@ -649,7 +782,7 @@ export function InteractiveNotebook() {
               </div>
             </div>
 
-            {/* Dynamic Cast Shadows over Resting Left & Right Page Stacks */}
+            {/* Dynamic Spread Cast Shadows */}
             <div
               ref={leftSpreadCastRef}
               className="nb-spread-cast nb-spread-cast--left"
@@ -661,7 +794,7 @@ export function InteractiveNotebook() {
               aria-hidden="true"
             />
 
-            {/* Left & Right Page Click Regions (Active when Notebook is Open) */}
+            {/* Left & Right Page Click Regions */}
             {bookState === "open" && (
               <>
                 <button
@@ -673,18 +806,11 @@ export function InteractiveNotebook() {
                   onMouseEnter={() => canGoPrev && setHoverSide("left")}
                   onMouseLeave={() => setHoverSide(null)}
                   disabled={!canGoPrev || isAnimating}
-                  aria-label={
-                    canGoPrev
-                      ? "Turn to previous spread"
-                      : "First spread reached"
-                  }
+                  aria-label={canGoPrev ? "Turn to previous spread" : "First spread"}
                   title={canGoPrev ? "Previous page" : undefined}
                 >
                   {canGoPrev && (
-                    <span
-                      className="nb-edge-hint nb-edge-hint--left"
-                      aria-hidden="true"
-                    >
+                    <span className="nb-edge-hint nb-edge-hint--left" aria-hidden="true">
                       ‹
                     </span>
                   )}
@@ -699,16 +825,11 @@ export function InteractiveNotebook() {
                   onMouseEnter={() => canGoNext && setHoverSide("right")}
                   onMouseLeave={() => setHoverSide(null)}
                   disabled={!canGoNext || isAnimating}
-                  aria-label={
-                    canGoNext ? "Turn to next spread" : "Last spread reached"
-                  }
+                  aria-label={canGoNext ? "Turn to next spread" : "Last spread reached"}
                   title={canGoNext ? "Next page" : undefined}
                 >
                   {canGoNext && (
-                    <span
-                      className="nb-edge-hint nb-edge-hint--right"
-                      aria-hidden="true"
-                    >
+                    <span className="nb-edge-hint nb-edge-hint--right" aria-hidden="true">
                       ›
                     </span>
                   )}
@@ -719,13 +840,17 @@ export function InteractiveNotebook() {
         </div>
       </div>
 
-      {/* Bottom Action Button & Whisper Indicator */}
+      {/* Bottom Action Controls */}
       <NotebookControls
         isOpen={bookState === "open"}
         isAnimating={isAnimating}
         spreadIndex={spreadIndex}
-        totalSpreads={TOTAL_SPREADS}
+        totalSpreads={totalSpreads}
+        notebookName={activeNotebook.nome}
+        notebookId={activeNotebook.id}
         onCloseBook={handleCloseNotebook}
+        onBackToShelf={navigateToShelf}
+        onContinueWriting={navigateToEditor}
       />
     </section>
   );

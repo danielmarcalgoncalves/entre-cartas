@@ -148,7 +148,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
     };
 
     const handleOpenNotebookExperience = () => {
-      router.push("/notebook");
+      setIsUpscaleOpen(true);
     };
 
     return (
@@ -191,7 +191,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                       draggable={false}
                       loading="eager"
                       onClick={handleOpenNotebookExperience}
-                      title="Click to open interactive notebook experience"
+                      title="Click to inspect plate in high resolution"
                     />
                   </div>
                 );
@@ -203,9 +203,9 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
               type="button"
               className="notebook-inspect-btn"
               onClick={handleOpenNotebookExperience}
-              aria-label="Open interactive notebook experience"
+              aria-label="Inspect notebook plate in high resolution"
             >
-              <span>Open Notebook</span>
+              <span>Inspect Plate</span>
             </button>
           </div>
 

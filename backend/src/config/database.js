@@ -34,6 +34,10 @@ async function initDb(retries = 15, delay = 2000) {
         email_verificado BOOLEAN DEFAULT FALSE,
         foto_url VARCHAR(500) DEFAULT NULL,
         bio TEXT DEFAULT NULL,
+        auth_provider VARCHAR(50) DEFAULT 'local',
+        google_id VARCHAR(255) DEFAULT NULL,
+        ultimo_login TIMESTAMP NULL DEFAULT NULL,
+        status_conta VARCHAR(30) DEFAULT 'ativo',
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
@@ -66,6 +70,22 @@ async function initDb(retries = 15, delay = 2000) {
 
     try {
       await connection.query(`ALTER TABLE usuarios ADD COLUMN bio TEXT DEFAULT NULL;`);
+    } catch (e) {}
+
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'local';`);
+    } catch (e) {}
+
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD COLUMN google_id VARCHAR(255) DEFAULT NULL;`);
+    } catch (e) {}
+
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD COLUMN ultimo_login TIMESTAMP NULL DEFAULT NULL;`);
+    } catch (e) {}
+
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo';`);
     } catch (e) {}
 
     // 3. Códigos de verificação OTP

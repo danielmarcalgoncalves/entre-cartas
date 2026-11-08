@@ -20,6 +20,10 @@ services:
       - JWT_SECRET=${JWT_SECRET:-XSfvtJaid8X39mPyO3i8iHE6cCrGZZYHJ_FM7KsfXRqJhtqj9tnYkZMv2uFkuOWV_2026}
       - AUTH_SERVICE_URL=http://auth-service:3000
       - LOG_SERVICE_URL=http://log-service:3000
+      # Google OAuth 2.0
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-}
       # MinIO — Object Storage para fotos de perfil
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio}
       - MINIO_PORT=${MINIO_PORT:-9000}
@@ -57,7 +61,11 @@ services:
       - MAIL_USER=${MAIL_USER}
       - MAIL_PASS=${MAIL_PASS}
       - MAIL_FROM=${MAIL_FROM}
-      - APP_URL=${APP_URL}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-Between Letters}
+      - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-false}
+      - APP_URL=${APP_URL:-http://localhost:3000}
       - LOG_SERVICE_URL=http://log-service:3000
     depends_on:
       - mariadb

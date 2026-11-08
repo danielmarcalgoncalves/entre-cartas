@@ -1,26 +1,17 @@
 /**
- * Middleware de Segurança Avançada:
- * 1. Rate Limiting em memória (Proteção contra OWASP ZAP, scanners automatizados e ataques de força bruta)
- * 2. Prevenção de IDOR e BOLA (Broken Object Level Authorization)
- * 3. Sanitização de entradas e Prevenção de XSS / Injeção de Links
- * 4. Headers de segurança HTTP
+ * Advanced Security Middleware:
+ * 1. In-memory Rate Limiting (Brute-force & automated scanner protection)
+ * 2. IDOR & BOLA prevention
+ * 3. Input sanitization & XSS / link injection filtering
+ * 4. HTTP Security Headers
  */
 
-// Armazenamento em memória para Rate Limiting por IP/rota
 const rateLimitStores = new Map();
 
-/**
- * Cria um middleware de Rate Limit em memória
- * @param {Object} options
- * @param {number} options.windowMs - Janela de tempo em milissegundos
- * @param {number} options.max - Quantidade máxima de requisições permitidas na janela
- * @param {string} options.message - Mensagem de erro ao exceder o limite
- */
 function createRateLimiter({ windowMs, max, message }) {
   return (req, res, next) => {
-    // Identificador por IP do cliente (considerando proxies como Nginx se houver)
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection.remoteAddress || 'unknown-ip';
-    const key = `${req.baseUrl || req.path}:${ip}`;
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection?.remoteAddress || 'unknown-ip';
+    const key = `${req.baseUrl || ""}${req.path}:${ip}`;
     const now = Date.now();
 
     let record = rateLimitStores.get(key);
@@ -35,15 +26,14 @@ function createRateLimiter({ windowMs, max, message }) {
       record.count += 1;
     }
 
-    // Adiciona headers padrão de rate limiting
     res.setHeader('X-RateLimit-Limit', max);
     res.setHeader('X-RateLimit-Remaining', Math.max(0, max - record.count));
     res.setHeader('X-RateLimit-Reset', Math.ceil((record.resetTime + windowMs) / 1000));
 
     if (record.count > max) {
-      console.warn(`[SECURITY ALERT] Rate limit excedido para IP ${ip} na rota ${req.originalUrl} (${record.count}/${max})`);
+      console.warn(`[SECURITY ALERT] Rate limit exceeded for IP ${ip} on route ${req.originalUrl} (${record.count}/${max})`);
       return res.status(429).json({
-        error: message || 'Muitas requisições enviadas. Por favor, aguarde alguns minutos e tente novamente.',
+        error: message || 'Too many requests sent. Please wait a few minutes and try again.',
         retryAfter: Math.ceil((record.resetTime + windowMs - now) / 1000)
       });
     }
@@ -52,7 +42,6 @@ function createRateLimiter({ windowMs, max, message }) {
   };
 }
 
-// Limpeza periódica da memória a cada 10 minutos para evitar consumo excessivo de RAM
 setInterval(() => {
   const now = Date.now();
   for (const [key, record] of rateLimitStores.entries()) {
@@ -62,62 +51,56 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-// 1. Limiter para Registro de Novas Contas: máx 5 registros a cada 15 minutos por IP
+// 1. Account registration limiter
 const registerLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: 'Bloqueio de segurança: Limite de criação de contas excedido. Tente novamente em 15 minutos.'
+  max: 10,
+  message: 'Account creation limit reached for your connection. Please try again in 15 minutes.'
 });
 
-// 2. Limiter para Login: máx 8 tentativas a cada 15 minutos por IP
+// 2. Login limiter
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 8,
-  message: 'Muitas tentativas de login consecutivas. Por motivos de segurança, aguarde 15 minutos.'
+  max: 12,
+  message: 'Too many consecutive sign-in attempts. For your security, please wait 15 minutes.'
 });
 
-// 3. Limiter para Verificação de Código (OTP) e Reenvio: máx 6 tentativas a cada 10 minutos
+// 3. Verification code (OTP) limiter
 const verifyCodeLimiter = createRateLimiter({
   windowMs: 10 * 60 * 1000,
-  max: 6,
-  message: 'Limite de tentativas de código de verificação excedido. Solicite um novo código após 10 minutos.'
+  max: 8,
+  message: 'Verification code attempt limit reached. Please request a new code after 10 minutes.'
 });
 
-// 4. Limiter para Comentários: máx 8 comentários a cada 1 minuto por usuário/IP
+// 4. Comment rate limiter
 const commentRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 8,
-  message: 'Você está publicando comentários muito rápido. Aguarde um minuto antes de postar novamente.'
+  message: 'You are posting notes too quickly. Please wait a moment before posting again.'
 });
 
-// 5. Limiter para Recuperação de Senha: máx 3 requisições a cada 30 minutos
+// 5. Password recovery limiter
 const forgotPasswordLimiter = createRateLimiter({
-  windowMs: 30 * 60 * 1000,
-  max: 3,
-  message: 'Muitas solicitações de redefinição de senha. Aguarde 30 minutos.'
+  windowMs: 15 * 60 * 1000,
+  max: 6,
+  message: 'Too many password recovery requests. Please wait a few minutes before trying again.'
 });
 
-/**
- * Middleware de Sanitização de Comentários e Filtro Anti-Bot / Anti-Spam
- * Impede que ferramentas como OWASP ZAP injetem URLs, payloads XSS ou links de rastreio
- */
 function sanitizeComment(req, res, next) {
   let { texto } = req.body;
 
   if (!texto || typeof texto !== 'string' || !texto.trim()) {
-    return res.status(400).json({ error: 'O texto do comentário não pode estar vazio.' });
+    return res.status(400).json({ error: 'Comment text cannot be empty.' });
   }
 
-  // 1. Bloqueia tentativas de injeção automatizada de URLs / SSRF / ZAP Scanner Payloads
   const urlPattern = /(https?:\/\/|ftp:\/\/|www\.)[^\s]+/gi;
   if (urlPattern.test(texto)) {
-    console.warn(`[SECURITY] Tentativa de injeção de link/URL bloqueada no comentário de usuário ID ${req.usuarioId}: "${texto.slice(0, 50)}..."`);
+    console.warn(`[SECURITY] External URL blocked in comment by user ID ${req.usuarioId}: "${texto.slice(0, 50)}..."`);
     return res.status(400).json({
-      error: 'Por motivos de segurança e combate a spam, comentários não podem conter links ou URLs externas.'
+      error: 'For security and spam prevention, notes cannot contain external links or URLs.'
     });
   }
 
-  // 2. Sanitização HTML básica contra Stored XSS (Cross-Site Scripting)
   texto = texto
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -126,9 +109,8 @@ function sanitizeComment(req, res, next) {
     .replace(/'/g, '&#x27;')
     .trim();
 
-  // 3. Validação de tamanho
   if (texto.length > 800) {
-    return res.status(400).json({ error: 'O comentário excede o tamanho máximo de 800 caracteres.' });
+    return res.status(400).json({ error: 'Note exceeds the maximum length of 800 characters.' });
   }
 
   req.body.texto = texto;
@@ -136,46 +118,43 @@ function sanitizeComment(req, res, next) {
 }
 
 /**
- * Validação rigorosa de Nome de Usuário no Cadastro
- * Impede nomes ofensivos, scripts ou caracteres de injeção
+ * Strict validation for user registration input
  */
 function validateRegistrationInput(req, res, next) {
   const { nome, email, senha } = req.body;
 
-  if (!nome || typeof nome !== 'string' || nome.trim().length < 2 || nome.trim().length > 50) {
-    return res.status(400).json({ error: 'O nome deve ter entre 2 e 50 caracteres.' });
+  if (!nome || typeof nome !== 'string' || nome.trim().length < 2 || nome.trim().length > 80) {
+    return res.status(400).json({ error: 'Full name must be between 2 and 80 characters.' });
   }
 
-  // Permite apenas letras (incluindo acentuadas), números e espaços
-  const validNameRegex = /^[a-zA-ZÀ-ÿ0-9 ]+$/;
+  // Allow letters (including accented), numbers, spaces, hyphens, apostrophes, and periods
+  const validNameRegex = /^[a-zA-ZÀ-ÿ0-9 '.\-]+$/;
   if (!validNameRegex.test(nome.trim())) {
-    return res.status(400).json({ error: 'O nome contém caracteres inválidos. Utilize apenas letras e números.' });
+    return res.status(400).json({ error: 'Name contains invalid characters. Please use letters, spaces, or standard punctuation.' });
   }
 
-  // Filtro de termos ofensivos básicos
   const blockedTerms = ['admin', 'root', 'administrator', 'moderator', 'nigga', 'nigger'];
   const lowerName = nome.trim().toLowerCase();
   for (const term of blockedTerms) {
     if (lowerName.includes(term)) {
-      return res.status(400).json({ error: 'Nome de usuário inválido ou restrito.' });
+      return res.status(400).json({ error: 'This name is restricted or invalid.' });
     }
   }
 
-  // Validação estrita de formato de e-mail
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email.trim())) {
-    return res.status(400).json({ error: 'Por favor, informe um endereço de e-mail válido.' });
+  if (!email || typeof email !== 'string' || !emailRegex.test(email.trim())) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
   }
 
   if (!senha || typeof senha !== 'string' || senha.length < 6) {
-    return res.status(400).json({ error: 'A senha deve ter no mínimo 6 caracteres.' });
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
   }
 
   next();
 }
 
 /**
- * Headers de Proteção HTTP (semelhante ao Helmet)
+ * HTTP Security Headers
  */
 function securityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -184,21 +163,20 @@ function securityHeaders(req, res, next) {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://image.tmdb.org http://localhost:* https://*; connect-src 'self' https://api.themoviedb.org http://localhost:* ws://localhost:*;"
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://image.tmdb.org https://lh3.googleusercontent.com http://localhost:* https://*; connect-src 'self' https://api.themoviedb.org http://localhost:* ws://localhost:*;"
   );
   res.removeHeader('X-Powered-By');
   next();
 }
 
 /**
- * Middleware de Proteção contra CSRF em requisições de alteração de estado (POST, PUT, PATCH, DELETE)
+ * CSRF Protection on state-changing requests
  */
 function csrfProtection(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
   }
 
-  // Validação de Origin/Host em requisições autenticadas via Cookie
   if (req.cookies && req.cookies.access_token) {
     const origin = req.headers['origin'];
     const host = req.headers['host'];
@@ -207,11 +185,11 @@ function csrfProtection(req, res, next) {
       try {
         const originUrl = new URL(origin);
         if (originUrl.host !== host) {
-          console.warn(`[CSRF BLOCK] Origem suspeita bloqueada: ${origin} vs Host ${host}`);
-          return res.status(403).json({ error: 'Acesso bloqueado por segurança (Validação CSRF).' });
+          console.warn(`[CSRF BLOCK] Suspicious origin blocked: ${origin} vs Host ${host}`);
+          return res.status(403).json({ error: 'Request blocked by security policy (CSRF validation).' });
         }
       } catch {
-        return res.status(403).json({ error: 'Acesso bloqueado por segurança (Origem inválida).' });
+        return res.status(403).json({ error: 'Request blocked by security policy (Invalid origin).' });
       }
     }
   }

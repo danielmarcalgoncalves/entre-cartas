@@ -1,0 +1,587 @@
+/* ============================================================================
+   BETWEEN LETTERS — HANDCRAFTED PAPER & KRAFT TAPE AUTHENTICATION EXPERIENCE
+   Visual Reference: Aged cream stationery sheet held by brown kraft tape
+   over a softly blurred nostalgic trees-and-sky photograph.
+   ============================================================================ */
+
+.bl-auth-viewport {
+  position: relative;
+  width: 100vw;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 44px 20px 36px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background-color: #3a352a;
+  color: #2c2117;
+  z-index: 1;
+}
+
+/* 1. Full-screen cinematic blurred background photograph */
+.bl-auth-bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bl-auth-bg-photo {
+  position: absolute;
+  inset: -24px;
+  background-image: url("/images/nova-ui/sunset-trees-bg.jpg");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  filter: blur(3.5px) brightness(0.95) saturate(0.86) contrast(0.98);
+  transform: scale(1.05);
+}
+
+.bl-auth-bg-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse at 50% 46%,
+      rgba(255, 238, 212, 0.08) 0%,
+      rgba(38, 32, 22, 0.24) 68%,
+      rgba(22, 18, 12, 0.48) 100%
+    );
+}
+
+/* Subtle top-left navigation back to landing page */
+.bl-auth-back-home {
+  position: fixed;
+  top: 22px;
+  left: 26px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-family: var(--serif, Georgia, "Times New Roman", serif);
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  color: rgba(250, 242, 228, 0.92);
+  text-decoration: none;
+  background: rgba(36, 28, 19, 0.34);
+  border: 1px solid rgba(250, 242, 228, 0.22);
+  border-radius: 2px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.bl-auth-back-home:hover {
+  background: rgba(36, 28, 19, 0.52);
+  color: #fffaf0;
+  border-color: rgba(250, 242, 228, 0.42);
+  transform: translateY(-1px);
+}
+
+/* 2. Central Aged Paper Sheet Container */
+.bl-auth-paper-stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 576px;
+  margin: auto;
+  perspective: 1200px;
+}
+
+.bl-auth-paper-sheet {
+  position: relative;
+  width: 100%;
+  background-color: #f6ecda;
+  background-image:
+    radial-gradient(
+      ellipse at 50% 45%,
+      rgba(255, 251, 242, 0.35) 0%,
+      rgba(224, 206, 178, 0.22) 75%,
+      rgba(198, 175, 142, 0.36) 100%
+    ),
+    url("/images/nova-ui/auth-paper-texture.jpg");
+  background-size: 100% 100%, cover;
+  background-position: center center;
+  padding: 46px 52px 38px;
+  box-sizing: border-box;
+  border-radius: 1.5px;
+  border: 1px solid rgba(212, 194, 165, 0.85);
+  box-shadow:
+    0 24px 60px rgba(24, 18, 11, 0.34),
+    0 6px 18px rgba(24, 18, 11, 0.2),
+    inset 0 0 38px rgba(188, 162, 124, 0.22),
+    inset 0 1px 0 rgba(255, 252, 245, 0.7);
+  color: #2c2117;
+  animation: blPaperArrive 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Subtle organic paper edge & fiber overlay */
+.bl-auth-paper-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 245, 0.26) 0%, transparent 14%, transparent 88%, rgba(168, 142, 105, 0.12) 100%);
+  border-radius: inherit;
+}
+
+/* 3. Realistic Brown Kraft Tape Attached to Upper Edge */
+.bl-auth-kraft-tape {
+  position: absolute;
+  top: -27px;
+  left: 50%;
+  transform: translateX(-48%) rotate(0.5deg);
+  width: 146px;
+  height: auto;
+  z-index: 5;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 5px 7px rgba(36, 24, 10, 0.28)) drop-shadow(0 1px 2px rgba(36, 24, 10, 0.22));
+}
+
+/* 4. Form Content & Page Transition Wrapper */
+.bl-auth-paper-inner {
+  position: relative;
+  z-index: 2;
+  animation: blInkFadeIn 0.32s ease-out both;
+}
+
+@keyframes blPaperArrive {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes blInkFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bl-auth-paper-sheet,
+  .bl-auth-paper-inner {
+    animation: none !important;
+  }
+}
+
+/* 5. Literary Header & Typography */
+.bl-auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.bl-auth-kicker {
+  display: block;
+  font-family: var(--serif, Georgia, "Times New Roman", serif);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #7d664c;
+  margin-bottom: 6px;
+}
+
+.bl-auth-title {
+  font-family: var(--serif, "Cormorant Garamond", Georgia, serif);
+  font-size: clamp(28px, 3.4vw, 35px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: #281d13;
+  margin: 0 0 6px 0;
+}
+
+.bl-auth-subtitle {
+  font-family: var(--serif, "Cormorant Garamond", Georgia, serif);
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.45;
+  color: #5e4b38;
+  margin: 0 auto;
+  max-width: 420px;
+}
+
+/* 6. Alerts / Validation Messages on Paper */
+.bl-auth-alert {
+  padding: 11px 14px;
+  margin-bottom: 18px;
+  border-radius: 2px;
+  font-family: var(--sans, -apple-system, BlinkMacSystemFont, sans-serif);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.bl-auth-alert--error {
+  background-color: rgba(158, 52, 44, 0.09);
+  border: 1px solid rgba(158, 52, 44, 0.38);
+  border-left: 3px solid #96342c;
+  color: #7a231c;
+}
+
+.bl-auth-alert--success {
+  background-color: rgba(68, 102, 54, 0.1);
+  border: 1px solid rgba(68, 102, 54, 0.36);
+  border-left: 3px solid #446636;
+  color: #2f4b23;
+}
+
+/* 7. Form Fields — Tactile Stationery Lines */
+.bl-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.bl-auth-form--compact {
+  gap: 12px;
+}
+
+.bl-auth-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.bl-auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.bl-auth-label {
+  font-family: var(--serif, Georgia, "Times New Roman", serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #4a3928;
+}
+
+.bl-auth-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bl-auth-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-family: var(--sans, -apple-system, BlinkMacSystemFont, sans-serif);
+  font-size: 13.5px;
+  color: #241a10;
+  background-color: rgba(255, 251, 243, 0.58);
+  border: 1px solid rgba(162, 138, 106, 0.52);
+  border-bottom: 1.5px solid rgba(128, 102, 70, 0.72);
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bl-auth-input::placeholder {
+  color: rgba(114, 93, 68, 0.54);
+  font-style: italic;
+}
+
+.bl-auth-input:focus {
+  background-color: rgba(255, 253, 248, 0.88);
+  border-color: #7c562e;
+  box-shadow: 0 2px 8px rgba(92, 67, 40, 0.1);
+}
+
+.bl-auth-input--with-toggle {
+  padding-right: 62px;
+}
+
+.bl-auth-pw-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 11.5px;
+  font-style: italic;
+  color: #6e5840;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.bl-auth-pw-toggle:hover {
+  color: #2c2117;
+  text-decoration: underline;
+}
+
+.bl-auth-field-hint {
+  font-size: 11px;
+  color: #78624a;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.bl-auth-field-hint--error {
+  color: #8c2921;
+}
+
+.bl-auth-field-hint--valid {
+  color: #3d612f;
+}
+
+/* 8. Auxiliary Options Row (Remember me & Forgot password) */
+.bl-auth-aux-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -2px;
+  font-size: 12.5px;
+}
+
+.bl-auth-checkbox-label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: var(--sans, sans-serif);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #4f3e2d;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bl-auth-checkbox {
+  margin-top: 2px;
+  width: 14px;
+  height: 14px;
+  accent-color: #5c4328;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.bl-auth-text-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 13px;
+  font-style: italic;
+  color: #6b4c2b;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.bl-auth-text-btn:hover {
+  color: #281d13;
+}
+
+/* 9. Handcrafted Archival Buttons */
+.bl-auth-submit-btn {
+  width: 100%;
+  min-height: 43px;
+  margin-top: 4px;
+  padding: 10px 20px;
+  font-family: var(--serif, Georgia, "Times New Roman", serif);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #fbf5e9;
+  background-color: #4a3520;
+  border: 1px solid #362514;
+  border-radius: 2px;
+  box-shadow:
+    0 3px 8px rgba(44, 33, 23, 0.2),
+    inset 0 1px 0 rgba(255, 245, 228, 0.18);
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.bl-auth-submit-btn:hover:not(:disabled) {
+  background-color: #3b2917;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(44, 33, 23, 0.26);
+}
+
+.bl-auth-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.bl-auth-submit-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+/* Divider ("or") */
+.bl-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: #846d53;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+.bl-auth-divider::before,
+.bl-auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 123, 92, 0.45),
+    transparent
+  );
+}
+
+/* Google Authentication Button on Stationery */
+.bl-auth-google-btn {
+  width: 100%;
+  min-height: 41px;
+  padding: 9px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--serif, Georgia, "Times New Roman", serif);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #362718;
+  background-color: rgba(255, 251, 243, 0.72);
+  border: 1px solid rgba(145, 118, 84, 0.62);
+  border-radius: 2px;
+  box-shadow: 0 2px 5px rgba(44, 33, 23, 0.07);
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+}
+
+.bl-auth-google-btn:hover:not(:disabled) {
+  background-color: rgba(255, 253, 248, 0.96);
+  border-color: #6b4c2b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(44, 33, 23, 0.12);
+}
+
+.bl-auth-google-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 10. Footer Switcher */
+.bl-auth-footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(166, 141, 108, 0.32);
+  text-align: center;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14px;
+  color: #5c4936;
+}
+
+.bl-auth-footer-link {
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  margin-left: 5px;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #4a3319;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.bl-auth-footer-link:hover {
+  color: #1f1409;
+}
+
+/* Terms Inline Note */
+.bl-auth-terms-box {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background-color: rgba(239, 226, 204, 0.65);
+  border: 1px solid rgba(166, 141, 108, 0.45);
+  border-radius: 2px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #4d3b29;
+}
+
+/* OTP Input styling */
+.bl-auth-otp-input {
+  text-align: center;
+  letter-spacing: 0.45em;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: "Courier New", Courier, monospace;
+  padding: 11px 14px;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ============================================================================ */
+@media (max-width: 640px) {
+  .bl-auth-viewport {
+    padding: 58px 14px 28px;
+    align-items: center;
+  }
+
+  .bl-auth-back-home {
+    top: 12px;
+    left: 12px;
+    padding: 5px 11px;
+    font-size: 13px;
+  }
+
+  .bl-auth-paper-sheet {
+    padding: 36px 22px 28px;
+  }
+
+  .bl-auth-kraft-tape {
+    width: 122px;
+    top: -22px;
+  }
+
+  .bl-auth-field-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .bl-auth-title {
+    font-size: 26px;
+  }
+
+  .bl-auth-subtitle {
+    font-size: 14.5px;
+  }
+
+  .bl-auth-aux-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

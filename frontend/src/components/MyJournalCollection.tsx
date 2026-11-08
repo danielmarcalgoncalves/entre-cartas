@@ -191,7 +191,10 @@ export default function MyJournalCollection({
                 key={nb.id}
                 className={`tome-book-item tome-book-color--${theme.id}`}
                 style={{ backgroundColor: theme.shelfBg }}
-                onClick={() => abrirCadernoParaLeitura(nb)}
+                onClick={() => {
+                  playPaperSound();
+                  router.push(`/notebook?id=${encodeURIComponent(nb.id)}`);
+                }}
                 whileHover={{ y: -6 }}
                 transition={{ duration: 0.2 }}
               >
@@ -240,10 +243,21 @@ export default function MyJournalCollection({
                     <button
                       type="button"
                       className="tome-action-btn tome-action-btn--primary"
-                      onClick={() => abrirCadernoParaLeitura(nb)}
-                      title={`Open and read "${nb.nome}"`}
+                      onClick={() => {
+                        playPaperSound();
+                        router.push(`/notebook?id=${encodeURIComponent(nb.id)}`);
+                      }}
+                      title={`Open and browse realistic 3D journal "${nb.nome}"`}
                     >
-                      Open Journal
+                      View Journal
+                    </button>
+                    <button
+                      type="button"
+                      className="tome-action-btn"
+                      onClick={() => abrirCadernoParaLeitura(nb)}
+                      title={`Quick read "${nb.nome}"`}
+                    >
+                      Quick Read
                     </button>
                     <button
                       type="button"

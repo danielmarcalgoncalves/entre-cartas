@@ -14,7 +14,7 @@ export interface TryItNowButtonProps {
 export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>(
   (
     {
-      href = "/journal",
+      href = "/login",
       label = "TRY IT NOW",
       className = "",
       onClick,
@@ -32,17 +32,8 @@ export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>
         return;
       }
 
-      // Check if a journal desk/shelf exists on the current page
-      const journalSection =
-        document.getElementById("journal-desk") ||
-        document.getElementById("journal-shelf");
-      if (journalSection) {
-        e.preventDefault();
-        journalSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      } else {
-        e.preventDefault();
-        router.push(href);
-      }
+      e.preventDefault();
+      router.push(href);
     };
 
     // Interactive 3D tilt tracking the cursor, matching the notebook display
@@ -53,7 +44,6 @@ export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
 
-      // Natural, tactile paper tilt
       const rotX = ((y - centerY) / centerY) * -6;
       const rotY = ((x - centerX) / centerX) * 6;
 
@@ -83,7 +73,6 @@ export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>
       }
     };
 
-    // Combine forwarded ref from parent GSAP context with internal tilt ref
     const setCombinedRef = (node: HTMLAnchorElement | null) => {
       buttonRef.current = node;
       if (typeof forwardedRef === "function") {
@@ -105,8 +94,8 @@ export const TryItNowButton = forwardRef<HTMLAnchorElement, TryItNowButtonProps>
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           className={`try-it-now-vintage-ticket ${className}`}
-          aria-label={`${label} — Open your writing desk`}
-          title="Click to open your journal and explore handwritten entries"
+          aria-label={`${label} — Enter Between Letters`}
+          title="Click to sign in or create your Between Letters account"
         >
           {/* Inner vintage printed ticket line */}
           <span className="vintage-ticket-inner-border" aria-hidden="true" />

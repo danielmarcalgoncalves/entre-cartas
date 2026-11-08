@@ -1,22 +1,56 @@
 /**
- * Serviço de Comunicação com a API do Entre Cartas
- * Conecta o Frontend Next.js aos endpoints do Backend Express
+ * API Communication Service for Between Letters (Entre Cartas)
+ * Connects the Next.js Frontend to the Express Backend endpoints
  */
 
 const API_BASE = '/api';
+const SESSION_TOKEN_STORAGE_KEY = 'entre-cartas:auth:token';
 
 let inMemoryToken: string | null = null;
 
 export function getToken(): string | null {
-  return inMemoryToken;
+  if (inMemoryToken) return inMemoryToken;
+  if (typeof window !== 'undefined') {
+    try {
+      const saved =
+        window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
+        window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+      if (saved) {
+        inMemoryToken = saved;
+        return saved;
+      }
+    } catch {}
+  }
+  return null;
 }
 
-export function setSession(token: string | null) {
+export function setSession(token: string | null, persist = true) {
   inMemoryToken = token;
+  if (typeof window !== 'undefined') {
+    try {
+      if (token) {
+        if (persist) {
+          window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+        } else {
+          window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+          window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        }
+      } else {
+        window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+      }
+    } catch {}
+  }
 }
 
 export function clearSession() {
   inMemoryToken = null;
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+      window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+    } catch {}
+  }
 }
 
 async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -110,10 +144,10 @@ export const api = {
 
   auth: {
     me: () => apiRequest('/auth/me'),
-    login: (email: string, senha: string) =>
+    login: (email: string, senha: string, rememberMe = true) =>
       apiRequest('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, senha }),
+        body: JSON.stringify({ email, senha, rememberMe }),
       }),
     register: (nome: string, email: string, senha: string) =>
       apiRequest('/auth/register', {
@@ -130,6 +164,19 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ email }),
       }),
+    forgotPassword: (email: string) =>
+      apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+    validateResetToken: (token: string) =>
+      apiRequest(`/auth/reset-password/validate?token=${encodeURIComponent(token)}`),
+    resetPassword: (token: string, novaSenha: string) =>
+      apiRequest('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, novaSenha }),
+      }),
+    googleStatus: () => apiRequest<{ configured: boolean }>('/auth/google/status'),
     logout: () =>
       apiRequest('/auth/logout', {
         method: 'POST',

@@ -1,39 +1,65 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import React, { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 import AuthCard from "@/components/AuthCard";
+import "./auth-paper.css";
 
-export default function LoginPage() {
+function LoginExperienceContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, loading } = useAuth();
+
+  const isResetFlow =
+    searchParams?.get("mode") === "reset" ||
+    Boolean(searchParams?.get("token") && searchParams?.get("oauth") !== "success");
+
+  // Redirect authenticated users visiting /login directly to My Desk
+  useEffect(() => {
+    if (!loading && user && !isResetFlow) {
+      router.replace("/my-desk");
+    }
+  }, [loading, user, isResetFlow, router]);
 
   const handleSuccess = () => {
     router.push("/my-desk");
   };
 
   return (
-    <div
-      className="page-shell"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "calc(100vh - 220px)",
-        padding: "30px 16px 50px",
-      }}
-    >
-      <div style={{ marginBottom: "22px", textAlign: "center" }}>
-        <Link
-          href="/"
-          className="text-link"
-          style={{ fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
-        >
-          <span>←</span> Return to sanctuary
-        </Link>
+    <div className="bl-auth-viewport">
+      {/* Full-screen softly blurred vintage photograph of trees and warm sky */}
+      <div className="bl-auth-bg-layer" aria-hidden="true">
+        <div className="bl-auth-bg-photo" />
+        <div className="bl-auth-bg-vignette" />
       </div>
 
-      <AuthCard onSuccess={handleSuccess} initialMode="choice" />
+      {/* Subtle return link to public landing page */}
+      <Link href="/" className="bl-auth-back-home">
+        <span aria-hidden="true">&larr;</span>
+        <span>Between Letters</span>
+      </Link>
+
+      {/* Central Aged Paper Sheet & Kraft Tape Authentication Card */}
+      <AuthCard onSuccess={handleSuccess} initialMode="login" />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bl-auth-viewport">
+          <div className="bl-auth-bg-layer" aria-hidden="true">
+            <div className="bl-auth-bg-photo" />
+            <div className="bl-auth-bg-vignette" />
+          </div>
+        </div>
+      }
+    >
+      <LoginExperienceContent />
+    </Suspense>
   );
 }

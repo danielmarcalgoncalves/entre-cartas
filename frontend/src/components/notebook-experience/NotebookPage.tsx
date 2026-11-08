@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  type Notebook,
+  type NotebookPage as StoredNotebookPage,
+  getFontFamilyById,
+  getInkColorById,
+  getPaperColorById,
+  getNotebookDates,
+} from "@/lib/journal-storage";
+
+
 import React, { type ReactNode } from "react";
 
 export type PageSide = "left" | "right";
@@ -502,3 +512,325 @@ export function ColophonSanctuaryPage() {
 }
 
 export default NotebookPage;
+
+/* ============================================================================
+ * REAL USER JOURNAL PAGE RENDERERS — DATA INTEGRATION
+ * ============================================================================ */
+
+export interface JournalUserPageProps {
+  page: StoredNotebookPage;
+  pageNumber: string;
+  side: PageSide;
+  notebookName: string;
+}
+
+/**
+ * Renders the EXACT user content of a saved journal page on a physical sheet.
+ * Faithfully preserves written text, titles, dates, fonts, inks, paper tones,
+ * favorited wax seals, and attached photographs.
+ */
+export function JournalUserPage({
+  page,
+  pageNumber,
+  side,
+  notebookName,
+}: JournalUserPageProps) {
+  const paperColor = getPaperColorById(page.tipoPapel);
+  const inkColor = getInkColorById(page.corTinta);
+  const fontFamily = getFontFamilyById(page.fonte || "caveat");
+
+  // Extract attached photo/polaroid if present in content or properties
+  let imageUrl: string | null = (page as any).polaroid_url || null;
+  let imageCaption: string | null = (page as any).polaroid_legenda || null;
+  let cleanContent = page.conteudo || "";
+
+  const markdownImgMatch = cleanContent.match(/!\[(.*?)\]\((.*?)\)/);
+  if (markdownImgMatch) {
+    if (!imageUrl) {
+      imageUrl = markdownImgMatch[2];
+      imageCaption = markdownImgMatch[1] || null;
+    }
+    cleanContent = cleanContent.replace(/!\[(.*?)\]\((.*?)\)/g, "").trim();
+  }
+
+  const hasContent = cleanContent.trim().length > 0;
+  const hasTitle = Boolean(page.titulo && page.titulo.trim().length > 0);
+
+  return (
+    <div
+      className="nb-user-entry-page"
+      style={{
+        backgroundColor: paperColor,
+        color: inkColor,
+      }}
+    >
+      {/* Subtle ruled notebook lines */}
+      <div className="nb-user-ruled-lines" aria-hidden="true">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <span key={i} className="nb-user-rule-line" />
+        ))}
+      </div>
+
+      <div className="nb-user-entry-content">
+        {/* Top Header: Date & Favorited Wax Heart Stamp */}
+        <div className="nb-user-entry-header">
+          <span className="nb-user-entry-date">
+            {page.dataFormatada || "Recorded Entry"}
+          </span>
+          {page.favoritado && (
+            <span className="nb-user-favorite-stamp" title="Favorited entry in your archive">
+              ♥ FAVORITED
+            </span>
+          )}
+        </div>
+
+        {/* Entry Title */}
+        {hasTitle && (
+          <h3
+            className="nb-user-entry-title"
+            style={{
+              fontFamily: fontFamily.includes("cursive") ? "'Cormorant Garamond', Georgia, serif" : fontFamily,
+              color: inkColor,
+            }}
+          >
+            {page.titulo}
+          </h3>
+        )}
+
+        {/* Optional Attached Polaroid Photograph */}
+        {imageUrl && (
+          <div className={`nb-user-polaroid-wrap ${side === "left" ? "nb-user-polaroid--left" : "nb-user-polaroid--right"}`}>
+            <div className="nb-mini-polaroid">
+              <span className="nb-washi nb-washi--top" aria-hidden="true" />
+              <div className="nb-mini-polaroid__img-wrap">
+                <img src={imageUrl} alt={imageCaption || "Journal photograph"} loading="lazy" />
+              </div>
+              {imageCaption && <span className="nb-mini-polaroid__cap">{imageCaption}</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Written Journal Text */}
+        <div
+          className="nb-user-entry-body"
+          style={{
+            fontFamily,
+            color: inkColor,
+          }}
+        >
+          {hasContent ? (
+            cleanContent
+          ) : (
+            <em className="nb-user-entry-empty">
+              This page contains no written text yet.
+            </em>
+          )}
+        </div>
+
+        {/* Page Footer Folio */}
+        <div className="nb-user-entry-footer">
+          <span className="nb-user-volume-tag">VOL · {notebookName}</span>
+          <span className="nb-user-page-folio">P. {pageNumber}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface JournalFrontispiecePageProps {
+  notebook: Notebook;
+}
+
+/**
+ * Dedicated Frontispiece / Ex-Libris plate for the user's saved journal volume.
+ */
+export function JournalFrontispiecePage({ notebook }: JournalFrontispiecePageProps) {
+  const dates = getNotebookDates(notebook);
+  const writtenCount = (notebook.paginas || []).filter(
+    (p) => Boolean(p.conteudo && p.conteudo.trim().length > 0) || Boolean(p.titulo && p.titulo.trim().length > 0)
+  ).length;
+
+  return (
+    <div className="nb-comp nb-comp--frontispiece">
+      <div className="nb-bookplate">
+        <span className="nb-washi nb-washi--top" aria-hidden="true" />
+
+        <div className="nb-bookplate__border">
+          <span className="nb-kicker">EX LIBRIS · PERSONAL VOLUME</span>
+
+          {/* Chamomile & olive sprig crest */}
+          <svg
+            className="nb-botanical-crest nb-float-slow"
+            viewBox="0 0 120 76"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M60 68C60 50 59 34 60 16"
+              stroke="#5b533b"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+            <path
+              d="M60 52C48 48 39 40 34 30M60 44C72 39 81 32 86 22M60 60C49 58 42 54 36 48"
+              stroke="#6d6549"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+            <g transform="translate(60, 16)">
+              <ellipse cx="0" cy="-9" rx="3" ry="6" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="0" cy="9" rx="3" ry="6" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="-9" cy="0" rx="6" ry="3" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="9" cy="0" rx="6" ry="3" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="-6.5" cy="-6.5" rx="4.5" ry="2.6" transform="rotate(45 -6.5 -6.5)" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="6.5" cy="-6.5" rx="4.5" ry="2.6" transform="rotate(-45 6.5 -6.5)" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="-6.5" cy="6.5" rx="4.5" ry="2.6" transform="rotate(-45 -6.5 6.5)" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <ellipse cx="6.5" cy="6.5" rx="4.5" ry="2.6" transform="rotate(45 6.5 6.5)" fill="#fbf7ee" stroke="#9e8c6c" strokeWidth="0.8" />
+              <circle cx="0" cy="0" r="4.8" fill="#cfa96f" stroke="#8a6836" strokeWidth="0.9" />
+            </g>
+          </svg>
+
+          <h2 className="nb-serif-heading">{notebook.nome}</h2>
+          <p className="nb-bookplate__motto">
+            This private volume holds authentic thoughts, unhurried memories,
+            and personal reflections recorded in Between Letters.
+          </p>
+
+          <div className="nb-signature-line">
+            <span className="nb-signature-label">CHRONICLE BOUND</span>
+            <span className="nb-hand-script nb-signature-script">
+              {writtenCount} {writtenCount === 1 ? "page recorded" : "pages recorded"}
+            </span>
+          </div>
+
+          <div className="nb-stamp-row">
+            <span className="nb-ink-postmark">
+              BEGUN: {dates.created.toUpperCase()}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface JournalColophonPageProps {
+  notebook: Notebook;
+  onContinueWriting?: () => void;
+  onBackToShelf?: () => void;
+}
+
+/**
+ * Sanctuary closing plate at the end of the user's journal volume.
+ */
+export function JournalColophonPage({
+  notebook,
+  onContinueWriting,
+  onBackToShelf,
+}: JournalColophonPageProps) {
+  const dates = getNotebookDates(notebook);
+  const writtenCount = (notebook.paginas || []).filter(
+    (p) => Boolean(p.conteudo && p.conteudo.trim().length > 0) || Boolean(p.titulo && p.titulo.trim().length > 0)
+  ).length;
+
+  return (
+    <div className="nb-comp nb-comp--colophon">
+      <div className="nb-colophon-frame">
+        <span className="nb-colophon-ornament" aria-hidden="true">
+          ❧
+        </span>
+        <span className="nb-kicker">COLOPHON · PERSONAL ARCHIVE</span>
+        <h3 className="nb-serif-heading">{notebook.nome}</h3>
+
+        <ul className="nb-colophon-list">
+          <li>
+            <strong>I. Archival Record</strong>
+            <span>
+              {writtenCount} {writtenCount === 1 ? "page" : "pages"} preserved in this volume.
+            </span>
+          </li>
+          <li>
+            <strong>II. Last Chronicle</strong>
+            <span>Recorded on {dates.updated}.</span>
+          </li>
+          <li>
+            <strong>III. Personal Sanctuary</strong>
+            <span>Saved permanently in your private browser archive.</span>
+          </li>
+        </ul>
+
+        <div className="nb-colophon-actions-row">
+          {onContinueWriting && (
+            <button
+              type="button"
+              className="nb-colophon-btn nb-colophon-btn--primary"
+              onClick={onContinueWriting}
+            >
+              <span>Continue Writing ✎</span>
+            </button>
+          )}
+          {onBackToShelf && (
+            <button
+              type="button"
+              className="nb-colophon-btn"
+              onClick={onBackToShelf}
+            >
+              <span>Back to My Shelf ↗</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface JournalEmptyPromptPageProps {
+  notebook: Notebook;
+  onContinueWriting?: () => void;
+}
+
+/**
+ * Shown on Page 1 if the journal has not yet received written text.
+ */
+export function JournalEmptyPromptPage({
+  notebook,
+  onContinueWriting,
+}: JournalEmptyPromptPageProps) {
+  return (
+    <div className="nb-comp nb-comp--first-lines">
+      <div className="nb-ruled-sheet">
+        <div className="nb-ruled-sheet__lines" aria-hidden="true">
+          {Array.from({ length: 14 }).map((_, i) => (
+            <span key={i} />
+          ))}
+        </div>
+
+        <div className="nb-date-stamp">
+          <span className="nb-date-stamp__day">PAGE 01</span>
+          <span className="nb-date-stamp__meta">AWAITING FIRST WORDS</span>
+        </div>
+
+        <h3 className="nb-sheet-title">Your story begins here.</h3>
+
+        <p className="nb-sheet-paragraph nb-hand-script" style={{ fontSize: "20px", lineHeight: "34px", color: "#3a2d21" }}>
+          This volume has been bound and awaits your honest thoughts.
+          Sit down with your favorite beverage, let the quiet settle in,
+          and begin your first entry.
+        </p>
+
+        {onContinueWriting && (
+          <div style={{ marginTop: "24px" }}>
+            <button
+              type="button"
+              className="nb-colophon-btn nb-colophon-btn--primary"
+              onClick={onContinueWriting}
+              style={{ padding: "10px 18px", fontSize: "13px" }}
+            >
+              <span>Start Writing on the Desk ✎</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -145,6 +145,8 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   const isPresentationPage =
     pathname === "/" ||
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
     pathname === "/notebook" ||
     pathname.startsWith("/notebook/");
 

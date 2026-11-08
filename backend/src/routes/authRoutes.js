@@ -10,17 +10,27 @@ const {
   validateRegistrationInput
 } = require('../middlewares/security');
 
-// Autenticação com proteção Anti-Brute Force e Anti-Bot (OWASP ZAP)
+// Email/Password & OTP Authentication
 router.post('/register', registerLimiter, validateRegistrationInput, authController.register);
 router.post('/verify-code', verifyCodeLimiter, authController.verifyCode);
+router.post('/verify-email', verifyCodeLimiter, authController.verifyCode);
 router.post('/resend-code', verifyCodeLimiter, authController.resendCode);
+router.post('/resend-verification', verifyCodeLimiter, authController.resendCode);
 router.post('/login', loginLimiter, authController.login);
 router.post('/logout', authController.logout);
 router.get('/me', authMiddleware, authController.me);
+
+// Password Recovery & Reset
 router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPassword);
+router.get('/reset-password/validate', authController.validateResetToken);
 router.post('/reset-password', forgotPasswordLimiter, authController.resetPassword);
 
-// Rotas de administração de usuários (RBAC - proteção estrita de nível Admin)
+// Google OAuth 2.0
+router.get('/google/status', authController.googleAuthStatus);
+router.get('/google', authController.googleAuthRedirect);
+router.get('/google/callback', authController.googleAuthCallback);
+
+// RBAC Admin Routes
 router.get('/users', authMiddleware, requireAdmin, authController.listUsers);
 router.patch('/users/:id/role', authMiddleware, requireAdmin, authController.updateUserRole);
 router.delete('/users/:id', authMiddleware, requireAdmin, authController.deleteUser);

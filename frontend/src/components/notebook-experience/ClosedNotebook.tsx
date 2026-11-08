@@ -1,26 +1,39 @@
 "use client";
 
 import React, { useRef } from "react";
+import { type NotebookColorOption, getNotebookTheme } from "@/lib/journal-storage";
 
 export interface ClosedNotebookProps {
   isClosed: boolean;
   isAnimating: boolean;
   onOpen: () => void;
   onHoverTilt?: (rotX: number, rotY: number, isHovering: boolean) => void;
+  notebookTitle?: string;
+  notebookColor?: string;
+  theme?: NotebookColorOption;
+  createdDate?: string;
+  totalPages?: number;
 }
 
 /**
- * Pure CSS Artisan Leather Cover (Rustic Brown #42220b per AGENTS.md Rule 4).
- * Renders embossed gold framing, raised spine binding & stitching, central gold foil
- * emblem, and silk bookmark ribbon, with subtle interactive hover physics when closed.
+ * Pure CSS Artisan Leather Cover adapting dynamically to user-selected color
+ * (Rustic Brown, Botanical Green, Noble Burgundy, Obsidian Black).
+ * Features perimeter saddle stitching, embossed gold framing, raised spine hubs,
+ * central gold foil medallion, dynamic journal title, and silk bookmark ribbon.
  */
 export function ClosedNotebook({
   isClosed,
   isAnimating,
   onOpen,
   onHoverTilt,
+  notebookTitle = "Between Letters",
+  notebookColor,
+  theme: explicitTheme,
+  createdDate,
+  totalPages,
 }: ClosedNotebookProps) {
   const rafRef = useRef<number | null>(null);
+  const theme = explicitTheme || getNotebookTheme(notebookColor);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!isClosed || isAnimating || !onHoverTilt) return;
@@ -49,10 +62,12 @@ export function ClosedNotebook({
     }
   };
 
+  const displayTitle = notebookTitle?.trim() || "Between Letters";
+
   return (
     <button
       type="button"
-      className={`nb-leather-cover ${
+      className={`nb-leather-cover nb-leather-cover--${theme.id} ${
         isClosed ? "nb-leather-cover--interactive" : "nb-leather-cover--opened"
       }`}
       onClick={() => {
@@ -64,14 +79,17 @@ export function ClosedNotebook({
       onMouseLeave={handleMouseLeave}
       onKeyDown={handleKeyDown}
       disabled={!isClosed || isAnimating}
-      aria-label="Closed leather journal — Click to open Between Letters notebook"
-      title={isClosed ? "Click to open notebook" : undefined}
+      aria-label={`Closed leather journal "${displayTitle}" — Click to open and read`}
+      title={isClosed ? `Click to open "${displayTitle}"` : undefined}
     >
-      {/* Subtle grain & aged leather patina */}
+      {/* Subtle organic leather grain & aged patina */}
       <span className="nb-leather-cover__grain" aria-hidden="true" />
       <span className="nb-leather-cover__sheen" aria-hidden="true" />
 
-      {/* Left bound spine crease, raised hubs, and saddle stitching */}
+      {/* Perimeter saddle stitching contouring the outer cover border */}
+      <span className="nb-leather-cover__edge-stitch" aria-hidden="true" />
+
+      {/* Left bound spine band, raised ribs, and binding seam */}
       <span className="nb-leather-cover__spine-band" aria-hidden="true">
         <span className="nb-spine-rib nb-spine-rib--1" />
         <span className="nb-spine-rib nb-spine-rib--2" />
@@ -89,7 +107,9 @@ export function ClosedNotebook({
 
         {/* Central embossed cartouche */}
         <span className="nb-leather-cover__cartouche">
-          <span className="nb-cover-kicker">ARCHIVE OF SENTIMENTS</span>
+          <span className="nb-cover-kicker">
+            {theme.etiqueta.toUpperCase()} · ARCHIVE
+          </span>
 
           {/* Gold-stamped wax/botanical medallion SVG */}
           <svg
@@ -131,17 +151,27 @@ export function ClosedNotebook({
             <circle cx="42" cy="64" r="1.8" fill="rgba(232, 198, 138, 0.85)" />
           </svg>
 
-          <span className="nb-cover-title">Between Letters</span>
+          <span className="nb-cover-title">{displayTitle}</span>
           <span className="nb-cover-rule" />
           <span className="nb-cover-subtitle">
-            Personal Memory &amp; Correspondence Volume
+            Personal Memory &amp; Reflection Volume
           </span>
-          <span className="nb-cover-edition">VOL. I · HAND-BOUND EDITION</span>
+          <span className="nb-cover-edition">
+            {typeof totalPages === "number" && totalPages > 0
+              ? `${totalPages} ${totalPages === 1 ? "PAGE" : "PAGES"} RECORDED · ARCHIVAL EDITION`
+              : createdDate
+              ? `BOUND ${createdDate.toUpperCase()}`
+              : "HAND-BOUND PERSONAL EDITION"}
+          </span>
         </span>
       </span>
 
-      {/* Amber-gold silk bookmark ribbon peeking from bottom edge */}
-      <span className="nb-silk-ribbon" aria-hidden="true" />
+      {/* Silk bookmark ribbon in matching theme color peeking from bottom edge */}
+      <span
+        className={`nb-silk-ribbon nb-silk-ribbon--${theme.id}`}
+        style={{ backgroundColor: theme.ribbonColor }}
+        aria-hidden="true"
+      />
     </button>
   );
 }
