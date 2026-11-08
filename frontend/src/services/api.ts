@@ -92,6 +92,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(dados),
       }),
+    atualizar: (id: string | number, dados: any) =>
+      apiRequest(`/cartas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(dados),
+      }),
+    excluir: (id: string | number) =>
+      apiRequest(`/cartas/${id}`, {
+        method: 'DELETE',
+      }),
     adicionarNota: (id: string | number, texto: string) =>
       apiRequest(`/cartas/${id}/notas`, {
         method: 'POST',

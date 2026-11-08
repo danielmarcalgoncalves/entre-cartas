@@ -21,6 +21,10 @@ router.get('/:id', optionalAuth, cartasController.obterCartaPorId);
 // 5. Enviar uma nova carta para o acervo (anônima ou autenticada)
 router.post('/', optionalAuth, cartasController.criarCarta);
 
+// 5.1 Atualizar ou excluir uma carta escrita pelo próprio usuário autenticado
+router.put('/:id', authMiddleware, cartasController.atualizarMinhaCarta);
+router.delete('/:id', authMiddleware, cartasController.excluirMinhaCarta);
+
 // 6. Carimbar e guardar carta na caixa de memórias (com limite do Plano Free)
 router.post('/:id/carimbar', authMiddleware, cartasController.carimbarCarta);
 

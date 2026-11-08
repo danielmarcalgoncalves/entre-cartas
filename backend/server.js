@@ -93,11 +93,11 @@ if (fs.existsSync(path.join(publicPath, 'index.html'))) {
 }
 
 if (staticPath) {
-  app.use(express.static(staticPath));
+  app.use(express.static(staticPath, { redirect: false, extensions: ['html'] }));
   app.get('*', (req, res) => {
     // Se for rota da API, retorna 404 JSON
     if (req.path.startsWith('/api')) {
-      return res.status(404).json({ error: 'Rota de API não encontrada' });
+      return res.status(404).json({ error: 'API route not found' });
     }
 
     // Se existir arquivo HTML estático gerado para esta rota específica (ex: /discover.html, /clube-pro.html)

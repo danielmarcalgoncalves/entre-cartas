@@ -97,7 +97,7 @@ export default function AuthCard({
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "24px" }}>
           <Link
-            href="/journal"
+            href="/my-desk"
             className="primary-cta"
             style={{
               textAlign: "center",
@@ -108,7 +108,7 @@ export default function AuthCard({
               border: "1px solid rgba(207, 169, 111, 0.4)",
             }}
           >
-            Go to My Journal ↗
+            Go to My Desk ↗
           </Link>
 
           <button

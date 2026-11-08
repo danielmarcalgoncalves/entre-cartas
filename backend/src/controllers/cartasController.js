@@ -173,16 +173,16 @@ async function criarCarta(req, res) {
     } = req.body;
 
     if (!titulo || !titulo.trim()) {
-      return res.status(400).json({ error: 'O título da carta é obrigatório.' });
+      return res.status(400).json({ error: 'Letter title is required.' });
     }
 
-    if (!conteudo || !conteudo.trim() || conteudo.trim().length < 20) {
-      return res.status(400).json({ error: 'O conteúdo da carta deve ter pelo menos 20 caracteres.' });
+    if (!conteudo || !conteudo.trim() || conteudo.trim().length < 5) {
+      return res.status(400).json({ error: 'Letter content must contain at least 5 characters.' });
     }
 
-    // Regra de negócio de cotas de cartas escritas:
-    // - Usuário Normal: máximo de 10 cartas
-    // - Usuário Premium: máximo de 30 cartas
+    // Business rule for written letter quotas:
+    // - Standard User: max 10 letters
+    // - Pro Sender User: max 30 letters
     if (usuarioId) {
       const isPremium = papelUsuario === 'premium' || papelUsuario === 'admin';
       const limiteCartas = isPremium ? 30 : 10;
@@ -202,8 +202,8 @@ async function criarCarta(req, res) {
         });
         return res.status(403).json({
           error: isPremium
-            ? `Você atingiu o limite de ${limiteCartas} cartas do Plano Premium.`
-            : `Você atingiu o limite de ${limiteCartas} cartas do Plano Normal. Assine o Clube Premium para ter até 30 cartas!`,
+            ? `You have reached the limit of ${limiteCartas} archived letters on the Premium Plan.`
+            : `You have reached the limit of ${limiteCartas} letters on the Standard Plan. Join Pro Club to write up to 30 letters!`,
           isLimitReached: true,
           limite: limiteCartas,
           upgradeToPremium: !isPremium
@@ -218,12 +218,12 @@ async function criarCarta(req, res) {
         usuarioId,
         titulo.trim(),
         conteudo.trim(),
-        remetente_anonimo ? remetente_anonimo.trim() : 'Anônimo',
+        remetente_anonimo ? remetente_anonimo.trim() : 'Anonymous',
         destinatario_anonimo ? destinatario_anonimo.trim() : null,
         categoria,
         tipo_papel,
         lacre_cera_cor,
-        data_carta || 'Hoje'
+        data_carta || 'Today'
       ]
     );
 
@@ -235,18 +235,18 @@ async function criarCarta(req, res) {
     });
 
     return res.status(201).json({
-      message: 'Carta depositada na caixa de memórias com sucesso!',
+      message: 'Letter sealed and archived in your memory box!',
       carta: {
         id: result.insertId,
         titulo,
         categoria,
         tipo_papel,
-        remetente_anonimo: remetente_anonimo || 'Anônimo'
+        remetente_anonimo: remetente_anonimo || 'Anonymous'
       }
     });
   } catch (error) {
     console.error('[Cartas Controller] Erro ao criar carta:', error);
-    return res.status(500).json({ error: 'Erro ao selar e enviar a carta.' });
+    return res.status(500).json({ error: 'Unable to seal and save the letter.' });
   }
 }
 
@@ -485,7 +485,85 @@ async function listarMinhasCartas(req, res) {
     });
   } catch (error) {
     console.error('[Cartas Controller] Erro ao listar cartas do usuário:', error);
-    return res.status(500).json({ error: 'Erro ao carregar suas páginas de diário.' });
+    return res.status(500).json({ error: 'Unable to load your archived letters.' });
+  }
+}
+
+// 10. Atualizar carta do próprio autor autenticado
+async function atualizarMinhaCarta(req, res) {
+  try {
+    const usuarioId = req.usuarioId;
+    const { id } = req.params;
+    const {
+      titulo,
+      conteudo,
+      destinatario_anonimo,
+      categoria,
+      tipo_papel
+    } = req.body;
+
+    if (!titulo || !titulo.trim()) {
+      return res.status(400).json({ error: 'Letter title is required.' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, conteudo, destinatario_anonimo, categoria, tipo_papel FROM cartas WHERE id = ? AND usuario_id = ?',
+      [id, usuarioId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Letter not found for this account.' });
+    }
+
+    const existing = rows[0];
+    const nextConteudo = conteudo !== undefined ? conteudo.trim() : existing.conteudo;
+    const nextDestinatario = destinatario_anonimo !== undefined ? (destinatario_anonimo ? destinatario_anonimo.trim() : null) : existing.destinatario_anonimo;
+    const nextCategoria = categoria || existing.categoria;
+    const nextPapel = tipo_papel || existing.tipo_papel;
+
+    await pool.query(
+      `UPDATE cartas
+       SET titulo = ?, conteudo = ?, destinatario_anonimo = ?, categoria = ?, tipo_papel = ?
+       WHERE id = ? AND usuario_id = ?`,
+      [titulo.trim(), nextConteudo, nextDestinatario, nextCategoria, nextPapel, id, usuarioId]
+    );
+
+    return res.json({
+      message: 'Letter updated successfully.',
+      carta: {
+        id: Number(id),
+        titulo: titulo.trim(),
+        conteudo: nextConteudo,
+        destinatario_anonimo: nextDestinatario,
+        categoria: nextCategoria,
+        tipo_papel: nextPapel
+      }
+    });
+  } catch (error) {
+    console.error('[Cartas Controller] Erro ao atualizar carta:', error);
+    return res.status(500).json({ error: 'Unable to update the letter.' });
+  }
+}
+
+// 11. Excluir carta do próprio autor autenticado
+async function excluirMinhaCarta(req, res) {
+  try {
+    const usuarioId = req.usuarioId;
+    const { id } = req.params;
+
+    const [result] = await pool.query(
+      'DELETE FROM cartas WHERE id = ? AND usuario_id = ?',
+      [id, usuarioId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Letter not found for this account.' });
+    }
+
+    return res.json({ message: 'Letter deleted permanently.' });
+  } catch (error) {
+    console.error('[Cartas Controller] Erro ao excluir carta:', error);
+    return res.status(500).json({ error: 'Unable to delete the letter.' });
   }
 }
 
@@ -497,6 +575,8 @@ module.exports = {
   descarimbarCarta,
   listarCartasGuardadas,
   listarMinhasCartas,
+  atualizarMinhaCarta,
+  excluirMinhaCarta,
   obterCategorias,
   adicionarNotaCarta
 };

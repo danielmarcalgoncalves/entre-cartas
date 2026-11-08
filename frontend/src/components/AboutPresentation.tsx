@@ -166,19 +166,19 @@ export default function AboutPresentation() {
               className="about-btn-primary"
               id="enter-journal-primary-btn"
             >
-              Open My Journal Desk ↗
+              Open Journal ↗
             </Link>
             <Link
-              href="/discover"
+              href="/letters"
               className="about-btn-secondary"
             >
-              Explore Archival Letters
+              Write a Letter ✉
             </Link>
             <Link
-              href="/clube-pro"
-              className="about-btn-tertiary"
+              href="/my-shelf"
+              className="about-btn-secondary"
             >
-              Pro Sender Club ✦
+              Visit My Shelf ✦
             </Link>
           </div>
         </div>

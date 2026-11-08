@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import gsap from "gsap";
+import { useAuth } from "@/hooks/useAuth";
 import LandingBackground from "./LandingBackground";
 import LandingTitle from "./LandingTitle";
 import NotebookDisplay from "./NotebookDisplay";
@@ -28,16 +30,25 @@ export function BetweenLettersLanding({
   eyebrow = "A PLACE FOR THINGS WORTH REMEMBERING",
   title = "BETWEEN LETTERS",
   flourish = "✦",
-  ctaHref = "/journal",
+  ctaHref = "/my-desk",
   ctaLabel = "TRY IT NOW",
   className = "",
 }: BetweenLettersLandingProps) {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [activeTheme, setActiveTheme] = useState<"sunset" | "meadow">("sunset");
   const heroRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLElement>(null);
   const journalRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLAnchorElement>(null);
+
+  // If the user is already authenticated and accesses the entry route, redirect directly to My Desk
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/my-desk");
+    }
+  }, [loading, user, router]);
 
   // Automatically cycle between the two backgrounds every 15 seconds
   useEffect(() => {
