@@ -195,6 +195,27 @@ export const api = {
       }),
   },
 
+  profile: {
+    get: () => apiRequest('/profile'),
+    update: (dados: { nome?: string; bio?: string | null; onboarding_concluido?: boolean }) =>
+      apiRequest('/profile', {
+        method: 'PUT',
+        body: JSON.stringify(dados),
+      }),
+    uploadAvatar: async (formData: FormData) => {
+      const token = getToken();
+      const res = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to upload photograph');
+      return data;
+    },
+  },
+
   admin: {
     getLogs: () => apiRequest('/admin/logs'),
   },

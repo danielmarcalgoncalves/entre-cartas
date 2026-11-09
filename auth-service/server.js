@@ -106,6 +106,7 @@ async function ensureAuthSchema() {
           google_id VARCHAR(255) DEFAULT NULL,
           ultimo_login TIMESTAMP NULL DEFAULT NULL,
           status_conta VARCHAR(30) DEFAULT 'ativo',
+          onboarding_concluido BOOLEAN DEFAULT FALSE,
           criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
@@ -484,7 +485,7 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid authentication token.' });
     }
 
-    const [users] = await pool.query('SELECT id, nome, email, papel, email_verificado, foto_url, bio, auth_provider FROM usuarios WHERE id = ?', [decoded.id]);
+    const [users] = await pool.query('SELECT id, nome, email, papel, email_verificado, foto_url, bio, auth_provider, onboarding_concluido FROM usuarios WHERE id = ?', [decoded.id]);
     if (users.length === 0) {
       return res.status(401).json({ error: 'User account not found or revoked.' });
     }
@@ -949,7 +950,7 @@ app.post('/oauth/google', async (req, res) => {
 app.get('/me', authMiddleware, async (req, res) => {
   try {
     const [users] = await pool.query(
-      'SELECT id, nome, email, papel, foto_url, bio, auth_provider, ultimo_login, criado_em FROM usuarios WHERE id = ?',
+      'SELECT id, nome, email, papel, foto_url, bio, auth_provider, onboarding_concluido, ultimo_login, criado_em FROM usuarios WHERE id = ?',
       [req.usuarioId]
     );
     if (users.length === 0) return res.status(404).json({ error: 'User not found.' });

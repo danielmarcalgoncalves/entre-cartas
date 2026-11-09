@@ -12,6 +12,7 @@ export interface User {
   auth_provider?: string;
   foto_url?: string | null;
   bio?: string | null;
+  onboarding_concluido?: boolean | number;
 }
 
 interface AuthContextType {

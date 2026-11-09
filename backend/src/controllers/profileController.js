@@ -24,7 +24,7 @@ const { sendLog } = require('../services/logClient');
 async function getProfile(req, res) {
   try {
     const [rows] = await pool.query(
-      'SELECT id, nome, email, papel, foto_url, bio, criado_em FROM usuarios WHERE id = ?',
+      'SELECT id, nome, email, papel, foto_url, bio, onboarding_concluido, criado_em FROM usuarios WHERE id = ?',
       [req.usuarioId]
     );
     if (rows.length === 0) {
@@ -77,9 +77,9 @@ async function updateProfile(req, res) {
       });
     }
 
-    const { nome, bio } = req.body;
+    const { nome, bio, onboarding_concluido } = req.body;
 
-    if (!nome && bio === undefined) {
+    if (!nome && bio === undefined && onboarding_concluido === undefined) {
       return res.status(400).json({ error: 'Nenhum campo enviado para atualizar.' });
     }
 
@@ -99,11 +99,16 @@ async function updateProfile(req, res) {
       values.push(bio ? bio.trim().slice(0, 500) : null);
     }
 
+    if (onboarding_concluido !== undefined) {
+      fields.push('onboarding_concluido = ?');
+      values.push(Boolean(onboarding_concluido) ? 1 : 0);
+    }
+
     values.push(req.usuarioId);
     await pool.query('UPDATE usuarios SET ' + fields.join(', ') + ' WHERE id = ?', values);
 
     const [rows] = await pool.query(
-      'SELECT id, nome, email, papel, foto_url, bio FROM usuarios WHERE id = ?',
+      'SELECT id, nome, email, papel, foto_url, bio, onboarding_concluido FROM usuarios WHERE id = ?',
       [req.usuarioId]
     );
 

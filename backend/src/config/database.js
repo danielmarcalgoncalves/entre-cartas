@@ -38,6 +38,7 @@ async function initDb(retries = 15, delay = 2000) {
         google_id VARCHAR(255) DEFAULT NULL,
         ultimo_login TIMESTAMP NULL DEFAULT NULL,
         status_conta VARCHAR(30) DEFAULT 'ativo',
+        onboarding_concluido BOOLEAN DEFAULT FALSE,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
