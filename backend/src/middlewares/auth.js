@@ -35,7 +35,7 @@ async function authMiddleware(req, res, next) {
 
   if (!token) {
     return res.status(401).json({
-      error: 'Acesso negado. Token de autenticação não fornecido.'
+      error: 'Access denied. Authentication token not provided.'
     });
   }
 
@@ -44,33 +44,34 @@ async function authMiddleware(req, res, next) {
 
     if (!decoded || !decoded.id) {
       return res.status(401).json({
-        error: 'Token inválido. Identificador de usuário ausente.'
+        error: 'Invalid authentication token: missing user identifier.'
       });
     }
 
     // Consulta no MariaDB para validar em tempo real (Defesa Anti-IDOR e Anti-Privilege Escalation)
     const [rows] = await pool.query(
-      'SELECT id, nome, email, papel, email_verificado, foto_url, bio FROM usuarios WHERE id = ?',
+      'SELECT id, nome, email, papel, email_verificado, foto_url, bio, onboarding_concluido FROM usuarios WHERE id = ?',
       [decoded.id]
     );
 
     if (rows.length === 0) {
       return res.status(401).json({
-        error: 'Sessão inválida: Usuário não encontrado ou conta revogada.'
+        error: 'Invalid session: User account not found or revoked.'
       });
     }
 
     const usuarioDb = rows[0];
 
-    // Bloqueia contas cujo e-mail ainda não foi confirmado via OTP
-    if (usuarioDb.email_verificado === 0 || usuarioDb.email_verificado === false) {
+    // Bloqueia contas se a verificação de e-mail estiver explicitamente ativada
+    const requireVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+    if (requireVerification && (usuarioDb.email_verificado === 0 || usuarioDb.email_verificado === false)) {
       sendLog('ACESSO_BLOQUEADO_403', req, {
         motivo: 'E-mail não verificado',
         usuario_id: usuarioDb.id,
         email: usuarioDb.email
       });
       return res.status(403).json({
-        error: 'Acesso bloqueado: Seu e-mail ainda não foi confirmado. Por favor, valide o código de verificação enviado.',
+        error: 'Access restricted: Your email address has not been confirmed yet. Please verify your account with the code sent to your inbox.',
         requireVerification: true,
         email: usuarioDb.email
       });
@@ -89,13 +90,14 @@ async function authMiddleware(req, res, next) {
       role: papelFinal,
       email_verificado: !!usuarioDb.email_verificado,
       foto_url: usuarioDb.foto_url || null,
-      bio: usuarioDb.bio || null
+      bio: usuarioDb.bio || null,
+      onboarding_concluido: usuarioDb.onboarding_concluido === 1 || usuarioDb.onboarding_concluido === true
     };
 
     next();
   } catch (error) {
     return res.status(401).json({
-      error: 'Token inválido ou expirado. Faça login novamente.'
+      error: 'Invalid or expired authentication token. Please sign in again.'
     });
   }
 }
@@ -116,9 +118,9 @@ function requireRole(...papeisPermitidos) {
         papeisPermitidos
       });
       return res.status(403).json({
-        error: 'Acesso proibido (403 Forbidden). Seu papel de usuário não possui permissão para realizar esta ação sensível.',
-        papelAtual: papelUsuario || 'desconhecido',
-        papeisPermitidos
+        error: 'Access forbidden (403 Forbidden). Your account permissions do not allow this action.',
+        currentRole: papelUsuario || 'unknown',
+        allowedRoles: papeisPermitidos
       });
     }
     next();
@@ -129,10 +131,10 @@ function requireAdmin(req, res, next) {
   const role = req.usuarioPapel || (req.usuario && (req.usuario.papel || req.usuario.role));
   if (role !== 'admin') {
     sendLog('BLOQUEIO_RBAC_ADMIN_403', req, {
-      motivo: 'Tentativa de acesso não autorizado a recurso administrativo',
-      papelAtual: role || 'desconhecido'
+      motivo: 'Unauthorized access attempt to administrative resource',
+      papelAtual: role || 'unknown'
     });
-    return res.status(403).json({ error: 'Acesso permitido apenas para administradores.' });
+    return res.status(403).json({ error: 'Access restricted to administrators only.' });
   }
   next();
 }

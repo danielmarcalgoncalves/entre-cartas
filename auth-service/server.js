@@ -142,7 +142,8 @@ async function ensureAuthSchema() {
         `ALTER TABLE usuarios ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'local'`,
         `ALTER TABLE usuarios ADD COLUMN google_id VARCHAR(255) DEFAULT NULL`,
         `ALTER TABLE usuarios ADD COLUMN ultimo_login TIMESTAMP NULL DEFAULT NULL`,
-        `ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo'`
+        `ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo'`,
+        `ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE`
       ];
 
       for (const q of alterQueries) {
@@ -788,13 +789,19 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email address or password.' });
     }
 
-    if (usuario.email_verificado === 0 || usuario.email_verificado === false) {
+    const requireOtpFlow = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+
+    if (requireOtpFlow && (usuario.email_verificado === 0 || usuario.email_verificado === false)) {
       sendLog('BLOQUEIO_EMAIL_NAO_VERIFICADO_403', req, { email: usuario.email, usuario_id: usuario.id });
       return res.status(403).json({
         error: 'Your email address has not been confirmed yet. Please enter the 6-digit verification code sent to your inbox.',
         requireVerification: true,
         email: usuario.email
       });
+    } else if (!requireOtpFlow && (usuario.email_verificado === 0 || usuario.email_verificado === false)) {
+      // Auto-verify legacy unverified accounts when email verification requirement is turned off
+      await pool.query('UPDATE usuarios SET email_verificado = TRUE WHERE id = ?', [usuario.id]).catch(() => {});
+      usuario.email_verificado = 1;
     }
 
     await pool.query('UPDATE usuarios SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?', [usuario.id]).catch(() => {});

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { api, setSession, clearSession } from "@/services/api";
 
 export interface User {
@@ -40,6 +41,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -69,9 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (res.usuario) {
       setUser(res.usuario);
-    } else {
-      await refreshUser();
     }
+    await refreshUser();
     return res;
   };
 
@@ -81,9 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(res.token, true);
       if (res.usuario) {
         setUser(res.usuario);
-      } else {
-        await refreshUser();
       }
+      await refreshUser();
     }
     return res;
   };
@@ -99,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
     clearSession();
     setUser(null);
+    // Smooth client navigation to landing page preserving personal data
+    router.push("/");
   };
 
   const isPro = user?.papel === "premium" || user?.papel === "admin";

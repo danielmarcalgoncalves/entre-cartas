@@ -6382,6 +6382,22 @@ body,
   gap: 0;
 }
 
+.site-header--vertical.is-collapsed:not(:hover) .nav-link--settings {
+  justify-content: center;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.site-header--vertical.is-collapsed:not(:hover) .sidebar-collapsible-content,
+.site-header--vertical.is-collapsed:not(:hover) .nav-link-chevron {
+  display: none !important;
+  margin: 0 !important;
+}
+
+.site-header--vertical.is-collapsed:not(:hover) .nav-link .nav-link-symbol {
+  margin: 0 auto;
+}
+
 .site-header--vertical .nav-link:hover {
   background: rgba(207, 169, 111, 0.1);
   color: var(--color-pollen);

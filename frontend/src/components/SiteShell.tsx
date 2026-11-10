@@ -85,7 +85,6 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   const [isFocusedInside, setIsFocusedInside] = useState(false);
   const [isPinnedOpen, setIsPinnedOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   const headerRef = useRef<HTMLElement | null>(null);
@@ -93,29 +92,8 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   const isSidebarExpanded = isHovered || isFocusedInside || isPinnedOpen;
 
-  // Sync user's profile photo from Auth context or local storage fallback
-  useEffect(() => {
-    const readLocalAvatar = () => {
-      try {
-        const saved =
-          window.localStorage.getItem("entre-cartas:profile:avatar") ||
-          window.localStorage.getItem("entre-cartas:user:avatar");
-        setLocalAvatar(saved || null);
-      } catch {
-        setLocalAvatar(null);
-      }
-    };
-
-    readLocalAvatar();
-    window.addEventListener("storage", readLocalAvatar);
-    window.addEventListener("entre-cartas:profile-updated", readLocalAvatar);
-    return () => {
-      window.removeEventListener("storage", readLocalAvatar);
-      window.removeEventListener("entre-cartas:profile-updated", readLocalAvatar);
-    };
-  }, []);
-
-  const profilePhotoUrl = user?.foto_url || localAvatar || null;
+  // Authoritative single profile photo from the authenticated user context
+  const profilePhotoUrl = user?.foto_url || null;
 
   useEffect(() => {
     setAvatarLoadError(false);

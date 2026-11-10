@@ -28,21 +28,32 @@ async function requestAuthService(config) {
   }
 }
 
-function setAuthCookie(res, token, rememberMe = false) {
+function isSecureConnection(req) {
+  const appUrl = (process.env.APP_URL || '').toLowerCase();
+  if (appUrl.startsWith('https://')) return true;
+  if (req && (req.secure || req.headers['x-forwarded-proto'] === 'https')) return true;
+  return false;
+}
+
+function setAuthCookie(res, token, rememberMe = false, req = null) {
   const days = rememberMe ? 30 : 7;
+  const isHttps = isSecureConnection(req);
   res.cookie('access_token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: Boolean(isHttps),
     sameSite: 'lax',
+    path: '/',
     maxAge: days * 24 * 60 * 60 * 1000
   });
 }
 
-function clearAuthCookie(res) {
+function clearAuthCookie(res, req = null) {
+  const isHttps = isSecureConnection(req);
   res.clearCookie('access_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
+    secure: Boolean(isHttps),
+    sameSite: 'lax',
+    path: '/'
   });
 }
 
@@ -95,7 +106,7 @@ async function register(req, res) {
     });
 
     if (response.data && response.data.token) {
-      setAuthCookie(res, response.data.token, true);
+      setAuthCookie(res, response.data.token, true, req);
       if (response.data.usuario) {
         response.data.usuario.role = response.data.usuario.papel || 'usuario';
       }
@@ -119,7 +130,7 @@ async function login(req, res) {
     });
 
     if (response.data && response.data.token) {
-      setAuthCookie(res, response.data.token, Boolean(req.body?.rememberMe));
+      setAuthCookie(res, response.data.token, Boolean(req.body?.rememberMe), req);
       if (response.data.usuario) {
         response.data.usuario.role = response.data.usuario.papel || 'usuario';
         if (!response.data.usuario.foto_url) {
@@ -157,7 +168,7 @@ async function logout(req, res) {
     usuario_id: req.usuarioId || req.usuario?.id || 'session_ended',
     motivo
   });
-  clearAuthCookie(res);
+  clearAuthCookie(res, req);
   return res.json({ message: 'Signed out successfully.' });
 }
 
@@ -257,13 +268,17 @@ function googleAuthRedirect(req, res) {
   const clientId = process.env.GOOGLE_CLIENT_ID.trim();
   const redirectUri = resolveGoogleCallbackUrl(req);
   const state = crypto.randomBytes(24).toString('hex');
+  const isHttps = isSecureConnection(req);
 
   res.cookie('oauth_state', state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: Boolean(isHttps),
     sameSite: 'lax',
+    path: '/',
     maxAge: 10 * 60 * 1000 // 10 minutes
   });
+
+  sendLog('GOOGLE_OAUTH_START', req, { redirectUri });
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authUrl.searchParams.set('client_id', clientId);
@@ -357,7 +372,7 @@ async function googleAuthCallback(req, res) {
       return res.redirect('/login?error=google_session_failed');
     }
 
-    setAuthCookie(res, token, true);
+    setAuthCookie(res, token, true, req);
     sendLog('LOGIN_GOOGLE_SUCESSO', req, {
       usuario_id: usuario?.id,
       email: usuario?.email
@@ -417,7 +432,7 @@ async function verifyCode(req, res) {
       data: req.body
     });
     if (response.data && response.data.token) {
-      setAuthCookie(res, response.data.token, true);
+      setAuthCookie(res, response.data.token, true, req);
       if (response.data.usuario) {
         response.data.usuario.role = response.data.usuario.papel || 'usuario';
       }

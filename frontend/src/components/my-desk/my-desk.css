@@ -1,13 +1,9 @@
 /* ============================================================================
-   BETWEEN LETTERS — MY DESK (COMPLETE VISUAL RECONSTRUCTION)
-   Every object on the desk is an independent visual asset with its own
-   positioning, shadow layer, GSAP physical movement, and interaction:
-   1. Bare Dark Walnut Wooden Desk Surface (desk-wood-bg-hd.jpg)
-   2. Independent Vintage Instant Camera (desk-camera-only.png)
-   3. Independent Tilted Polaroid Frame (desk-polaroid-frame.png) + Exact Inner Window
-   4. Independent Leather Journal (desk-journal-clean.png) -> /journal
-   5. Independent Vintage Handwritten Envelope (desk-envelope-clean.png) -> /letters
-   6. Independent About Me Tag + Tall Narrow Paper Emerging from Viewport Bottom
+   BETWEEN LETTERS — MY DESK (COHESIVE ART-DIRECTED COMPOSITION)
+   1. Left Column: Polaroid Portrait + "About Me" Note & Sliding Biography Page
+      positioned directly underneath the Polaroid.
+   2. Center Stage: Handcrafted Heirloom Leather Notebook (/journal).
+   3. Right Column: Vintage Wax-Sealed Correspondence Parcel (/letters).
    ============================================================================ */
 
 .desk-page-container {
@@ -18,86 +14,82 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background-color: #1c0d06;
   background-image: url("/images/nova-ui/desk-wood-bg-hd.jpg");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
   user-select: none;
-  perspective: 1400px;
+  padding: 28px 32px;
+  box-sizing: border-box;
 }
 
 /* Warm overhead cinematic lighting and vignette across the wooden desk */
 .desk-ambient-lighting {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background:
     radial-gradient(
-      ellipse 72% 68% at 50% 46%,
-      rgba(255, 214, 165, 0.08) 0%,
-      rgba(40, 18, 7, 0.22) 62%,
-      rgba(12, 5, 2, 0.68) 100%
+      ellipse 76% 72% at 52% 46%,
+      rgba(255, 218, 170, 0.09) 0%,
+      rgba(38, 17, 6, 0.24) 62%,
+      rgba(10, 4, 1, 0.72) 100%
     );
   pointer-events: none;
   z-index: 1;
 }
 
-/* Master overhead composition stage preserving the 16:9 artistic arrangement */
+/* ============================================================================
+   MASTER THREE-ZONE DESK COMPOSITION STAGE
+   Balanced spatial arrangement with zero camera clutter or empty corners
+   ============================================================================ */
 .desk-composition-stage {
   position: relative;
   width: 100%;
-  max-width: 1520px;
-  height: 100vh;
-  height: 100dvh;
-  max-height: 920px;
+  max-width: 1380px;
+  min-height: min(86vh, 780px);
   margin: 0 auto;
   z-index: 2;
-  transform-style: preserve-3d;
+  display: grid;
+  grid-template-columns: minmax(260px, 315px) minmax(300px, 390px) minmax(270px, 355px);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(24px, 3.5vw, 56px);
+  perspective: 1400px;
 }
 
 /* ============================================================================
-   1. VINTAGE INSTANT CAMERA (UPPER-LEFT — INDEPENDENT OBJECT)
-   Positioned in the top-left corner, overlapping the top slot of the Polaroid
+   ZONE 1 (LEFT COLUMN): POLAROID PORTRAIT + ABOUT ME NOTE & BIOGRAPHY PAGE
    ============================================================================ */
-.desk-camera-object {
-  position: absolute;
-  left: -0.4%;
-  top: -0.8%;
-  width: clamp(210px, 25.5vw, 370px);
-  aspect-ratio: 275 / 135;
-  z-index: 18;
-  pointer-events: none;
-  filter: drop-shadow(0 16px 24px rgba(8, 3, 1, 0.78))
-          drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
-  will-change: transform;
-}
-
-.desk-camera-img {
+.desk-personal-column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: flex-start;
+  padding-top: 8px;
   width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
+  z-index: 25;
 }
 
-/* ============================================================================
-   2. VINTAGE POLAROID (UPPER-LEFT — INDEPENDENT TILTING OBJECT)
-   Rotated at -17.25deg to match the reference ejection angle from the camera.
-   Inside its local coordinate system (220 x 268):
-   - Inner photo window is an exact rectangle:
-     left: 7.73%, top: 5.97%, width: 84.55%, height: 68.28%
-   - Polaroid paper frame PNG overlays with a transparent window cutout,
-     making it impossible for the user photo to overlap the white frame or caption.
-   ============================================================================ */
+.desk-polaroid-anchor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
 .desk-polaroid-wrapper {
-  position: absolute;
-  left: 4.2%;
-  top: 12.2%;
-  width: clamp(148px, 15.6vw, 232px);
+  position: relative;
+  width: clamp(190px, 16.5vw, 232px);
   aspect-ratio: 220 / 268;
-  z-index: 14;
-  transform-origin: 48% 12%;
-  transform: rotate(-17.25deg);
+  z-index: 20;
+  transform-origin: 50% 50%;
+  transform: rotate(-2.4deg);
   cursor: pointer;
   outline: none;
   will-change: transform;
@@ -106,9 +98,9 @@
 /* Independent physical shadow beneath the Polaroid on the wooden surface */
 .desk-polaroid-shadow {
   position: absolute;
-  inset: 3% 2% -4% 4%;
-  background: rgba(10, 4, 1, 0.68);
-  filter: blur(11px);
+  inset: 3% 2% -5% 4%;
+  background: rgba(8, 3, 1, 0.72);
+  filter: blur(12px);
   border-radius: 3px;
   z-index: 0;
   pointer-events: none;
@@ -215,7 +207,7 @@
   opacity: 1;
 }
 
-/* Hover action badge inside the top-right of the photo window */
+/* Hover action badge inside the bottom-right of the photo window */
 .polaroid-window-hover-pill {
   position: absolute;
   bottom: 6px;
@@ -268,7 +260,7 @@
 
 .polaroid-caption-name {
   font-family: var(--serif, "Playfair Display", "Times New Roman", Georgia, serif);
-  font-size: clamp(12px, 1.38vw, 19px);
+  font-size: clamp(13px, 1.3vw, 18px);
   font-weight: 500;
   letter-spacing: 0.06em;
   color: #1b130d;
@@ -295,7 +287,7 @@
   border: 1px solid #6e4b2a;
   border-radius: 2px;
   font-family: var(--serif, "Playfair Display", Georgia, serif);
-  font-size: clamp(11px, 1.2vw, 16px);
+  font-size: clamp(11px, 1.15vw, 15px);
   font-weight: 600;
   letter-spacing: 0.05em;
   color: #1b130d;
@@ -308,17 +300,17 @@
 /* Floating Crop & Reposition Toolbar next to the Polaroid */
 .polaroid-crop-toolbar {
   position: absolute;
-  left: 22.5%;
-  top: 17%;
-  z-index: 40;
+  left: calc(100% + 8px);
+  top: 16px;
+  z-index: 50;
   background: #f5ead8;
   background-image: url("/images/nova-ui/auth-paper-texture.jpg");
   background-size: cover;
   border: 1px solid #7a5634;
-  border-radius: 3px;
+  border-radius: 4px;
   box-shadow: 0 14px 34px rgba(8, 3, 1, 0.72);
   padding: 12px 14px;
-  width: 230px;
+  width: 225px;
   color: #26170b;
   font-family: var(--serif, Georgia, serif);
 }
@@ -387,34 +379,450 @@
 }
 
 /* ============================================================================
-   3. CENTRAL LEATHER JOURNAL (INDEPENDENT PHYSICAL OBJECT -> /journal)
-   Positioned near the center of the desk with natural rotation (-3.5deg),
-   independent cast shadow, and GSAP physical elevation + tilt on hover.
+   ABOUT ME — DIRECTLY BELOW THE POLAROID PHOTO
+   1. Vintage Archival Paper Label Button immediately under the Polaroid
+   2. Biography Manuscript Page sliding upward directly underneath the Polaroid
+   ============================================================================ */
+.desk-about-under-polaroid {
+  position: relative;
+  width: 100%;
+  max-width: 305px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 24;
+}
+
+/* Dedicated "About Me" Paper Note Button */
+.desk-about-note-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 176px;
+  padding: 10px 22px 9px;
+  background-color: #efe2cc;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 251, 243, 0.72) 0%,
+      rgba(235, 220, 196, 0.5) 100%
+    ),
+    url("/images/nova-ui/auth-paper-texture.jpg");
+  background-size: cover;
+  border: 1px solid rgba(142, 110, 74, 0.75);
+  border-radius: 3px;
+  box-shadow:
+    0 8px 20px rgba(7, 3, 1, 0.62),
+    0 2px 5px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 3px rgba(244, 234, 216, 0.65),
+    inset 0 0 0 4px rgba(138, 104, 68, 0.32);
+  color: #26160a;
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+  transform: rotate(0.8deg);
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    background-color 0.2s ease;
+  z-index: 26;
+}
+
+.desk-about-note-btn:hover {
+  transform: translateY(-3px) rotate(0deg);
+  background-color: #f6ecdb;
+  box-shadow:
+    0 12px 26px rgba(7, 3, 1, 0.72),
+    0 3px 7px rgba(0, 0, 0, 0.48),
+    inset 0 0 0 3px rgba(250, 242, 228, 0.8),
+    inset 0 0 0 4px rgba(138, 104, 68, 0.45);
+}
+
+.desk-about-note-btn:focus-visible {
+  outline: 2px solid #d4af72;
+  outline-offset: 3px;
+}
+
+.desk-about-note-btn.is-active {
+  transform: rotate(0deg);
+  background-color: #f6ecdb;
+}
+
+/* Miniature antique brass pin at top center of the About Me note tab */
+.desk-about-note-btn__pin {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f3d292 0%, #b58438 65%, #5e3d12 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.desk-about-note-btn__ornament {
+  font-size: 11px;
+  color: #8c5d2e;
+  line-height: 1;
+}
+
+.desk-about-note-btn__label {
+  line-height: 1;
+}
+
+.desk-about-note-btn__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b4724;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.desk-about-note-btn__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* ============================================================================
+   BIOGRAPHY MANUSCRIPT PAGE — SLIDES UPWARD DIRECTLY UNDERNEATH POLAROID
+   - Begins hidden below (translateY(42px), opacity: 0, max-height: 0)
+   - When clicked, slides upward into view directly below the Polaroid
+   ============================================================================ */
+.desk-bio-under-sheet {
+  position: relative;
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  overflow: hidden;
+  transform: translateY(42px) scale(0.97);
+  transform-origin: top center;
+  pointer-events: none;
+  transition:
+    transform 0.46s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.34s ease,
+    max-height 0.46s cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 0.36s ease,
+    visibility 0.46s;
+  z-index: 25;
+}
+
+.desk-bio-under-sheet.is-open {
+  max-height: 430px;
+  opacity: 1;
+  visibility: visible;
+  margin-top: 10px;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  overflow: visible;
+}
+
+.desk-bio-paper-surface {
+  position: relative;
+  width: 100%;
+  background-color: #f4ead7;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 251, 244, 0.72) 0%,
+      rgba(242, 231, 212, 0.45) 50%,
+      rgba(224, 206, 180, 0.68) 100%
+    ),
+    url("/images/nova-ui/auth-paper-texture.jpg");
+  background-size: cover;
+  border: 1px solid rgba(145, 114, 78, 0.78);
+  border-radius: 4px;
+  box-shadow:
+    0 18px 38px rgba(6, 2, 0, 0.76),
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 0 24px rgba(168, 136, 96, 0.22);
+  padding: 16px 18px 15px;
+  box-sizing: border-box;
+  color: #24160a;
+}
+
+.desk-bio-paper-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed rgba(132, 100, 66, 0.42);
+}
+
+.desk-bio-paper-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.desk-bio-paper-kicker {
+  font-family: var(--sans, sans-serif);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #845c34;
+}
+
+.desk-bio-paper-heading {
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: #1f1208;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.desk-bio-close-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(130, 98, 64, 0.38);
+  background: rgba(90, 58, 28, 0.06);
+  color: #4a2f16;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.desk-bio-close-btn:hover {
+  background: rgba(90, 58, 28, 0.16);
+  transform: scale(1.06);
+}
+
+.desk-bio-paper-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Reading Mode */
+.desk-bio-reading-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.desk-bio-content-text {
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: 14px;
+  line-height: 24px;
+  color: #26170b;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 192px;
+  overflow-y: auto;
+  padding: 2px 4px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 23px,
+    rgba(138, 108, 76, 0.2) 24px
+  );
+}
+
+.desk-bio-empty-message {
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: 14px;
+  line-height: 1.65;
+  font-style: italic;
+  color: #5c4026;
+  margin: 0;
+  padding: 12px 6px;
+  text-align: center;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 23px,
+    rgba(138, 108, 76, 0.16) 24px
+  );
+}
+
+.desk-bio-reading-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(132, 100, 66, 0.32);
+}
+
+.desk-bio-author-sign {
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: 12px;
+  font-style: italic;
+  color: #6b4a2b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-bio-edit-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 3px;
+  border: 1px solid rgba(92, 60, 30, 0.45);
+  background: rgba(92, 60, 30, 0.08);
+  color: #38200d;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.desk-bio-edit-trigger:hover {
+  background: #3b210e;
+  color: #f8eedb;
+  border-color: #261407;
+}
+
+/* Edit Mode */
+.desk-bio-edit-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.desk-bio-textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 180px;
+  background: rgba(255, 252, 245, 0.55);
+  border: 1px solid rgba(132, 100, 66, 0.48);
+  border-radius: 3px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 23px,
+    rgba(138, 108, 76, 0.2) 24px
+  );
+  font-family: var(--serif, Georgia, "Times New Roman", serif);
+  font-size: 13.5px;
+  line-height: 24px;
+  color: #231409;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+}
+
+.desk-bio-textarea:focus {
+  border-color: #5e3a1a;
+  box-shadow: inset 0 0 0 1px rgba(94, 58, 26, 0.3);
+}
+
+.desk-bio-edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(132, 100, 66, 0.28);
+}
+
+.desk-bio-char-counter {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 11px;
+  color: #6a4929;
+}
+
+.desk-bio-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.desk-bio-btn-cancel {
+  padding: 5px 11px;
+  background: transparent;
+  border: 1px solid rgba(92, 60, 30, 0.45);
+  border-radius: 2px;
+  color: #4a2f16;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.desk-bio-btn-cancel:hover:not(:disabled) {
+  background: rgba(92, 60, 30, 0.1);
+}
+
+.desk-bio-btn-save {
+  padding: 5px 14px;
+  background: #3b210e;
+  border: 1px solid #241306;
+  border-radius: 2px;
+  color: #f7ecda;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.desk-bio-btn-save:hover:not(:disabled) {
+  background: #241306;
+}
+
+.desk-bio-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   ZONE 2 (CENTER): REDESIGNED HEIRLOOM ARTISAN NOTEBOOK (-> /journal)
+   Bespoke handcrafted editorial leather volume with exact proportions,
+   cream deckled page edges, spine ribs, gold-leaf filigree & silk ribbon
    ============================================================================ */
 .desk-journal-object {
-  position: absolute;
-  left: 33.2%;
-  top: 8.5%;
-  width: clamp(230px, 31.5vw, 465px);
-  aspect-ratio: 330 / 505;
-  z-index: 15;
+  position: relative;
+  justify-self: center;
+  width: clamp(265px, 24.5vw, 358px);
+  aspect-ratio: 340 / 472;
+  z-index: 18;
   cursor: pointer;
   text-decoration: none;
   outline: none;
   transform-style: preserve-3d;
   will-change: transform;
+  display: block;
 }
 
-/* Separate physical cast shadow resting on the wood beneath the leather journal */
+.desk-journal-object:focus-visible {
+  outline: 2px solid #d4af72;
+  outline-offset: 8px;
+  border-radius: 8px;
+}
+
+/* Physical cast shadow resting on the walnut wood beneath the notebook */
 .desk-journal-shadow {
   position: absolute;
-  inset: 3.5% 4% 2.5% 5%;
-  background: rgba(6, 2, 0, 0.82);
-  filter: blur(14px);
-  border-radius: 8px;
+  inset: 3% 2% -2% 4%;
+  background: rgba(5, 2, 0, 0.84);
+  filter: blur(16px);
+  border-radius: 10px;
   z-index: 0;
   pointer-events: none;
-  transform: translate(6px, 10px);
+  transform: translate(8px, 14px);
   will-change: transform, filter, opacity;
 }
 
@@ -423,48 +831,436 @@
   width: 100%;
   height: 100%;
   z-index: 1;
+  transform-style: preserve-3d;
   will-change: transform;
 }
 
-.desk-journal-img {
+/* 1. Back Hardcover Board & Cream Deckled Paper Stack Fore-Edges */
+.desk-book__backboard {
+  position: absolute;
+  inset: 2px -8px -7px 3px;
+  border-radius: 4px 11px 11px 4px;
+  background: linear-gradient(145deg, #3c1e0a 0%, #281205 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(218, 179, 112, 0.38),
+    0 6px 16px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.desk-book__pages-right {
+  position: absolute;
+  top: 7px;
+  bottom: 4px;
+  right: -5px;
+  width: 11px;
+  border-radius: 0 3px 3px 0;
+  background: repeating-linear-gradient(
+    90deg,
+    #f4ecdc 0px,
+    #f4ecdc 1.5px,
+    #d2c2a8 1.5px,
+    #d2c2a8 2.6px
+  );
+  box-shadow:
+    inset 2px 0 4px rgba(45, 26, 10, 0.35),
+    1px 0 2px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.desk-book__pages-bottom {
+  position: absolute;
+  left: 10px;
+  right: -3px;
+  bottom: -4px;
+  height: 9px;
+  border-radius: 0 0 4px 2px;
+  background: repeating-linear-gradient(
+    0deg,
+    #efe5d2 0px,
+    #efe5d2 1.5px,
+    #cbbba0 1.5px,
+    #cbbba0 2.6px
+  );
+  box-shadow: inset 0 2px 4px rgba(45, 26, 10, 0.38);
+  pointer-events: none;
+}
+
+/* 2. Silk Bookmark Ribbon Tail */
+.desk-book__silk-ribbon {
+  position: absolute;
+  bottom: -22px;
+  left: 28%;
+  width: 16px;
+  height: 28px;
+  background: linear-gradient(180deg, #7c1f28 0%, #9e2b36 55%, #68171f 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  filter: drop-shadow(0 5px 6px rgba(10, 3, 1, 0.65));
+  z-index: 0;
+  transition: transform 0.35s ease;
+  pointer-events: none;
+}
+
+.desk-journal-object:hover .desk-book__silk-ribbon {
+  transform: translateY(3px) rotate(-3deg);
+}
+
+/* 3. Main Hand-Tooled Leather Cover */
+.desk-book__leather-cover {
+  position: relative;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  display: block;
-  filter: drop-shadow(0 6px 12px rgba(8, 3, 1, 0.65));
-  user-select: none;
-  -webkit-user-drag: none;
+  border-radius: 4px 10px 10px 4px;
+  border: 1px solid rgba(116, 70, 32, 0.88);
+  background:
+    radial-gradient(
+      ellipse 82% 74% at 54% 40%,
+      rgba(108, 60, 24, 0.46) 0%,
+      rgba(66, 34, 11, 0.18) 56%,
+      rgba(28, 13, 4, 0.62) 100%
+    ),
+    linear-gradient(138deg, #542c10 0%, #42220b 48%, #2b1405 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(244, 210, 152, 0.28),
+    inset -3px -3px 8px rgba(16, 7, 2, 0.72),
+    2px 4px 12px rgba(14, 6, 1, 0.55);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Support for Botanical Green & Noble Wine themes per AGENTS.md Rule 4 */
+.desk-heirloom-book--verde .desk-book__leather-cover {
+  border-color: rgba(62, 104, 74, 0.82);
+  background:
+    radial-gradient(
+      ellipse 82% 74% at 54% 40%,
+      rgba(42, 86, 56, 0.44) 0%,
+      rgba(22, 51, 33, 0.2) 56%,
+      rgba(9, 24, 15, 0.65) 100%
+    ),
+    linear-gradient(138deg, #1f442d 0%, #163321 50%, #0d2014 100%);
+}
+
+.desk-heirloom-book--vinho .desk-book__leather-cover {
+  border-color: rgba(118, 46, 58, 0.85);
+  background:
+    radial-gradient(
+      ellipse 82% 74% at 54% 40%,
+      rgba(92, 28, 40, 0.45) 0%,
+      rgba(58, 15, 24, 0.2) 56%,
+      rgba(24, 5, 9, 0.65) 100%
+    ),
+    linear-gradient(138deg, #4d1521 0%, #3a0f18 50%, #22080d 100%);
+}
+
+/* Fine Organic Leather Grain & Patina */
+.desk-book__grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.26;
+  background-image:
+    radial-gradient(rgba(255, 232, 195, 0.16) 0.75px, transparent 0.75px),
+    radial-gradient(rgba(12, 5, 1, 0.4) 0.9px, transparent 0.9px);
+  background-size: 7px 7px, 11px 11px;
+  background-position: 0 0, 3px 4px;
+}
+
+.desk-book__sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    rgba(255, 232, 190, 0.1) 0%,
+    transparent 38%,
+    transparent 70%,
+    rgba(12, 5, 1, 0.34) 100%
+  );
+}
+
+/* Perimeter Saddle Stitching */
+.desk-book__stitch-perimeter {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 10px;
+  right: 8px;
+  border: 1px dashed rgba(222, 185, 122, 0.36);
+  border-radius: 2px 7px 7px 2px;
+  pointer-events: none;
+}
+
+/* Bound Left Spine with 5 Raised Hub Ribs */
+.desk-book__spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 9%;
+  min-width: 24px;
+  background: linear-gradient(
+    90deg,
+    rgba(20, 8, 2, 0.76) 0%,
+    rgba(96, 54, 22, 0.38) 38%,
+    rgba(22, 9, 2, 0.72) 84%,
+    rgba(224, 186, 120, 0.22) 94%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.desk-book__spine-rib {
+  position: absolute;
+  left: 2px;
+  right: 4px;
+  height: 5px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    rgba(232, 194, 128, 0.38) 0%,
+    rgba(64, 32, 11, 0.88) 52%,
+    rgba(14, 5, 1, 0.94) 100%
+  );
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
+}
+
+.desk-book__spine-rib--1 { top: 12%; }
+.desk-book__spine-rib--2 { top: 28%; }
+.desk-book__spine-rib--3 { top: 50%; }
+.desk-book__spine-rib--4 { bottom: 28%; }
+.desk-book__spine-rib--5 { bottom: 12%; }
+
+.desk-book__spine-groove {
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  right: 3px;
+  width: 1px;
+  border-right: 1px dashed rgba(224, 186, 120, 0.38);
+}
+
+/* Double Embossed Gold-Foil Frame */
+.desk-book__gold-frame {
+  position: absolute;
+  top: 5.5%;
+  bottom: 5.5%;
+  left: 12.5%;
+  right: 7.5%;
+  border: 1.4px solid rgba(222, 184, 116, 0.78);
+  border-radius: 3px 6px 6px 3px;
+  box-shadow:
+    inset 0 0 0 3px rgba(42, 20, 6, 0.82),
+    inset 0 0 0 4.2px rgba(222, 184, 116, 0.44),
+    0 1px 2px rgba(14, 5, 1, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  box-sizing: border-box;
+  color: #e4c286;
+  pointer-events: none;
+}
+
+/* Botanical Gold Filigree Corner SVGs */
+.desk-book__corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  color: rgba(232, 196, 132, 0.88);
+  filter: drop-shadow(0 1px 1px rgba(12, 4, 0, 0.7));
+}
+
+.desk-book__corner--tl { top: 6px; left: 6px; }
+.desk-book__corner--tr { top: 6px; right: 6px; }
+.desk-book__corner--bl { bottom: 6px; left: 6px; }
+.desk-book__corner--br { bottom: 6px; right: 6px; }
+
+/* Central Gold Cartouche */
+.desk-book__cartouche {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.desk-book__kicker {
+  font-family: var(--sans, sans-serif);
+  font-size: clamp(8px, 0.75vw, 9.5px);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(232, 198, 138, 0.84);
+}
+
+.desk-book__medallion {
+  width: clamp(58px, 6vw, 76px);
+  height: clamp(58px, 6vw, 76px);
+  color: #e8c68a;
+  margin: 4px 0;
+  filter: drop-shadow(0 2px 3px rgba(14, 5, 1, 0.72));
+  transition: transform 0.38s ease;
+}
+
+.desk-journal-object:hover .desk-book__medallion {
+  transform: scale(1.05);
+}
+
+.desk-book__title {
+  font-family: var(--serif, "Playfair Display", "Cormorant Garamond", Georgia, serif);
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.12;
+  color: #f2dab0;
+  text-shadow: 0 2px 3px rgba(12, 4, 0, 0.85);
+  max-width: 94%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.desk-book__divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 68%;
+  margin: 2px 0;
+}
+
+.desk-book__divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(226, 189, 124, 0.82) 50%,
+    transparent 100%
+  );
+}
+
+.desk-book__divider-gem {
+  font-size: 9px;
+  color: rgba(232, 198, 138, 0.85);
+  line-height: 1;
+}
+
+.desk-book__subtitle {
+  font-family: var(--serif, "EB Garamond", Georgia, serif);
+  font-style: italic;
+  font-size: clamp(11px, 1vw, 13px);
+  line-height: 1.35;
+  color: rgba(238, 214, 172, 0.86);
+  max-width: 88%;
+}
+
+.desk-book__edition-badge {
+  margin-top: 8px;
+  padding: 4px 12px;
+  border: 1px solid rgba(222, 184, 116, 0.45);
+  border-radius: 2px;
+  background: rgba(20, 8, 2, 0.36);
+  font-family: var(--sans, monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ebd09e;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.desk-journal-object:hover .desk-book__edition-badge {
+  background: rgba(222, 184, 116, 0.18);
+  border-color: rgba(238, 206, 148, 0.8);
+}
+
+/* Right Fore-Edge Antique Brass Clasp */
+.desk-book__brass-clasp {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 48px;
+  border-radius: 3px 0 0 3px;
+  background: linear-gradient(
+    180deg,
+    #9e7332 0%,
+    #e2bd78 32%,
+    #b68940 52%,
+    #dfba74 74%,
+    #78531e 100%
+  );
+  border: 1px solid rgba(58, 34, 8, 0.85);
+  border-right: none;
+  box-shadow:
+    -2px 2px 6px rgba(10, 4, 0, 0.65),
+    inset 1px 1px 1px rgba(255, 240, 205, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.desk-book__clasp-rivet {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #4e300d;
+  box-shadow: 0 1px 0 rgba(255, 232, 185, 0.5);
+}
+
+.desk-book__clasp-lock {
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(62, 36, 10, 0.72);
+  border: 1px solid rgba(250, 224, 174, 0.45);
 }
 
 /* ============================================================================
-   4. VINTAGE HANDWRITTEN ENVELOPE (INDEPENDENT PHYSICAL OBJECT -> /letters)
-   Positioned on the right of the desk with its natural angle, independent
-   shadow layer, and GSAP physical elevation + tilt on hover.
+   ZONE 3 (RIGHT COLUMN): VINTAGE WAX-SEALED CORRESPONDENCE (-> /letters)
+   Handcrafted postal parcel with parchment texture, postage stamp,
+   circular postmark cancellation, sepia calligraphy & crimson wax seal
    ============================================================================ */
 .desk-envelope-object {
-  position: absolute;
-  left: 68.2%;
-  top: 23.5%;
-  width: clamp(200px, 27.8vw, 410px);
-  aspect-ratio: 295 / 315;
-  z-index: 15;
+  position: relative;
+  justify-self: end;
+  width: clamp(255px, 23.5vw, 345px);
+  aspect-ratio: 350 / 260;
+  z-index: 16;
   cursor: pointer;
   text-decoration: none;
   outline: none;
   transform-style: preserve-3d;
   will-change: transform;
+  display: block;
 }
 
-/* Separate physical cast shadow beneath the aged envelope */
+.desk-envelope-object:focus-visible {
+  outline: 2px solid #d4af72;
+  outline-offset: 8px;
+  border-radius: 6px;
+}
+
+/* Separate physical cast shadow beneath the correspondence parcel */
 .desk-envelope-shadow {
   position: absolute;
-  inset: 12% 10% 10% 10%;
-  background: rgba(8, 3, 1, 0.72);
-  filter: blur(13px);
-  border-radius: 4px;
+  inset: 5% 3% -4% 5%;
+  background: rgba(6, 2, 0, 0.78);
+  filter: blur(15px);
+  border-radius: 6px;
   z-index: 0;
   pointer-events: none;
-  transform: rotate(-42deg) translate(4px, 10px);
+  transform: translate(6px, 12px);
   will-change: transform, filter, opacity;
 }
 
@@ -476,249 +1272,274 @@
   will-change: transform;
 }
 
-.desk-envelope-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-  filter: drop-shadow(0 5px 10px rgba(10, 4, 1, 0.58));
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-/* ============================================================================
-   5. ABOUT ME — INITIAL TAB & TALL NARROW PAPER EMERGING FROM VIEWPORT BOTTOM
-   - Initial state: Small aged paper element ("About me ↓") at the bottom edge.
-   - Open state: A long, narrow sheet of aged stationery physically emerges
-     from below the bottom edge of the viewport and slides upward into view.
-   ============================================================================ */
-.desk-about-trigger-wrapper {
-  position: fixed;
-  left: max(8.5%, calc(50% - 580px));
-  bottom: 0;
-  width: clamp(118px, 11.4vw, 164px);
-  height: clamp(66px, 11.5vh, 86px);
-  z-index: 26;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-  background: transparent;
-  outline: none;
-  will-change: transform, opacity;
-}
-
-.desk-about-trigger-paper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: #decab2;
-  background-image: url("/images/nova-ui/desk-about-tag-clean.png");
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-  border-radius: 2px 2px 0 0;
-  box-shadow:
-    0 -6px 18px rgba(8, 3, 1, 0.62),
-    0 -1px 4px rgba(0, 0, 0, 0.4);
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.28s ease;
-}
-
-.desk-about-trigger-wrapper:hover .desk-about-trigger-paper {
-  transform: translateY(-6px);
-  box-shadow:
-    0 -12px 26px rgba(8, 3, 1, 0.72),
-    0 -2px 6px rgba(0, 0, 0, 0.45);
-}
-
-/* The Tall, Narrow Physical Paper Strip Emerging from Below the Viewport */
-.desk-about-emerging-strip {
-  position: fixed;
-  left: max(6.8%, calc(50% - 605px));
-  bottom: 0;
-  width: clamp(220px, 16.5vw, 268px);
-  height: min(76vh, 610px);
-  z-index: 45;
-  transform: translateY(104%);
-  pointer-events: none;
-  will-change: transform;
-}
-
-.desk-about-emerging-strip.is-interactive {
-  pointer-events: auto;
-}
-
-/* Aged cream stationery body with irregular vintage paper texture & shadow */
-.desk-about-paper-sheet {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: #dfd0bc;
+/* Underlying Second Stationery Sheet Peeking Out Behind the Envelope */
+.desk-parcel-under-sheet {
+  position: absolute;
+  inset: -6px 6px 8px -8px;
+  background-color: #e9dac1;
   background-image:
-    linear-gradient(
-      180deg,
-      rgba(210, 192, 168, 0.55) 0%,
-      rgba(238, 226, 208, 0.25) 14%,
-      rgba(232, 218, 198, 0.35) 88%,
-      rgba(195, 174, 148, 0.65) 100%
-    ),
+    linear-gradient(180deg, rgba(255, 250, 240, 0.5) 0%, rgba(216, 196, 168, 0.65) 100%),
     url("/images/nova-ui/auth-paper-texture.jpg");
   background-size: cover;
-  border: 1px solid rgba(155, 130, 98, 0.65);
-  border-bottom: none;
-  border-radius: 3px 3px 0 0;
-  box-shadow:
-    0 -18px 44px rgba(6, 2, 0, 0.78),
-    10px 0 28px rgba(8, 3, 1, 0.52),
-    inset 0 1px 0 rgba(255, 250, 242, 0.65),
-    inset 0 0 28px rgba(175, 148, 112, 0.28);
-  padding: 20px 18px 18px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  color: #24170c;
+  border: 1px solid rgba(142, 112, 76, 0.62);
+  border-radius: 3px;
+  transform: rotate(-4.2deg);
+  box-shadow: 0 6px 16px rgba(8, 3, 1, 0.46);
+  pointer-events: none;
+  overflow: hidden;
 }
 
-/* Top header of the emerging paper matching the "About me" reference typography */
-.desk-about-sheet-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px dashed rgba(128, 102, 72, 0.45);
-  position: relative;
-  cursor: pointer;
-}
-
-.desk-about-sheet-heading {
-  font-family: var(--serif, "Playfair Display", Georgia, serif);
-  font-size: clamp(19px, 1.55vw, 23px);
-  font-weight: 500;
-  color: #1c1209;
-  letter-spacing: 0.01em;
-  line-height: 1.15;
-}
-
-.desk-about-sheet-arrow-btn {
-  margin-top: 6px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 2px 8px;
-  color: #2b1b0e;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s ease;
-}
-
-.desk-about-sheet-arrow-btn:hover {
-  transform: translateY(3px);
-}
-
-/* Editable Biography Area on the Tall Narrow Paper */
-.desk-about-sheet-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.desk-about-textarea {
-  flex: 1;
-  width: 100%;
-  background: transparent;
-  border: none;
+.desk-parcel-under-lines {
+  position: absolute;
+  inset: 14px;
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 25px,
-    rgba(135, 108, 78, 0.22) 26px
+    transparent 19px,
+    rgba(135, 104, 70, 0.18) 20px
   );
-  font-family: var(--serif, Georgia, "Times New Roman", serif);
-  font-size: 13.5px;
-  line-height: 26px;
-  color: #25170b;
-  resize: none;
-  outline: none;
-  padding: 2px 4px;
+}
+
+/* Main Vintage Parchment Envelope */
+.desk-parcel-envelope {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #f3e7d2;
+  background-image:
+    radial-gradient(
+      ellipse 85% 80% at 50% 48%,
+      rgba(255, 251, 242, 0.68) 0%,
+      rgba(238, 224, 200, 0.42) 65%,
+      rgba(206, 184, 152, 0.72) 100%
+    ),
+    url("/images/nova-ui/auth-paper-texture.jpg");
+  background-size: cover;
+  border: 1px solid rgba(138, 106, 70, 0.82);
+  border-radius: 4px;
+  box-shadow:
+    0 10px 26px rgba(8, 3, 1, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 0 28px rgba(166, 134, 92, 0.25);
+  padding: 16px 18px 14px;
   box-sizing: border-box;
-  overflow-y: auto;
-}
-
-.desk-about-textarea::placeholder {
-  color: rgba(78, 54, 32, 0.55);
-  font-style: italic;
-}
-
-.desk-about-sheet-footer {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(135, 108, 78, 0.32);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.desk-about-meta-row {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  font-family: var(--serif, Georgia, serif);
-  font-size: 11px;
-  color: #5e4329;
+  overflow: hidden;
 }
 
-.desk-about-actions-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.desk-about-save-btn {
-  flex: 1;
-  background-color: #3f2612;
-  color: #f7ecda;
-  border: 1px solid #2b1809;
+/* Vintage Inner Postal Frame */
+.desk-parcel-envelope__border {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(145, 110, 72, 0.36);
   border-radius: 2px;
-  padding: 7px 12px;
+  pointer-events: none;
+}
+
+/* Subtle Envelope Flap Crease Lines */
+.desk-parcel-envelope__flap-lines {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      32deg,
+      transparent 49.4%,
+      rgba(136, 102, 66, 0.16) 49.8%,
+      rgba(255, 250, 240, 0.45) 50.3%,
+      transparent 50.8%
+    ),
+    linear-gradient(
+      -32deg,
+      transparent 49.4%,
+      rgba(136, 102, 66, 0.16) 49.8%,
+      rgba(255, 250, 240, 0.45) 50.3%,
+      transparent 50.8%
+    );
+  pointer-events: none;
+}
+
+/* Top Row: Circular Postmark Cancellation & Perforated Stamp */
+.desk-parcel-top-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.desk-parcel-postmark {
+  color: rgba(78, 48, 24, 0.68);
+  transform: rotate(-3deg);
+}
+
+.desk-parcel-postmark__svg {
+  width: clamp(104px, 9.5vw, 128px);
+  height: auto;
+  display: block;
+}
+
+/* Perforated Vintage Postage Stamp */
+.desk-parcel-stamp {
+  width: 52px;
+  height: 62px;
+  padding: 4px;
+  background:
+    radial-gradient(circle at 0 6px, transparent 2.5px, #f7efe0 2.8px) 0 0 / 8px 8px repeat-y,
+    radial-gradient(circle at 100% 6px, transparent 2.5px, #f7efe0 2.8px) 100% 0 / 8px 8px repeat-y,
+    #f7efe0;
+  border: 1px dotted rgba(126, 94, 60, 0.65);
+  box-shadow: 0 2px 6px rgba(24, 12, 4, 0.28);
+  transform: rotate(2.5deg);
+  box-sizing: border-box;
+}
+
+.desk-parcel-stamp__inner {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #7c2d26;
+  background: linear-gradient(180deg, #8b332b 0%, #68211b 100%);
+  color: #f6e7ce;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 2px;
+  box-sizing: border-box;
+}
+
+.desk-parcel-stamp__price {
   font-family: var(--serif, Georgia, serif);
-  font-size: 12.5px;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.desk-parcel-stamp__art {
+  width: 22px;
+  height: 22px;
+  color: #f4dfbe;
+}
+
+.desk-parcel-stamp__label {
+  font-family: var(--sans, sans-serif);
+  font-size: 6px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Center Calligraphic Recipient Inscription */
+.desk-parcel-address {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.desk-parcel-address__kicker {
+  font-family: var(--sans, sans-serif);
+  font-size: 8.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  transition: background-color 0.18s ease;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #7c5632;
 }
 
-.desk-about-save-btn:hover:not(:disabled) {
-  background-color: #2b1809;
+.desk-parcel-address__recipient {
+  font-family: var(--serif, "Playfair Display", "Cormorant Garamond", Georgia, serif);
+  font-size: clamp(16px, 1.55vw, 20px);
+  font-style: italic;
+  font-weight: 600;
+  color: #25150a;
+  line-height: 1.2;
 }
 
-.desk-about-save-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.desk-parcel-address__line {
+  width: 78%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(114, 80, 46, 0.55) 0%, transparent 100%);
+  margin: 1px 0;
 }
 
-.desk-about-fold-btn {
-  background: transparent;
-  border: 1px solid rgba(90, 62, 35, 0.45);
-  color: #4a3019;
-  border-radius: 2px;
-  padding: 7px 10px;
+.desk-parcel-address__sub {
   font-family: var(--serif, Georgia, serif);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.18s ease;
+  font-size: 11.5px;
+  color: #5c3e22;
 }
 
-.desk-about-fold-btn:hover {
-  background-color: rgba(90, 62, 35, 0.1);
+/* Bottom Row: Action Cue & 3D Crimson Wax Seal */
+.desk-parcel-bottom-row {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.desk-parcel-cta {
+  padding: 4px 10px;
+  border: 1px solid rgba(118, 82, 46, 0.48);
+  border-radius: 2px;
+  background: rgba(74, 46, 20, 0.08);
+  font-family: var(--sans, sans-serif);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #3d2410;
+  transition: background-color 0.22s ease, color 0.22s ease;
+}
+
+.desk-envelope-object:hover .desk-parcel-cta {
+  background: #3d2410;
+  color: #f7ecda;
+}
+
+/* Embossed 3D Crimson Wax Seal */
+.desk-parcel-wax-seal {
+  width: 44px;
+  height: 44px;
+  border-radius: 50% 47% 52% 48% / 48% 52% 47% 50%;
+  background: radial-gradient(
+    circle at 35% 32%,
+    #b5302a 0%,
+    #881b18 52%,
+    #520d0b 100%
+  );
+  box-shadow:
+    0 4px 9px rgba(18, 5, 2, 0.58),
+    inset 0 2px 3px rgba(255, 175, 165, 0.36),
+    inset 0 -3px 5px rgba(38, 4, 3, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-6deg);
+  transition: transform 0.3s ease;
+}
+
+.desk-envelope-object:hover .desk-parcel-wax-seal {
+  transform: rotate(0deg) scale(1.06);
+}
+
+.desk-parcel-wax-seal__inner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(64, 8, 6, 0.7);
+  box-shadow:
+    inset 0 2px 4px rgba(34, 4, 3, 0.78),
+    0 1px 1px rgba(255, 180, 170, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ============================================================================
-   6. VINTAGE TOAST FEEDBACK & FIRST-LOGIN ONBOARDING
+   VINTAGE TOAST FEEDBACK & FIRST-LOGIN ONBOARDING
    ============================================================================ */
 .desk-toast-banner {
   position: fixed;
@@ -729,21 +1550,21 @@
   border: 1px solid rgba(222, 190, 145, 0.45);
   color: #faeedb;
   padding: 10px 18px;
-  border-radius: 2px;
-  font-family: var(--serif, Georgia, serif);
-  font-size: 13.5px;
-  letter-spacing: 0.04em;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: 13px;
+  letter-spacing: 0.03em;
   display: flex;
   align-items: center;
   gap: 8px;
-  animation: deskToastSlideIn 0.25s ease-out both;
+  animation: deskToastIn 0.25s ease-out;
 }
 
-@keyframes deskToastSlideIn {
+@keyframes deskToastIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -752,32 +1573,32 @@
 }
 
 .desk-onboarding-bubble {
-  position: absolute;
-  z-index: 90;
-  background-color: #f6ebda;
+  position: fixed;
+  z-index: 60;
+  background-color: #f6ecd9;
   background-image: url("/images/nova-ui/auth-paper-texture.jpg");
   background-size: cover;
-  border: 1px solid #7a5634;
-  box-shadow: 0 18px 40px rgba(8, 3, 1, 0.72);
-  border-radius: 2px;
-  padding: 18px 20px 16px;
-  max-width: 310px;
-  color: #28180b;
+  border: 1.5px solid #6b4928;
+  border-radius: 4px;
+  padding: 16px 20px;
+  width: clamp(235px, 23vw, 295px);
+  box-shadow: 0 18px 42px rgba(8, 3, 1, 0.75);
+  color: #24160a;
 }
 
 .desk-onboarding-title {
-  font-family: var(--serif, Georgia, serif);
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
   font-size: 16px;
   font-weight: 700;
-  color: #211207;
   margin: 0 0 6px 0;
+  color: #1c1006;
 }
 
 .desk-onboarding-text {
   font-family: var(--serif, Georgia, serif);
   font-size: 13px;
   line-height: 1.5;
-  color: #4c3520;
+  color: #3f2915;
   margin: 0 0 14px 0;
 }
 
@@ -785,17 +1606,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
 }
 
 .desk-onboarding-btn-primary {
-  background-color: #462c16;
-  color: #fbf2e4;
-  border: 1px solid #2e1b0b;
+  background-color: #462b14;
+  color: #f7ecda;
+  border: 1px solid #2b1808;
   border-radius: 2px;
-  padding: 6px 14px;
+  padding: 5px 12px;
   font-family: var(--serif, Georgia, serif);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -811,105 +1631,71 @@
 }
 
 /* ============================================================================
-   7. RESPONSIVE ADAPTATION (TABLET & MOBILE)
-   Preserves the artistic overhead desk identity without horizontal overflow
+   RESPONSIVE ADAPTATION (TABLET & MOBILE)
+   - Keeps About Me directly below the Polaroid on all screen sizes
+   - Maintains notebook proportions and full visibility without clipping
    ============================================================================ */
-@media (max-width: 1024px) {
-  .desk-camera-object {
-    left: -1%;
-    top: -0.5%;
-    width: clamp(185px, 28vw, 290px);
-  }
-
-  .desk-polaroid-wrapper {
-    left: 3.5%;
-    top: 11.5%;
-    width: clamp(138px, 18.5vw, 195px);
-  }
-
-  .desk-journal-object {
-    left: 31.5%;
-    top: 12%;
-    width: clamp(210px, 34vw, 360px);
-  }
-
-  .desk-envelope-object {
-    left: 66.5%;
-    top: 26%;
-    width: clamp(185px, 30vw, 310px);
-  }
-}
-
-@media (max-width: 768px) {
+@media (max-width: 1120px) {
   .desk-page-container {
-    align-items: flex-start;
-    overflow-x: hidden;
-    overflow-y: auto;
+    padding: 24px 20px;
   }
 
   .desk-composition-stage {
-    height: auto;
-    min-height: 100dvh;
-    max-height: none;
-    padding: 20px 16px 110px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 26px;
-  }
-
-  .desk-camera-object {
-    position: absolute;
-    left: -10px;
-    top: -8px;
-    width: 185px;
-  }
-
-  .desk-polaroid-wrapper {
-    position: relative;
-    left: auto;
-    top: auto;
-    margin-top: 54px;
-    margin-right: auto;
-    margin-left: 28px;
-    width: 162px;
+    grid-template-columns: minmax(235px, 285px) minmax(255px, 330px) minmax(235px, 300px);
+    gap: 20px;
   }
 
   .polaroid-crop-toolbar {
     position: relative;
     left: auto;
     top: auto;
-    width: min(92vw, 280px);
-    margin: 4px auto 0;
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 880px) {
+  .desk-page-container {
+    align-items: flex-start;
+    padding: 24px 16px 64px;
+  }
+
+  .desk-composition-stage {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 36px;
+    min-height: auto;
+    max-width: 480px;
+  }
+
+  .desk-personal-column {
+    align-self: center;
+    width: 100%;
+  }
+
+  .desk-polaroid-wrapper {
+    width: min(64vw, 224px);
+  }
+
+  .desk-about-under-polaroid {
+    max-width: min(90vw, 330px);
   }
 
   .desk-journal-object {
-    position: relative;
-    left: auto;
-    top: auto;
-    width: min(74vw, 290px);
-    margin: 4px auto;
+    justify-self: center;
+    width: min(78vw, 310px);
   }
 
   .desk-envelope-object {
-    position: relative;
-    left: auto;
-    top: auto;
-    width: min(72vw, 270px);
-    margin: 0 auto;
+    justify-self: center;
+    width: min(84vw, 325px);
   }
 
-  .desk-about-trigger-wrapper {
-    left: 22px;
-    width: 128px;
-    height: 68px;
-  }
-
-  .desk-about-emerging-strip {
-    left: 50%;
-    transform: translate(-50%, 104%);
-    width: min(88vw, 300px);
-    height: min(78dvh, 560px);
+  .desk-onboarding-bubble {
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: 20px !important;
+    transform: translateX(-50%) !important;
+    width: min(90vw, 310px);
   }
 }

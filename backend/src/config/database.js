@@ -89,6 +89,10 @@ async function initDb(retries = 15, delay = 2000) {
       await connection.query(`ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo';`);
     } catch (e) {}
 
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE;`);
+    } catch (e) {}
+
     // 3. Códigos de verificação OTP
     await connection.query(`
       CREATE TABLE IF NOT EXISTS codigos_verificacao (

@@ -1,16 +1,10 @@
 /**
  * profileController.js
- * Gerencia o perfil do usuario autenticado.
+ * Manages authenticated user profile and MinIO profile photograph storage.
  *
- * Seguranca Anti-IDOR:
- *   Todas as rotas usam req.usuarioId (injetado pelo authMiddleware a partir do JWT
- *   validado no banco), nunca um ID enviado pelo cliente no corpo/params da requisicao.
- *   Isso garante que um usuario so pode ler/editar o proprio perfil.
- *
- * Rotas:
- *   GET  /api/profile        -> getProfile()     - retorna dados do usuario logado
- *   PUT  /api/profile        -> updateProfile()  - atualiza nome e bio
- *   POST /api/profile/avatar -> uploadAvatar()   - faz upload da foto para o MinIO
+ * Anti-IDOR Defense:
+ *   All operations strictly use req.usuarioId injected by authMiddleware (validated
+ *   against MariaDB), never trusting client-supplied IDs.
  */
 
 const { pool } = require('../config/database');
@@ -19,7 +13,7 @@ const { sendLog } = require('../services/logClient');
 
 /**
  * GET /api/profile
- * Retorna todos os dados do usuario logado (incluindo foto_url e bio se existirem).
+ * Returns full profile data of the currently authenticated user.
  */
 async function getProfile(req, res) {
   try {
@@ -28,49 +22,45 @@ async function getProfile(req, res) {
       [req.usuarioId]
     );
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Usuario nao encontrado.' });
+      return res.status(404).json({ error: 'User profile not found.' });
     }
     return res.json({ usuario: rows[0] });
   } catch (err) {
     console.error('[profileController] getProfile error:', err.message);
-    return res.status(500).json({ error: 'Erro ao buscar perfil.' });
+    return res.status(500).json({ error: 'Failed to retrieve profile data.' });
   }
 }
 
 /**
  * PUT /api/profile
- * Atualiza nome e/ou bio do usuario logado.
- * Body esperado: { nome?: string, bio?: string }
+ * Updates name, bio, and onboarding status of the authenticated user.
  */
 async function updateProfile(req, res) {
   try {
-    // 🛡️ Defesa Anti-IDOR (Insecure Direct Object Reference):
-    // 1. Bloqueia se tentar passar outro ID via parâmetro de rota (ex: PUT /api/profile/99)
     const targetParamId = req.params.id ? Number(req.params.id) : null;
     if (targetParamId && targetParamId !== req.usuarioId) {
       sendLog('BLOQUEIO_IDOR_403', req, {
-        motivo: 'Tentativa de alteração não autorizada de perfil de outro usuário via URL',
+        motivo: 'Unauthorized profile edit attempt via URL parameter',
         usuarioAutenticado: req.usuarioId,
         usuarioAlvo: targetParamId
       });
       return res.status(403).json({
-        error: 'Acesso negado (403 Forbidden - Anti-IDOR). Você não possui permissão para editar o perfil de outro usuário.',
+        error: 'Access denied (403 Forbidden - Anti-IDOR). You do not have permission to modify another user profile.',
         codigo: 'IDOR_BLOCK',
         usuarioAutenticado: req.usuarioId,
         tentativaId: targetParamId
       });
     }
 
-    // 2. Bloqueia se tentar forjar usuario_id ou id no corpo JSON da requisição
     const targetBodyId = req.body.usuario_id || req.body.id;
     if (targetBodyId && Number(targetBodyId) !== req.usuarioId) {
       sendLog('BLOQUEIO_IDOR_403', req, {
-        motivo: 'Tentativa de alteração não autorizada de perfil de outro usuário via corpo JSON',
+        motivo: 'Unauthorized profile edit attempt via JSON body',
         usuarioAutenticado: req.usuarioId,
         usuarioAlvo: Number(targetBodyId)
       });
       return res.status(403).json({
-        error: 'Acesso negado (403 Forbidden - Anti-IDOR). Você não possui permissão para alterar o perfil de outro usuário.',
+        error: 'Access denied (403 Forbidden - Anti-IDOR). You do not have permission to modify another user profile.',
         codigo: 'IDOR_BLOCK',
         usuarioAutenticado: req.usuarioId,
         tentativaId: Number(targetBodyId)
@@ -80,7 +70,7 @@ async function updateProfile(req, res) {
     const { nome, bio, onboarding_concluido } = req.body;
 
     if (!nome && bio === undefined && onboarding_concluido === undefined) {
-      return res.status(400).json({ error: 'Nenhum campo enviado para atualizar.' });
+      return res.status(400).json({ error: 'No fields provided for profile update.' });
     }
 
     const fields = [];
@@ -88,7 +78,7 @@ async function updateProfile(req, res) {
 
     if (nome) {
       if (typeof nome !== 'string' || nome.trim().length < 2) {
-        return res.status(400).json({ error: 'Nome deve ter pelo menos 2 caracteres.' });
+        return res.status(400).json({ error: 'Full name must be at least 2 characters.' });
       }
       fields.push('nome = ?');
       values.push(nome.trim().slice(0, 100));
@@ -113,78 +103,91 @@ async function updateProfile(req, res) {
     );
 
     sendLog('PERFIL_ATUALIZADO', req, { usuario_id: req.usuarioId });
-    return res.json({ message: 'Perfil atualizado com sucesso.', usuario: rows[0] });
+    return res.json({ message: 'Profile updated successfully.', usuario: rows[0] });
   } catch (err) {
     console.error('[profileController] updateProfile error:', err.message);
-    return res.status(500).json({ error: 'Erro ao atualizar perfil.' });
+    return res.status(500).json({ error: 'Failed to update profile.' });
   }
 }
 
 /**
  * POST /api/profile/avatar
- * Recebe a imagem via multipart/form-data (campo: "avatar"),
- * faz upload para o MinIO e salva a URL no banco.
- *
- * O middleware multer (configurado na rota) ja fez o parse e colocou
- * o arquivo em req.file com os campos: buffer, originalname, mimetype, size.
+ * Receives multipart image upload, stores in MinIO, updates DB, and returns new URL and user profile.
  */
 async function uploadAvatar(req, res) {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado. Use o campo "avatar".' });
+      return res.status(400).json({ error: 'No image file uploaded. Please select an image using the "avatar" field.' });
     }
 
     const { buffer, originalname, mimetype, size } = req.file;
 
-    // Limite de 5 MB
+    // 5 MB limit
     if (size > 5 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Imagem muito grande. Limite de 5 MB.' });
+      return res.status(400).json({ error: 'Image file too large. Maximum size allowed is 5 MB.' });
     }
 
-    // Aceita apenas JPEG, PNG e WebP
-    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!tiposPermitidos.includes(mimetype)) {
-      return res.status(400).json({ error: 'Formato invalido. Use JPEG, PNG ou WebP.' });
+    // Accept only JPEG, PNG, and WebP
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(mimetype)) {
+      return res.status(400).json({ error: 'Invalid image format. Please upload JPEG, PNG, or WebP.' });
     }
 
-    // Remove a foto antiga do MinIO (se existir) para nao acumular arquivos orfaos
-    const [rows] = await pool.query('SELECT foto_url FROM usuarios WHERE id = ?', [req.usuarioId]);
-    const urlAntiga = rows[0]?.foto_url;
+    sendLog('AVATAR_UPLOAD_START', req, {
+      usuario_id: req.usuarioId,
+      size,
+      mimetype
+    });
+
+    // Fetch existing photo reference before upload
+    const [existingRows] = await pool.query('SELECT foto_url FROM usuarios WHERE id = ?', [req.usuarioId]);
+    const urlAntiga = existingRows[0]?.foto_url;
+
+    // 1. Upload new photo to MinIO storage
+    const { objectName, url } = await uploadFile(buffer, originalname, mimetype, req.usuarioId);
+
+    // 2. Persist updated image reference in MariaDB
+    await pool.query('UPDATE usuarios SET foto_url = ? WHERE id = ?', [url, req.usuarioId]);
+
+    // 3. Remove old photo from MinIO only after new one is successfully stored
     if (urlAntiga) {
       const match = urlAntiga.match(/usuario-\d+-\d+\.[a-zA-Z0-9]+/);
       if (match) {
-        await deleteFile('avatar/' + match[0]);
+        deleteFile('avatar/' + match[0]).catch(delErr => {
+          console.warn('[profileController] Could not clean up previous avatar:', delErr.message);
+        });
       }
     }
 
-    // Faz upload da nova foto
-    const { url } = await uploadFile(buffer, originalname, mimetype, req.usuarioId);
+    // 4. Retrieve complete updated user profile for synchronized frontend state
+    const [updatedRows] = await pool.query(
+      'SELECT id, nome, email, papel, foto_url, bio, onboarding_concluido FROM usuarios WHERE id = ?',
+      [req.usuarioId]
+    );
 
-    // Salva a URL no banco
-    await pool.query('UPDATE usuarios SET foto_url = ? WHERE id = ?', [url, req.usuarioId]);
-
-    sendLog('AVATAR_ATUALIZADO', req, { usuario_id: req.usuarioId, foto_url: url });
+    sendLog('AVATAR_ATUALIZADO', req, { usuario_id: req.usuarioId, foto_url: url, objectName });
 
     return res.json({
-      message: 'Foto de perfil atualizada com sucesso.',
-      foto_url: url
+      message: 'Profile photograph updated successfully.',
+      foto_url: url,
+      usuario: updatedRows[0] || null
     });
   } catch (err) {
     console.error('[profileController] uploadAvatar error:', err.message);
-    return res.status(500).json({ error: 'Erro ao fazer upload da imagem: ' + err.message });
+    sendLog('AVATAR_UPLOAD_ERRO', req, { usuario_id: req.usuarioId, error: err.message });
+    return res.status(500).json({ error: 'Failed to upload photograph: ' + (err.message || 'Internal error.') });
   }
 }
 
 /**
  * GET /api/profile/avatar/:filename
- * Serve a imagem diretamente do MinIO via streaming.
- * Público para permitir exibição em tags <img> no navegador.
+ * Streams user profile photo directly from MinIO with secure cache headers.
  */
 async function getAvatar(req, res) {
   try {
     const filename = req.params.filename;
     if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      return res.status(400).send('Nome de arquivo invalido.');
+      return res.status(400).send('Invalid filename.');
     }
 
     const objectName = 'avatar/' + filename;
@@ -201,7 +204,7 @@ async function getAvatar(req, res) {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     stream.pipe(res);
   } catch (err) {
-    return res.status(404).send('Foto de perfil nao encontrada.');
+    return res.status(404).send('Profile photograph not found.');
   }
 }
 
