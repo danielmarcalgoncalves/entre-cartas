@@ -1,17 +1,14 @@
-name: filmecc-main
-
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tomhanks_app
     restart: unless-stopped
     ports:
       - "${RESERVED_PORT:-3000}:3000"
     environment:
       - PORT=3000
-      - TMDB_API_KEY=${TMDB_API_KEY}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
       - DB_HOST=${DB_HOST:-mariadb}
       - DB_PORT=${DB_PORT:-3306}
       - DB_USER=${DB_USER:-root}
@@ -30,11 +27,11 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
       - MINIO_BUCKET=${MINIO_BUCKET:-perfil-fotos}
-      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://localhost:9000}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://minio:9000}
       # Stripe — Pagamentos e Assinatura Premium (Modo de Teste)
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       - APP_URL=${APP_URL:-http://localhost:3000}
     depends_on:
       - mariadb
@@ -46,7 +43,6 @@ services:
     build:
       context: ./auth-service
       dockerfile: Dockerfile
-    container_name: tomhanks_auth
     restart: unless-stopped
     environment:
       - PORT=3000
@@ -58,9 +54,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:-XSfvtJaid8X39mPyO3i8iHE6cCrGZZYHJ_FM7KsfXRqJhtqj9tnYkZMv2uFkuOWV_2026}
       - MAIL_HOST=${MAIL_HOST:-smtp-relay.brevo.com}
       - MAIL_PORT=${MAIL_PORT:-587}
-      - MAIL_USER=${MAIL_USER}
-      - MAIL_PASS=${MAIL_PASS}
-      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_USER=${MAIL_USER:-}
+      - MAIL_PASS=${MAIL_PASS:-}
+      - MAIL_FROM=${MAIL_FROM:-}
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
       - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-Between Letters}
@@ -75,7 +71,6 @@ services:
     build:
       context: ./log-service
       dockerfile: Dockerfile
-    container_name: tomhanks_log
     restart: unless-stopped
     environment:
       - PORT=3000
@@ -85,22 +80,19 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: tomhanks_redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
 
-  # MinIO — Object Storage S3-compatível para arquivos de usuário (fotos de perfil)
-  # Console web: http://localhost:9001 | API S3: http://localhost:9000
+  # MinIO — Object Storage S3-compatível para arquivos de usuário (expostos apenas na rede interna da stack)
   minio:
     image: coollabsio/minio:latest
-    container_name: tomhanks_minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
-    ports:
-      - "${MINIO_API_PORT:-9010}:9000"   # API S3 mapeada para porta 9010 externa (evita conflito com a porta 9000 do Portainer)
-      - "${MINIO_CONSOLE_PORT:-9011}:9001" # Console web do MinIO na porta 9011 externa
+    expose:
+      - "9000"
+      - "9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
@@ -109,15 +101,14 @@ services:
 
   mariadb:
     image: mariadb:10.11
-    container_name: tomhanks_mariadb
     restart: unless-stopped
+    expose:
+      - "3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root_password}
       MYSQL_DATABASE: ${DB_NAME:-filmes_db}
     volumes:
       - mariadb_data:/var/lib/mysql
-    ports:
-      - "127.0.0.1:3307:3306"
 
 volumes:
   mariadb_data:
@@ -127,6 +118,3 @@ volumes:
 networks:
   default:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 10.82.2.0/24

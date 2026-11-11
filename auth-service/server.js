@@ -87,87 +87,94 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Safe schema migration on startup so auth-service columns are always available
-async function ensureAuthSchema() {
-  try {
-    const conn = await pool.getConnection();
+// Safe schema migration on startup with retries so cold-start MariaDB boots succeed cleanly
+async function ensureAuthSchema(retries = 15, delay = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS usuarios (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          nome VARCHAR(100) NOT NULL,
-          email VARCHAR(150) UNIQUE NOT NULL,
-          senha_hash VARCHAR(255) NOT NULL,
-          papel VARCHAR(50) DEFAULT 'usuario',
-          email_verificado BOOLEAN DEFAULT FALSE,
-          foto_url VARCHAR(500) DEFAULT NULL,
-          bio TEXT DEFAULT NULL,
-          auth_provider VARCHAR(50) DEFAULT 'local',
-          google_id VARCHAR(255) DEFAULT NULL,
-          ultimo_login TIMESTAMP NULL DEFAULT NULL,
-          status_conta VARCHAR(30) DEFAULT 'ativo',
-          onboarding_concluido BOOLEAN DEFAULT FALSE,
-          criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `);
+      const conn = await pool.getConnection();
+      try {
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS usuarios (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nome VARCHAR(100) NOT NULL,
+            email VARCHAR(150) UNIQUE NOT NULL,
+            senha_hash VARCHAR(255) NOT NULL,
+            papel VARCHAR(50) DEFAULT 'usuario',
+            email_verificado BOOLEAN DEFAULT FALSE,
+            foto_url VARCHAR(500) DEFAULT NULL,
+            bio TEXT DEFAULT NULL,
+            auth_provider VARCHAR(50) DEFAULT 'local',
+            google_id VARCHAR(255) DEFAULT NULL,
+            ultimo_login TIMESTAMP NULL DEFAULT NULL,
+            status_conta VARCHAR(30) DEFAULT 'ativo',
+            onboarding_concluido BOOLEAN DEFAULT FALSE,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
 
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS reset_tokens (
-          token VARCHAR(255) PRIMARY KEY,
-          usuario_id INT NOT NULL,
-          criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          expira_em TIMESTAMP NOT NULL,
-          usado BOOLEAN DEFAULT FALSE,
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `);
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS reset_tokens (
+            token VARCHAR(255) PRIMARY KEY,
+            usuario_id INT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expira_em TIMESTAMP NOT NULL,
+            usado BOOLEAN DEFAULT FALSE,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
 
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS codigos_verificacao (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          email VARCHAR(150) NOT NULL,
-          codigo VARCHAR(10) NOT NULL,
-          expira_em DATETIME NOT NULL,
-          usado BOOLEAN DEFAULT FALSE,
-          criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_email_codigo (email, codigo)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `);
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS codigos_verificacao (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(150) NOT NULL,
+            codigo VARCHAR(10) NOT NULL,
+            expira_em DATETIME NOT NULL,
+            usado BOOLEAN DEFAULT FALSE,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_email_codigo (email, codigo)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
 
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS revoked_tokens (
-          token_hash VARCHAR(64) PRIMARY KEY,
-          usuario_id INT NULL,
-          expira_em DATETIME NOT NULL,
-          revogado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_expira (expira_em)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `);
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS revoked_tokens (
+            token_hash VARCHAR(64) PRIMARY KEY,
+            usuario_id INT NULL,
+            expira_em DATETIME NOT NULL,
+            revogado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_expira (expira_em)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
 
-      const alterQueries = [
-        `ALTER TABLE usuarios ADD COLUMN papel VARCHAR(50) DEFAULT 'usuario'`,
-        `ALTER TABLE usuarios ADD COLUMN email_verificado BOOLEAN DEFAULT FALSE`,
-        `ALTER TABLE usuarios ADD COLUMN foto_url VARCHAR(500) DEFAULT NULL`,
-        `ALTER TABLE usuarios ADD COLUMN bio TEXT DEFAULT NULL`,
-        `ALTER TABLE usuarios ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'local'`,
-        `ALTER TABLE usuarios ADD COLUMN google_id VARCHAR(255) DEFAULT NULL`,
-        `ALTER TABLE usuarios ADD COLUMN ultimo_login TIMESTAMP NULL DEFAULT NULL`,
-        `ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo'`,
-        `ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE`
-      ];
+        const alterQueries = [
+          `ALTER TABLE usuarios ADD COLUMN papel VARCHAR(50) DEFAULT 'usuario'`,
+          `ALTER TABLE usuarios ADD COLUMN email_verificado BOOLEAN DEFAULT FALSE`,
+          `ALTER TABLE usuarios ADD COLUMN foto_url VARCHAR(500) DEFAULT NULL`,
+          `ALTER TABLE usuarios ADD COLUMN bio TEXT DEFAULT NULL`,
+          `ALTER TABLE usuarios ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'local'`,
+          `ALTER TABLE usuarios ADD COLUMN google_id VARCHAR(255) DEFAULT NULL`,
+          `ALTER TABLE usuarios ADD COLUMN ultimo_login TIMESTAMP NULL DEFAULT NULL`,
+          `ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo'`,
+          `ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE`
+        ];
 
-      for (const q of alterQueries) {
-        try {
-          await conn.query(q);
-        } catch (e) {
-          // Column already exists
+        for (const q of alterQueries) {
+          try {
+            await conn.query(q);
+          } catch (e) {
+            // Column already exists
+          }
         }
+        return;
+      } finally {
+        conn.release();
       }
-    } finally {
-      conn.release();
+    } catch (err) {
+      if (attempt === retries) {
+        console.warn('[Auth-Service] Schema initialization deferred:', err.message);
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
-  } catch (err) {
-    console.warn('[Auth-Service] Schema initialization deferred:', err.message);
   }
 }
 
