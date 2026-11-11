@@ -135,10 +135,38 @@ export const api = {
       apiRequest(`/cartas/${id}`, {
         method: 'DELETE',
       }),
+    setTrash: (id: string | number, na_lixeira: boolean) =>
+      apiRequest(`/cartas/${id}/trash`, {
+        method: 'PATCH',
+        body: JSON.stringify({ na_lixeira }),
+      }),
     adicionarNota: (id: string | number, texto: string) =>
       apiRequest(`/cartas/${id}/notas`, {
         method: 'POST',
         body: JSON.stringify({ texto }),
+      }),
+  },
+
+  journal: {
+    listNotebooks: () => apiRequest('/journal/notebooks'),
+    upsertNotebook: (clientId: string, dados: { nome: string; corCapa: string; paginas: any[] }) =>
+      apiRequest(`/journal/notebooks/${encodeURIComponent(clientId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(dados),
+      }),
+    deleteNotebook: (clientId: string) =>
+      apiRequest(`/journal/notebooks/${encodeURIComponent(clientId)}`, {
+        method: 'DELETE',
+      }),
+    listFolders: () => apiRequest('/journal/folders'),
+    upsertFolder: (clientId: string, dados: { nome: string; cor?: string }) =>
+      apiRequest(`/journal/folders/${encodeURIComponent(clientId)}`, {
+        method: 'PUT',
+        body: JSON.stringify(dados),
+      }),
+    deleteFolder: (clientId: string) =>
+      apiRequest(`/journal/folders/${encodeURIComponent(clientId)}`, {
+        method: 'DELETE',
       }),
   },
 

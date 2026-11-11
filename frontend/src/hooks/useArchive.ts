@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/services/api";
+import { useCallback, useEffect, useState } from "react";
+import { api, getToken } from "@/services/api";
+import { useAuth } from "@/hooks/useAuth";
+import { SESSION_CLEARED_EVENT } from "@/lib/journal-storage";
 
 const FAVORITES_KEY = "entre-cartas:favorites";
 const SAVED_KEY = "entre-cartas:saved";
@@ -9,28 +11,37 @@ const EVENT_NAME = "entre-cartas:archive-updated";
 
 export type ArchiveKind = "favorites" | "saved";
 
-function keyFor(kind: ArchiveKind) {
-  return kind === "favorites" ? FAVORITES_KEY : SAVED_KEY;
+function keyFor(kind: ArchiveKind, userId?: string | number | null) {
+  const base = kind === "favorites" ? FAVORITES_KEY : SAVED_KEY;
+  return userId ? `${base}:${String(userId)}` : null;
 }
 
-export function getArchive(kind: ArchiveKind): string[] {
+export function getArchive(kind: ArchiveKind, userId?: string | number | null): string[] {
   if (typeof window === "undefined") return [];
+  const key = keyFor(kind, userId);
+  if (!key || !getToken()) return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(keyFor(kind)) ?? "[]");
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
     return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
   } catch {
     return [];
   }
 }
 
-export async function toggleArchivedLetter(kind: ArchiveKind, id: string) {
-  const current = getArchive(kind);
+export async function toggleArchivedLetter(
+  kind: ArchiveKind,
+  id: string,
+  userId?: string | number | null
+) {
+  const key = keyFor(kind, userId);
+  if (!key || !getToken()) return [];
+
+  const current = getArchive(kind, userId);
   const isRemoving = current.includes(id);
   const updated = isRemoving ? current.filter((item) => item !== id) : [...current, id];
-  window.localStorage.setItem(keyFor(kind), JSON.stringify(updated));
+  window.localStorage.setItem(key, JSON.stringify(updated));
   window.dispatchEvent(new Event(EVENT_NAME));
 
-  // Sincronização em background com o backend quando aplicável
   try {
     if (kind === "favorites") {
       if (isRemoving) {
@@ -49,34 +60,59 @@ export async function toggleArchivedLetter(kind: ArchiveKind, id: string) {
 }
 
 export function useArchive(kind: ArchiveKind) {
+  const { user, loading } = useAuth();
+  const userId = user?.id ? String(user.id) : null;
   const [ids, setIds] = useState<string[]>([]);
 
   useEffect(() => {
-    const update = () => setIds(getArchive(kind));
+    const clearMemory = () => setIds([]);
+    window.addEventListener(SESSION_CLEARED_EVENT, clearMemory);
+    return () => {
+      window.removeEventListener(SESSION_CLEARED_EVENT, clearMemory);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!userId) {
+      setIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    const update = () => setIds(getArchive(kind, userId));
     update();
     window.addEventListener(EVENT_NAME, update);
     window.addEventListener("storage", update);
 
-    // Tenta sincronizar com as cartas guardadas no banco se logado
     api.cartas.guardadas()
       .then((res: any) => {
+        if (cancelled) return;
         if (res && res.cartas_guardadas && Array.isArray(res.cartas_guardadas)) {
           const remoteIds = res.cartas_guardadas.map((c: any) => String(c.id));
-          const current = getArchive(kind);
+          const current = getArchive(kind, userId);
           const merged = Array.from(new Set([...current, ...remoteIds]));
-          window.localStorage.setItem(keyFor(kind), JSON.stringify(merged));
+          const key = keyFor(kind, userId);
+          if (key) {
+            window.localStorage.setItem(key, JSON.stringify(merged));
+          }
           setIds(merged);
         }
       })
-      .catch(() => {
-        // Silencioso se visitante anônimo
-      });
+      .catch(() => {});
 
     return () => {
+      cancelled = true;
       window.removeEventListener(EVENT_NAME, update);
       window.removeEventListener("storage", update);
     };
-  }, [kind]);
+  }, [kind, loading, userId]);
 
-  return { ids, has: (id: string) => ids.includes(id) };
+  const toggle = useCallback(
+    (id: string) => toggleArchivedLetter(kind, id, userId),
+    [kind, userId]
+  );
+
+  return { ids, has: (id: string) => ids.includes(id), toggle };
 }

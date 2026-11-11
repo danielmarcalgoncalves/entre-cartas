@@ -30,7 +30,7 @@ export function BetweenLettersLanding({
   eyebrow = "A PLACE FOR THINGS WORTH REMEMBERING",
   title = "BETWEEN LETTERS",
   flourish = "✦",
-  ctaHref = "/login",
+  ctaHref = "/journal",
   ctaLabel = "TRY IT NOW",
   className = "",
 }: BetweenLettersLandingProps) {

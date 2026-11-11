@@ -6,6 +6,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import { letters, type Letter } from "@/lib/letters";
 import { Tape, Sticker } from "@/components/paper-kit";
 import { useAuth } from "@/hooks/useAuth";
+import { useGuestDemo } from "@/hooks/useGuestDemo";
+import { api } from "@/services/api";
+import GuestSavePromptModal, { type GuestPromptVariant } from "@/components/GuestSavePromptModal";
+import {
+  JOURNAL_MAX_CHARS_PER_PAGE,
+  JOURNAL_MAX_LINES_PER_PAGE,
+  JOURNAL_PAGE_HEIGHT,
+  JOURNAL_PAGE_WIDTH,
+  splitJournalPageOverflow,
+} from "@/lib/journal-page-layout";
 import {
   ACTIVE_LETTER_EDIT_ID_KEY,
   ACTIVE_LETTER_FOLDER_ID_KEY,
@@ -23,6 +33,7 @@ import {
   PROMPTS,
   SAVED_ENTRIES_KEY,
   SEAL_OPTIONS,
+  SESSION_CLEARED_EVENT,
   TRASH_STORAGE_KEY,
   filterWrittenPages,
   getFontFamilyById,
@@ -76,10 +87,9 @@ export {
   type PostalSeal,
 };
 
-// Exact line count visible per sheet (23 ruled lines in textarea + 1 for header = 24 lines)
-const MAX_LINES_PER_PAGE = 23;
-// Maximum character count fitting physically without overflowing the box
-const MAX_CHARS_PER_PAGE = 1200;
+// Exact line count & char capacity shared with the cinematic 3D viewer
+const MAX_LINES_PER_PAGE = JOURNAL_MAX_LINES_PER_PAGE;
+const MAX_CHARS_PER_PAGE = JOURNAL_MAX_CHARS_PER_PAGE;
 
 function EyeIcon({ className = "", filled = false }: { className?: string; filled?: boolean }) {
   return (
@@ -124,7 +134,42 @@ function SaveIcon({ className = "" }: { className?: string }) {
 }
 
 export default function JournalEditor() {
-  const { user, isPro } = useAuth();
+  const { user, loading: authLoading, isPro } = useAuth();
+  const isGuestMode = !authLoading && !user;
+  const {
+    guestNotebooks,
+    setGuestNotebooks,
+    guestActiveNotebookId,
+    setGuestActiveNotebookId,
+    guestPinnedTheme,
+    setGuestPinnedTheme,
+  } = useGuestDemo();
+
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+  const [guestPromptVariant, setGuestPromptVariant] = useState<GuestPromptVariant>("save");
+  const [sheetScale, setSheetScale] = useState(1);
+
+  const openGuestPrompt = (variant: GuestPromptVariant) => {
+    setGuestPromptVariant(variant);
+    setGuestPromptOpen(true);
+  };
+
+  // Preserve identical canonical 580x820 sheet layout on narrow viewports via proportional scaling
+  useEffect(() => {
+    const updateSheetScale = () => {
+      const vw = window.innerWidth;
+      const availableWidth = vw < 680 ? vw - 64 : vw - 140;
+      const nextScale =
+        availableWidth < JOURNAL_PAGE_WIDTH
+          ? Math.max(0.45, Number((availableWidth / JOURNAL_PAGE_WIDTH).toFixed(4)))
+          : 1;
+      setSheetScale(nextScale);
+    };
+
+    updateSheetScale();
+    window.addEventListener("resize", updateSheetScale);
+    return () => window.removeEventListener("resize", updateSheetScale);
+  }, []);
 
   // Focus Mode
   const [modoFoco, setModoFoco] = useState(false);
@@ -215,12 +260,20 @@ export default function JournalEditor() {
     };
     const dataExtenso = hoje.toLocaleDateString("en-US", opcoes);
     setDataFormatada(dataExtenso);
+  }, []);
 
+  // Load pinned theme cleanly depending on auth vs guest mode
+  useEffect(() => {
+    if (authLoading) return;
+    if (isGuestMode) {
+      setTemaSalvo(guestPinnedTheme || "");
+      return;
+    }
     try {
       const temaSalvoStorage = window.localStorage.getItem(PINNED_THEME_STORAGE_KEY);
-      if (temaSalvoStorage) setTemaSalvo(temaSalvoStorage);
+      setTemaSalvo(temaSalvoStorage || "");
     } catch {}
-  }, []);
+  }, [authLoading, isGuestMode, guestPinnedTheme]);
 
   // Close customization menu when clicking outside
   useEffect(() => {
@@ -244,9 +297,36 @@ export default function JournalEditor() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modoFoco]);
 
-  // Initialize notebooks from LocalStorage and URL query params
+  // Initialize notebooks from in-memory guest store (for guests) or LocalStorage (for authenticated users)
   const carregarCadernos = (event?: any) => {
+    if (authLoading) return;
     if (event?.detail?.source === "editor") return;
+
+    if (isGuestMode) {
+      setNotebooks(guestNotebooks);
+      const currentId = activeNotebookIdRef.current;
+      const exists = guestNotebooks.some((n) => n.id === currentId);
+      if (!hasInitialLoadedRef.current || !exists) {
+        hasInitialLoadedRef.current = true;
+        const targetId = guestNotebooks.some((n) => n.id === guestActiveNotebookId)
+          ? guestActiveNotebookId
+          : guestNotebooks[0]?.id || "";
+        setActiveNotebookId(targetId);
+        const active =
+          guestNotebooks.find((n) => n.id === targetId) || guestNotebooks[0];
+        const pages =
+          active?.paginas && active.paginas.length > 0
+            ? active.paginas
+            : [createBlankPage()];
+        setCadernoPaginas(pages);
+        setCurrentPageIndex(0);
+        setCadernoTitulo(pages[0]?.titulo || "");
+        setCadernoConteudo(pages[0]?.conteudo || "");
+        setCadernoFavoritado(Boolean(pages[0]?.favoritado));
+        applyPageFormatting(pages[0]);
+      }
+      return;
+    }
 
     const userOnlyNotebooks = loadUserNotebooks(user?.id);
     setNotebooks(userOnlyNotebooks);
@@ -330,14 +410,37 @@ export default function JournalEditor() {
   };
 
   useEffect(() => {
+    hasInitialLoadedRef.current = false;
+  }, [user?.id, isGuestMode]);
+
+  useEffect(() => {
+    const resetEditorMemory = () => {
+      hasInitialLoadedRef.current = false;
+      setNotebooks([]);
+      setActiveNotebookId("");
+      setCadernoPaginas([createBlankPage()]);
+      setCurrentPageIndex(0);
+      setCadernoTitulo("");
+      setCadernoConteudo("");
+      setCadernoFavoritado(false);
+    };
+    window.addEventListener(SESSION_CLEARED_EVENT, resetEditorMemory);
+    return () => {
+      window.removeEventListener(SESSION_CLEARED_EVENT, resetEditorMemory);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
     carregarCadernos();
+    if (isGuestMode) return;
     window.addEventListener(JOURNAL_UPDATED_EVENT, carregarCadernos);
     window.addEventListener("storage", carregarCadernos);
     return () => {
       window.removeEventListener(JOURNAL_UPDATED_EVENT, carregarCadernos);
       window.removeEventListener("storage", carregarCadernos);
     };
-  }, [user?.id]);
+  }, [user?.id, authLoading, isGuestMode]);
 
   // Listen to EDIT request from reading room
   useEffect(() => {
@@ -390,32 +493,86 @@ export default function JournalEditor() {
     notebooks.find((n) => n.id === activeNotebookId) ||
     (notebooks.length > 0 ? notebooks[0] : null);
 
-  // CRITICAL RULE: Only save written pages to persistent storage
-  const salvarCadernosNoStorage = (paginasAtuais: NotebookPage[]) => {
-    if (!activeNotebook) return;
+  // CRITICAL RULE: Only save written pages to persistent storage (isolated in memory during guest demo)
+  const backendNotebookSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncNotebookToBackend = (nb: Notebook, paginasEscritas: NotebookPage[]) => {
+    if (!user?.id || isGuestMode) return;
+    api.journal
+      .upsertNotebook(nb.id, {
+        nome: nb.nome,
+        corCapa: nb.corCapa,
+        paginas: paginasEscritas,
+      })
+      .catch(() => {});
+  };
+
+  const salvarCadernosNoStorage = (paginasAtuais: NotebookPage[], immediateBackendSync = false) => {
+    if (!activeNotebook || authLoading) return;
 
     const nowIso = new Date().toISOString();
+
+    if (isGuestMode) {
+      const paginasTemp = paginasAtuais.map((p) => ({
+        ...p,
+        atualizadoEm: p.atualizadoEm || nowIso,
+      }));
+      const updatedGuest = notebooks.map((nb) =>
+        nb.id === activeNotebook.id
+          ? {
+              ...nb,
+              paginas: paginasTemp,
+              criadoEm: nb.criadoEm || nowIso,
+              atualizadoEm: nowIso,
+            }
+          : nb
+      );
+      setNotebooks(updatedGuest);
+      setGuestNotebooks(updatedGuest);
+      return;
+    }
+
+    if (!user?.id) return;
+
     const paginasEscritas = filterWrittenPages(paginasAtuais).map((p) => ({
       ...p,
       atualizadoEm: p.atualizadoEm || nowIso,
     }));
 
     const allStored = loadAllRawNotebooks();
+    let updatedNotebook: Notebook | null = null;
     const atualizados = allStored.map((nb) => {
       if (nb.id === activeNotebook.id) {
-        return {
+        updatedNotebook = {
           ...nb,
           paginas: paginasEscritas,
           criadoEm: nb.criadoEm || nowIso,
           atualizadoEm: nowIso,
-          ownerId: nb.ownerId || user?.id,
+          ownerId: nb.ownerId || user.id,
         };
+        return updatedNotebook;
       }
       return nb;
     });
 
-    setNotebooks(atualizados.filter((nb) => !user?.id || !nb.ownerId || String(nb.ownerId) === String(user.id)));
+    setNotebooks(
+      atualizados.filter((nb) => Boolean(nb.ownerId && String(nb.ownerId) === String(user.id)))
+    );
     saveAllNotebooks(atualizados, "editor");
+
+    if (updatedNotebook) {
+      const target = updatedNotebook;
+      if (backendNotebookSyncRef.current) {
+        clearTimeout(backendNotebookSyncRef.current);
+      }
+      if (immediateBackendSync) {
+        syncNotebookToBackend(target, paginasEscritas);
+      } else {
+        backendNotebookSyncRef.current = setTimeout(() => {
+          syncNotebookToBackend(target, paginasEscritas);
+        }, 550);
+      }
+    }
   };
 
   const salvarCadernoAtualNoStorage = () => {
@@ -696,27 +853,12 @@ export default function JournalEditor() {
     const textoProjetado =
       cadernoConteudo.slice(0, start) + pastedText + cadernoConteudo.slice(end);
 
-    const linhas = textoProjetado.split("\n");
-    if (
-      linhas.length > MAX_LINES_PER_PAGE ||
-      textoProjetado.length > MAX_CHARS_PER_PAGE
-    ) {
+    const overflow = splitJournalPageOverflow(textoProjetado);
+    if (overflow.exceeded) {
       e.preventDefault();
-
-      let textoQueCabe = "";
-      let textoExcedente = "";
-
-      if (linhas.length > MAX_LINES_PER_PAGE) {
-        textoQueCabe = linhas.slice(0, MAX_LINES_PER_PAGE).join("\n");
-        textoExcedente = linhas.slice(MAX_LINES_PER_PAGE).join("\n");
-      } else {
-        textoQueCabe = textoProjetado.slice(0, MAX_CHARS_PER_PAGE);
-        textoExcedente = textoProjetado.slice(MAX_CHARS_PER_PAGE);
-      }
-
-      setCadernoConteudo(textoQueCabe);
-      atualizarRascunhoCaderno(textoQueCabe);
-      avancarParaProximaPaginaComTexto(textoExcedente);
+      setCadernoConteudo(overflow.currentPageText);
+      atualizarRascunhoCaderno(overflow.currentPageText);
+      avancarParaProximaPaginaComTexto(overflow.overflowText);
     }
   };
 
@@ -729,25 +871,12 @@ export default function JournalEditor() {
     e: React.ChangeEvent<HTMLTextAreaElement>
   ) => {
     const novoTexto = e.target.value;
-    const linhas = novoTexto.split("\n");
+    const overflow = splitJournalPageOverflow(novoTexto);
 
-    if (linhas.length > MAX_LINES_PER_PAGE) {
-      const linhasPaginaAtual = linhas.slice(0, MAX_LINES_PER_PAGE).join("\n");
-      const linhasExcedentes = linhas.slice(MAX_LINES_PER_PAGE).join("\n");
-
-      setCadernoConteudo(linhasPaginaAtual);
-      atualizarRascunhoCaderno(linhasPaginaAtual);
-      avancarParaProximaPaginaComTexto(linhasExcedentes);
-      return;
-    }
-
-    if (novoTexto.length > MAX_CHARS_PER_PAGE) {
-      const textoPaginaAtual = novoTexto.slice(0, MAX_CHARS_PER_PAGE);
-      const textoExcedente = novoTexto.slice(MAX_CHARS_PER_PAGE);
-
-      setCadernoConteudo(textoPaginaAtual);
-      atualizarRascunhoCaderno(textoPaginaAtual);
-      avancarParaProximaPaginaComTexto(textoExcedente);
+    if (overflow.exceeded) {
+      setCadernoConteudo(overflow.currentPageText);
+      atualizarRascunhoCaderno(overflow.currentPageText);
+      avancarParaProximaPaginaComTexto(overflow.overflowText);
       return;
     }
 
@@ -781,6 +910,12 @@ export default function JournalEditor() {
   };
 
   const salvarPagina = async () => {
+    if (isGuestMode) {
+      playPaperSound();
+      openGuestPrompt("save");
+      return;
+    }
+
     if (!cadernoConteudo.trim() && !cadernoTitulo.trim()) {
       alert("Please write something on the page before saving.");
       return;
@@ -816,7 +951,7 @@ export default function JournalEditor() {
     }
     setCadernoPaginas(paginasAtualizadas);
 
-    salvarCadernosNoStorage(paginasAtualizadas);
+    salvarCadernosNoStorage(paginasAtualizadas, true);
 
     setSalvando(false);
     setMensagemSucesso(
@@ -826,6 +961,12 @@ export default function JournalEditor() {
   };
 
   const selecionarCaderno = (nb: Notebook) => {
+    if (isGuestMode) {
+      playPaperSound();
+      openGuestPrompt("notebook-open");
+      return;
+    }
+
     if (activeNotebook && activeNotebook.id !== nb.id) {
       salvarCadernoAtualNoStorage();
     }
@@ -851,6 +992,11 @@ export default function JournalEditor() {
 
   const criarNovoCaderno = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuestMode) {
+      playPaperSound();
+      openGuestPrompt("notebook-manage");
+      return;
+    }
     if (!newNotebookTitle.trim()) return;
 
     const limiteCadernos = isPro ? 10 : 3;
@@ -928,10 +1074,11 @@ export default function JournalEditor() {
     };
 
     const listaFinal = [...allStored, novoCaderno];
-    saveAllNotebooks(listaFinal);
+    saveAllNotebooks(listaFinal, "editor");
+    syncNotebookToBackend(novoCaderno, initialPagesForNewNotebook);
     setNotebooks(
       listaFinal.filter(
-        (nb) => !user?.id || !nb.ownerId || String(nb.ownerId) === String(user.id)
+        (nb) => Boolean(user?.id && nb.ownerId && String(nb.ownerId) === String(user.id))
       )
     );
 
@@ -971,6 +1118,12 @@ export default function JournalEditor() {
   };
 
   const confirmarRenomearCaderno = (notebookId: string) => {
+    if (isGuestMode) {
+      playPaperSound();
+      setRenamingNotebookId(null);
+      openGuestPrompt("notebook-manage");
+      return;
+    }
     if (!renameDraftValue.trim()) return;
     renameUserNotebook(notebookId, renameDraftValue);
     setNotebooks(loadUserNotebooks(user?.id));
@@ -993,9 +1146,13 @@ export default function JournalEditor() {
   const aplicarInspiracao = () => {
     if (promptTexto) {
       setTemaSalvo(promptTexto);
-      try {
-        window.localStorage.setItem(PINNED_THEME_STORAGE_KEY, promptTexto);
-      } catch {}
+      if (isGuestMode) {
+        setGuestPinnedTheme(promptTexto);
+      } else {
+        try {
+          window.localStorage.setItem(PINNED_THEME_STORAGE_KEY, promptTexto);
+        } catch {}
+      }
     }
     setInspiracaoModal(false);
     playPaperSound();
@@ -1201,12 +1358,33 @@ export default function JournalEditor() {
                       borderLeftColor: theme.shelfSpine2,
                     }}
                     onClick={() => {
+                      if (isGuestMode) {
+                        playPaperSound();
+                        openGuestPrompt("notebook-open");
+                        return;
+                      }
                       setCadernoPromptNotice(null);
                       setNotebookDrawerOpen(true);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        if (isGuestMode) {
+                          playPaperSound();
+                          openGuestPrompt("notebook-open");
+                          return;
+                        }
+                        setCadernoPromptNotice(null);
+                        setNotebookDrawerOpen(true);
+                      }
+                    }}
                     role="button"
                     tabIndex={0}
-                    title="Click to switch, rename, or create a journal"
+                    title={
+                      isGuestMode
+                        ? "Sign in or create an account to open saved journals"
+                        : "Click to switch, rename, or create a journal"
+                    }
                   >
                     <div
                       className="leather-notebook-ribbon"
@@ -1227,12 +1405,21 @@ export default function JournalEditor() {
               <div
                 className="leather-notebook-card is-empty-state"
                 onClick={() => {
+                  if (isGuestMode) {
+                    playPaperSound();
+                    openGuestPrompt("notebook-manage");
+                    return;
+                  }
                   setCadernoPromptNotice(null);
                   setNotebookDrawerOpen(true);
                 }}
                 role="button"
                 tabIndex={0}
-                title="Click to create your first journal"
+                title={
+                  isGuestMode
+                    ? "Sign in or create an account to create personal journals"
+                    : "Click to create your first journal"
+                }
               >
                 <div className="leather-notebook-ribbon" aria-hidden="true" />
                 <span className="leather-notebook-tag">NEW VOLUME</span>
@@ -1318,81 +1505,108 @@ export default function JournalEditor() {
               </svg>
             </button>
 
-            <motion.div
-              key={`${activeNotebookId}-${currentPageIndex}`}
-              className="writing-sheet-card mode-caderno"
-              style={{
-                backgroundColor: sheetBgColor,
-                color: inkColor,
-                fontFamily: getFontFamilyById(fontFamilyId),
-              }}
-              initial={{ opacity: 0.9, scale: 0.99 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.22 }}
+            <div
+              className="caderno-sheet-viewport-box"
+              style={
+                sheetScale < 1
+                  ? {
+                      width: `${Math.round(JOURNAL_PAGE_WIDTH * sheetScale)}px`,
+                      height: `${Math.round(JOURNAL_PAGE_HEIGHT * sheetScale)}px`,
+                      position: "relative",
+                      flexShrink: 0,
+                    }
+                  : { width: "100%", maxWidth: `${JOURNAL_PAGE_WIDTH}px` }
+              }
             >
-              <div className="caderno-content-inner">
-                <div className="caderno-date-line">
-                  <span>
-                    {cadernoPaginas[currentPageIndex]?.dataFormatada ||
-                      dataFormatada ||
-                      "Today"}
-                  </span>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    {isSheetFull(cadernoConteudo, textareaRef.current) && (
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          color: "var(--color-red-sands, #ad5b30)",
-                          fontWeight: 700,
-                          letterSpacing: "0.08em",
-                        }}
-                      >
-                        SHEET FULL
+              <div
+                style={
+                  sheetScale < 1
+                    ? {
+                        width: `${JOURNAL_PAGE_WIDTH}px`,
+                        height: `${JOURNAL_PAGE_HEIGHT}px`,
+                        transform: `scale(${sheetScale})`,
+                        transformOrigin: "top left",
+                      }
+                    : undefined
+                }
+              >
+                <motion.div
+                  key={`${activeNotebookId}-${currentPageIndex}`}
+                  className="writing-sheet-card mode-caderno"
+                  style={{
+                    backgroundColor: sheetBgColor,
+                    color: inkColor,
+                    fontFamily: getFontFamilyById(fontFamilyId),
+                  }}
+                  initial={{ opacity: 0.9, scale: 0.99 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.22 }}
+                >
+                  <div className="caderno-content-inner">
+                    <div className="caderno-date-line">
+                      <span>
+                        {cadernoPaginas[currentPageIndex]?.dataFormatada ||
+                          dataFormatada ||
+                          "Today"}
                       </span>
-                    )}
-                    <small className="caderno-page-counter">
-                      page {currentPageIndex + 1} of {Math.max(cadernoPaginas.length, 1)}
-                    </small>
+                      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        {isSheetFull(cadernoConteudo, textareaRef.current) && (
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              color: "var(--color-red-sands, #ad5b30)",
+                              fontWeight: 700,
+                              letterSpacing: "0.08em",
+                            }}
+                          >
+                            SHEET FULL
+                          </span>
+                        )}
+                        <small className="caderno-page-counter">
+                          page {currentPageIndex + 1} of {Math.max(cadernoPaginas.length, 1)}
+                        </small>
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      className="caderno-title-input"
+                      value={cadernoTitulo}
+                      onChange={(e) => handleCadernoTituloChange(e.target.value)}
+                      placeholder="Entry title (optional)..."
+                      aria-label="Journal entry title"
+                    />
+
+                    <textarea
+                      ref={textareaRef}
+                      className="caderno-textarea-ruled"
+                      value={cadernoConteudo}
+                      onChange={handleCadernoConteudoChange}
+                      onKeyDown={handleKeyDown}
+                      onPaste={handlePaste}
+                      onKeyUp={handleKeyUp}
+                      placeholder="Write your journal entry here..."
+                      aria-label="Journal page content"
+                      rows={MAX_LINES_PER_PAGE}
+                    />
+
+                    <div className="caderno-bottom-corner">
+                      <motion.button
+                        type="button"
+                        className={`classic-stamp-favorite ${
+                          cadernoFavoritado ? "is-favorited" : ""
+                        }`}
+                        onClick={toggleFavoritoCaderno}
+                        whileTap={{ scale: 0.95 }}
+                        title="Stamp page as favorite"
+                      >
+                        {cadernoFavoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
+                      </motion.button>
+                    </div>
                   </div>
-                </div>
-
-                <input
-                  type="text"
-                  className="caderno-title-input"
-                  value={cadernoTitulo}
-                  onChange={(e) => handleCadernoTituloChange(e.target.value)}
-                  placeholder="Entry title (optional)..."
-                  aria-label="Journal entry title"
-                />
-
-                <textarea
-                  ref={textareaRef}
-                  className="caderno-textarea-ruled"
-                  value={cadernoConteudo}
-                  onChange={handleCadernoConteudoChange}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  onKeyUp={handleKeyUp}
-                  placeholder="Write your journal entry here..."
-                  aria-label="Journal page content"
-                  rows={MAX_LINES_PER_PAGE}
-                />
-
-                <div className="caderno-bottom-corner">
-                  <motion.button
-                    type="button"
-                    className={`classic-stamp-favorite ${
-                      cadernoFavoritado ? "is-favorited" : ""
-                    }`}
-                    onClick={toggleFavoritoCaderno}
-                    whileTap={{ scale: 0.95 }}
-                    title="Stamp page as favorite"
-                  >
-                    {cadernoFavoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
-                  </motion.button>
-                </div>
+                </motion.div>
               </div>
-            </motion.div>
+            </div>
 
             <button
               type="button"
@@ -1454,9 +1668,13 @@ export default function JournalEditor() {
                     className="pinned-theme-clear"
                     onClick={() => {
                       setTemaSalvo("");
-                      try {
-                        window.localStorage.removeItem(PINNED_THEME_STORAGE_KEY);
-                      } catch {}
+                      if (isGuestMode) {
+                        setGuestPinnedTheme("");
+                      } else {
+                        try {
+                          window.localStorage.removeItem(PINNED_THEME_STORAGE_KEY);
+                        } catch {}
+                      }
                     }}
                     title="Remove theme"
                   >
@@ -1630,6 +1848,11 @@ export default function JournalEditor() {
                               className="stamp-button compact"
                               style={{ padding: "3px 8px", fontSize: "9px" }}
                               onClick={() => {
+                                if (isGuestMode) {
+                                  playPaperSound();
+                                  openGuestPrompt("notebook-manage");
+                                  return;
+                                }
                                 setRenamingNotebookId(nb.id);
                                 setRenameDraftValue(nb.nome);
                               }}
@@ -1717,6 +1940,13 @@ export default function JournalEditor() {
                   type="submit"
                   className="new-notebook-btn"
                   style={{ marginTop: "14px" }}
+                  onClick={(e) => {
+                    if (isGuestMode) {
+                      e.preventDefault();
+                      playPaperSound();
+                      openGuestPrompt("notebook-manage");
+                    }
+                  }}
                 >
                   + Create Journal
                 </button>
@@ -1802,6 +2032,13 @@ export default function JournalEditor() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Account Required Prompt for Guest Save & Notebook Restrictions */}
+      <GuestSavePromptModal
+        isOpen={guestPromptOpen}
+        onClose={() => setGuestPromptOpen(false)}
+        variant={guestPromptVariant}
+      />
     </section>
   );
 }

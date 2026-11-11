@@ -134,6 +134,16 @@ async function ensureAuthSchema() {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
 
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS revoked_tokens (
+          token_hash VARCHAR(64) PRIMARY KEY,
+          usuario_id INT NULL,
+          expira_em DATETIME NOT NULL,
+          revogado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_expira (expira_em)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
       const alterQueries = [
         `ALTER TABLE usuarios ADD COLUMN papel VARCHAR(50) DEFAULT 'usuario'`,
         `ALTER TABLE usuarios ADD COLUMN email_verificado BOOLEAN DEFAULT FALSE`,
@@ -484,6 +494,12 @@ const authMiddleware = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (!decoded || !decoded.id) {
       return res.status(401).json({ error: 'Invalid authentication token.' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const [revoked] = await pool.query('SELECT 1 FROM revoked_tokens WHERE token_hash = ? LIMIT 1', [tokenHash]);
+    if (revoked.length > 0) {
+      return res.status(401).json({ error: 'Session has been logged out or revoked.' });
     }
 
     const [users] = await pool.query('SELECT id, nome, email, papel, email_verificado, foto_url, bio, auth_provider, onboarding_concluido FROM usuarios WHERE id = ?', [decoded.id]);
@@ -1214,6 +1230,44 @@ app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password rese
   } catch (error) {
     console.error('[RESET-PASSWORD ERROR]:', error);
     res.status(500).json({ error: 'Internal error while resetting password.' });
+  }
+});
+
+app.post('/logout', async (req, res) => {
+  try {
+    let token = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    } else if (req.body && req.body.token) {
+      token = String(req.body.token).trim();
+    }
+
+    if (token) {
+      let decoded = null;
+      try {
+        decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true });
+      } catch {}
+
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const expDate =
+        decoded && decoded.exp
+          ? new Date(decoded.exp * 1000)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const userId = decoded && decoded.id ? Number(decoded.id) : null;
+
+      await pool.query(
+        `INSERT IGNORE INTO revoked_tokens (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)`,
+        [tokenHash, userId, expDate]
+      );
+      await pool.query(`DELETE FROM revoked_tokens WHERE expira_em < NOW()`);
+      sendLog('LOGOUT', req, { usuario_id: userId || 'anonimo', motivo: req.body?.motivo || 'user_action' });
+    }
+
+    return res.json({ message: 'Session invalidated.' });
+  } catch (err) {
+    console.error('[Auth-Service /logout ERROR]:', err.message);
+    return res.status(500).json({ error: 'Unable to invalidate server session.' });
   }
 });
 

@@ -187,6 +187,64 @@ async function initDb(retries = 15, delay = 2000) {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // 8.1 Revoked session tokens (logout invalidation)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS revoked_tokens (
+        token_hash VARCHAR(64) PRIMARY KEY,
+        usuario_id INT NULL,
+        expira_em DATETIME NOT NULL,
+        revogado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_expira (expira_em)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 8.2 Personal Journal Volumes (cadernos) & Pages (persisted per authenticated user)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS cadernos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id VARCHAR(120) NOT NULL,
+        usuario_id INT NOT NULL,
+        nome VARCHAR(120) NOT NULL,
+        cor_capa VARCHAR(30) DEFAULT 'marrom',
+        paginas_json LONGTEXT NOT NULL,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE KEY uk_usuario_caderno (usuario_id, client_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 8.3 Personal Correspondence Folders (pastas_cartas)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS pastas_cartas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        client_id VARCHAR(120) NOT NULL,
+        usuario_id INT NOT NULL,
+        nome VARCHAR(120) NOT NULL,
+        cor VARCHAR(30) DEFAULT 'marrom',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE KEY uk_usuario_pasta (usuario_id, client_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Safe column extensions on cartas for personal archive sync (drafts, folders, fonts, soft-delete)
+    const cartasAlters = [
+      `ALTER TABLE cartas ADD COLUMN client_id VARCHAR(120) DEFAULT NULL`,
+      `ALTER TABLE cartas ADD COLUMN pasta_client_id VARCHAR(120) DEFAULT NULL`,
+      `ALTER TABLE cartas ADD COLUMN pasta_nome VARCHAR(120) DEFAULT NULL`,
+      `ALTER TABLE cartas ADD COLUMN fonte VARCHAR(50) DEFAULT 'caveat'`,
+      `ALTER TABLE cartas ADD COLUMN status_carta VARCHAR(30) DEFAULT 'completed'`,
+      `ALTER TABLE cartas ADD COLUMN tema_carta VARCHAR(60) DEFAULT NULL`,
+      `ALTER TABLE cartas ADD COLUMN favoritado BOOLEAN DEFAULT FALSE`,
+      `ALTER TABLE cartas ADD COLUMN na_lixeira BOOLEAN DEFAULT FALSE`
+    ];
+    for (const q of cartasAlters) {
+      try {
+        await connection.query(q);
+      } catch (e) {}
+    }
+
     // ========================================================
     // TABELAS STRIPE (Plano Pro & Assinaturas)
     // ========================================================

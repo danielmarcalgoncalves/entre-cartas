@@ -164,12 +164,47 @@ async function login(req, res) {
 
 async function logout(req, res) {
   const motivo = req.body?.motivo || 'user_action';
-  sendLog('LOGOUT', req, {
-    usuario_id: req.usuarioId || req.usuario?.id || 'session_ended',
-    motivo
-  });
-  clearAuthCookie(res, req);
-  return res.json({ message: 'Signed out successfully.' });
+  const token = getBearerToken(req);
+
+  try {
+    if (token) {
+      let revokedOk = false;
+      try {
+        await requestAuthService({
+          method: 'POST',
+          path: '/logout',
+          data: { token, motivo },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        revokedOk = true;
+      } catch (svcErr) {
+        // Fallback: revoke directly in MariaDB if auth-service is momentarily unreachable
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        await pool.query(
+          `INSERT IGNORE INTO revoked_tokens (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)`,
+          [tokenHash, req.usuarioId || null, expDate]
+        );
+        revokedOk = true;
+      }
+
+      if (!revokedOk) {
+        clearAuthCookie(res, req);
+        return res.status(500).json({ error: 'Unable to complete server-side session invalidation.' });
+      }
+    }
+
+    sendLog('LOGOUT', req, {
+      usuario_id: req.usuarioId || req.usuario?.id || 'session_ended',
+      motivo
+    });
+    clearAuthCookie(res, req);
+    return res.json({ message: 'Signed out and session invalidated successfully.' });
+  } catch (err) {
+    console.error('[authController] logout error:', err.message);
+    clearAuthCookie(res, req);
+    return res.status(500).json({ error: 'Server session invalidation failed during logout.' });
+  }
 }
 
 async function me(req, res) {

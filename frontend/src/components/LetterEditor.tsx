@@ -5,6 +5,8 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { api } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useGuestDemo } from "@/hooks/useGuestDemo";
+import GuestSavePromptModal from "@/components/GuestSavePromptModal";
 import {
   ACTIVE_LETTER_EDIT_ID_KEY,
   ACTIVE_LETTER_FOLDER_ID_KEY,
@@ -14,6 +16,7 @@ import {
   LETTER_THEMES,
   PAPER_OPTIONS,
   SEAL_OPTIONS,
+  SESSION_CLEARED_EVENT,
   createLetterFolder,
   formatShortDate,
   getFontFamilyById,
@@ -31,7 +34,18 @@ import {
 } from "@/lib/journal-storage";
 
 export default function LetterEditor() {
-  const { user, isPro } = useAuth();
+  const { user, loading: authLoading, isPro } = useAuth();
+  const isGuestMode = !authLoading && !user;
+  const {
+    guestLetterFolders,
+    setGuestLetterFolders,
+    guestSelectedFolderId,
+    setGuestSelectedFolderId,
+    guestDraftLetter,
+    setGuestDraftLetter,
+  } = useGuestDemo();
+
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
 
   // Letter State
   const [editingLetterId, setEditingLetterId] = useState<string | null>(null);
@@ -136,7 +150,31 @@ export default function LetterEditor() {
   };
 
   const refreshData = (event?: any) => {
+    if (authLoading) return;
     if (event?.detail?.source === "letter-editor") return;
+
+    if (isGuestMode) {
+      setSavedLetters([]);
+      setLetterFolders(guestLetterFolders);
+      const validFolderId = guestLetterFolders.some((f) => f.id === guestSelectedFolderId)
+        ? guestSelectedFolderId
+        : guestLetterFolders[0]?.id || "";
+      setSelectedFolderId(validFolderId);
+
+      if (!hasLoadedInitialEditRef.current) {
+        hasLoadedInitialEditRef.current = true;
+        setCartaTitulo(guestDraftLetter.titulo);
+        setCartaDestinatario(guestDraftLetter.destinatario);
+        setCartaConteudo(guestDraftLetter.conteudo);
+        setCartaAssinatura(guestDraftLetter.assinatura);
+        setCartaFavoritado(guestDraftLetter.favoritado);
+        setLetterTheme(guestDraftLetter.letterTheme);
+        setSheetBgId(guestDraftLetter.sheetBgId);
+        setSheetBgColor(guestDraftLetter.sheetBgColor);
+        setFontFamilyId(guestDraftLetter.fontFamilyId);
+      }
+      return;
+    }
 
     const loadedLetters = loadSavedLetters(user?.id);
     setSavedLetters(loadedLetters);
@@ -174,14 +212,70 @@ export default function LetterEditor() {
   };
 
   useEffect(() => {
+    hasLoadedInitialEditRef.current = false;
+  }, [user?.id, isGuestMode]);
+
+  useEffect(() => {
+    const resetEditorMemory = () => {
+      hasLoadedInitialEditRef.current = false;
+      setSavedLetters([]);
+      setLetterFolders([]);
+      setSelectedFolderId("");
+      setEditingLetterId(null);
+      setEditingRemoteId(undefined);
+      setEditingCreatedAt(null);
+      setLetterStatus("draft");
+      setCartaTitulo("");
+      setCartaDestinatario("");
+      setCartaConteudo("");
+      setCartaAssinatura("");
+      setCartaFavoritado(false);
+    };
+    window.addEventListener(SESSION_CLEARED_EVENT, resetEditorMemory);
+    return () => {
+      window.removeEventListener(SESSION_CLEARED_EVENT, resetEditorMemory);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
     refreshData();
+    if (isGuestMode) return;
     window.addEventListener(JOURNAL_UPDATED_EVENT, refreshData);
     window.addEventListener("storage", refreshData);
     return () => {
       window.removeEventListener(JOURNAL_UPDATED_EVENT, refreshData);
       window.removeEventListener("storage", refreshData);
     };
-  }, [user?.id]);
+  }, [user?.id, authLoading, isGuestMode]);
+
+  // Keep in-memory guest letter synced while navigating within preview session
+  useEffect(() => {
+    if (!isGuestMode || !hasLoadedInitialEditRef.current) return;
+    setGuestDraftLetter({
+      titulo: cartaTitulo,
+      destinatario: cartaDestinatario,
+      conteudo: cartaConteudo,
+      assinatura: cartaAssinatura,
+      favoritado: cartaFavoritado,
+      letterTheme,
+      sheetBgId,
+      sheetBgColor,
+      fontFamilyId,
+    });
+  }, [
+    isGuestMode,
+    cartaTitulo,
+    cartaDestinatario,
+    cartaConteudo,
+    cartaAssinatura,
+    cartaFavoritado,
+    letterTheme,
+    sheetBgId,
+    sheetBgColor,
+    fontFamilyId,
+    setGuestDraftLetter,
+  ]);
 
   const handleStartNewLetter = () => {
     playPaperSound();
@@ -195,15 +289,23 @@ export default function LetterEditor() {
     setCartaAssinatura(user?.nome || "");
     setCartaFavoritado(false);
     setLetterTheme("Love");
-    try {
-      window.localStorage.removeItem(ACTIVE_LETTER_EDIT_ID_KEY);
-    } catch {}
+    if (!isGuestMode) {
+      try {
+        window.localStorage.removeItem(ACTIVE_LETTER_EDIT_ID_KEY);
+      } catch {}
+    }
     setToastMessage("Fresh stationery ready on your desk.");
     setTimeout(() => setToastMessage(null), 3000);
     setTimeout(() => titleInputRef.current?.focus(), 100);
   };
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
+    if (isGuestMode) {
+      playPaperSound();
+      setGuestPromptOpen(true);
+      return;
+    }
+
     if (!cartaConteudo.trim() && !cartaTitulo.trim() && !cartaDestinatario.trim()) {
       alert("Please write a title, recipient, or a few words before saving a draft.");
       return;
@@ -220,6 +322,49 @@ export default function LetterEditor() {
 
     const currentFolder =
       letterFolders.find((f) => f.id === selectedFolderId) || letterFolders[0];
+
+    let remoteId = editingRemoteId;
+    if (user?.id) {
+      try {
+        if (remoteId) {
+          await api.cartas.atualizar(remoteId, {
+            titulo: finalTitle,
+            conteudo: cartaConteudo || "",
+            destinatario_anonimo: cartaDestinatario.trim() || null,
+            categoria: cartaSelo.id,
+            tipo_papel: sheetBgId,
+            pasta_client_id: currentFolder?.id || null,
+            pasta_nome: currentFolder?.nome || null,
+            fonte: fontFamilyId,
+            status_carta: "draft",
+            tema_carta: letterTheme,
+            favoritado: cartaFavoritado,
+          });
+        } else {
+          const res = await api.cartas.enviar({
+            client_id: draftId,
+            titulo: finalTitle,
+            conteudo: cartaConteudo || finalTitle,
+            remetente_anonimo: cartaAssinatura.trim() || user?.nome || "Correspondent",
+            destinatario_anonimo: cartaDestinatario.trim() || null,
+            categoria: cartaSelo.id,
+            tipo_papel: sheetBgId,
+            data_carta: dataFormatada || "Today",
+            pasta_client_id: currentFolder?.id || null,
+            pasta_nome: currentFolder?.nome || null,
+            fonte: fontFamilyId,
+            status_carta: "draft",
+            tema_carta: letterTheme,
+            favoritado: cartaFavoritado,
+          });
+          if (res?.carta?.id) {
+            remoteId = res.carta.id;
+          }
+        }
+      } catch {
+        // Keep local draft even if network temporarily unavailable
+      }
+    }
 
     const draftEntry: JournalEntry = {
       id: draftId,
@@ -241,11 +386,12 @@ export default function LetterEditor() {
       pasta_nome: currentFolder?.nome,
       status: "draft",
       usuario_id: user?.id,
-      remote_id: editingRemoteId,
+      remote_id: remoteId,
     };
 
     upsertUserLetter(draftEntry, "letter-editor");
     setEditingLetterId(draftId);
+    setEditingRemoteId(remoteId);
     setEditingCreatedAt(draftEntry.criado_em);
     setLetterStatus("draft");
     setSavedLetters(loadSavedLetters(user?.id));
@@ -255,6 +401,12 @@ export default function LetterEditor() {
   };
 
   const handleSaveAndSeal = async () => {
+    if (isGuestMode) {
+      playPaperSound();
+      setGuestPromptOpen(true);
+      return;
+    }
+
     if (!cartaConteudo.trim() && !cartaTitulo.trim()) {
       alert("Please write your letter before sealing and preserving it.");
       return;
@@ -297,26 +449,39 @@ export default function LetterEditor() {
 
     let remoteId = editingRemoteId;
 
-    // Backend sync when available
-    if (cartaConteudo.trim().length >= 5) {
+    // Backend sync
+    if (user?.id) {
       try {
         if (remoteId) {
           await api.cartas.atualizar(remoteId, {
             titulo: finalTitle,
-            conteudo: cartaConteudo.trim(),
+            conteudo: cartaConteudo.trim() || finalTitle,
             destinatario_anonimo: cartaDestinatario.trim() || null,
             categoria: cartaSelo.id,
             tipo_papel: sheetBgId,
+            pasta_client_id: targetFolder.id,
+            pasta_nome: targetFolder.nome,
+            fonte: fontFamilyId,
+            status_carta: "completed",
+            tema_carta: letterTheme,
+            favoritado: cartaFavoritado,
           });
         } else {
           const res = await api.cartas.enviar({
+            client_id: letterId,
             titulo: finalTitle,
-            conteudo: cartaConteudo.trim(),
+            conteudo: cartaConteudo.trim() || finalTitle,
             remetente_anonimo: cartaAssinatura.trim() || user?.nome || "Correspondent",
             destinatario_anonimo: cartaDestinatario.trim() || null,
             categoria: cartaSelo.id,
             tipo_papel: sheetBgId,
             data_carta: dataFormatada || "Today",
+            pasta_client_id: targetFolder.id,
+            pasta_nome: targetFolder.nome,
+            fonte: fontFamilyId,
+            status_carta: "completed",
+            tema_carta: letterTheme,
+            favoritado: cartaFavoritado,
           });
           if (res?.carta?.id) {
             remoteId = res.carta.id;
@@ -375,6 +540,26 @@ export default function LetterEditor() {
           ? `You have reached the limit of ${limitFolders} folders on the Premium Plan.`
           : `You have reached the limit of ${limitFolders} folders on the Standard Plan. Join Pro Club for up to 10 folders!`
       );
+      return;
+    }
+
+    if (isGuestMode) {
+      const tempFolder: LetterFolder = {
+        id: "guest-folder-" + Date.now(),
+        nome: newFolderInputName.trim(),
+        cor: "marrom",
+        criadoEm: new Date().toISOString(),
+      };
+      const updatedTemp = [...letterFolders, tempFolder];
+      setLetterFolders(updatedTemp);
+      setGuestLetterFolders(updatedTemp);
+      setSelectedFolderId(tempFolder.id);
+      setGuestSelectedFolderId(tempFolder.id);
+      setNewFolderInputName("");
+      setShowNewFolderModal(false);
+      playPaperSound();
+      setToastMessage(`Preview folder "${tempFolder.nome}" added (temporary session only).`);
+      setTimeout(() => setToastMessage(null), 3500);
       return;
     }
 
@@ -475,9 +660,13 @@ export default function LetterEditor() {
                 } else {
                   playPaperSound();
                   setSelectedFolderId(e.target.value);
-                  try {
-                    window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, e.target.value);
-                  } catch {}
+                  if (isGuestMode) {
+                    setGuestSelectedFolderId(e.target.value);
+                  } else {
+                    try {
+                      window.localStorage.setItem(ACTIVE_LETTER_FOLDER_ID_KEY, e.target.value);
+                    } catch {}
+                  }
                 }
               }}
               aria-label="Select correspondence folder"
@@ -758,6 +947,13 @@ export default function LetterEditor() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Account Required Prompt when Guest Attempts Permanent Save */}
+      <GuestSavePromptModal
+        isOpen={guestPromptOpen}
+        onClose={() => setGuestPromptOpen(false)}
+        variant="save"
+      />
     </div>
   );
 }

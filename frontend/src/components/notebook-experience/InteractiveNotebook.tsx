@@ -27,50 +27,76 @@ import {
   type Notebook,
   ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
+  SESSION_CLEARED_EVENT,
   filterWrittenPages,
   getNotebookById,
   getNotebookTheme,
-  loadAllRawNotebooks,
+  loadUserNotebooks,
   playPaperSound,
 } from "@/lib/journal-storage";
+import { useAuth } from "@/hooks/useAuth";
 import "./notebook-experience.css";
 
 type BookState = "closed" | "opening" | "open" | "closing";
 
+const EMPTY_NOTEBOOK_FALLBACK: Notebook = {
+  id: "default-journal",
+  nome: "My Journal",
+  corCapa: "marrom",
+  paginas: [],
+  criadoEm: "",
+};
+
 export function InteractiveNotebook() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ? String(user.id) : null;
   const searchParams = useSearchParams();
   const requestedNotebookId = searchParams ? searchParams.get("id") || searchParams.get("notebook") : null;
 
-  // Active Notebook resolution from real persistent storage
-  const [activeNotebook, setActiveNotebook] = useState<Notebook>(() => {
-    if (typeof window !== "undefined") {
-      if (requestedNotebookId) {
-        const found = getNotebookById(requestedNotebookId);
-        if (found) return found;
-      }
-      const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
-      if (activeId) {
-        const found = getNotebookById(activeId);
-        if (found) return found;
-      }
-      const all = loadAllRawNotebooks();
-      if (all.length > 0) return all[0];
-    }
-    return {
-      id: requestedNotebookId || "default-journal",
-      nome: "My Journal",
-      corCapa: "marrom",
-      paginas: [],
-      criadoEm: new Date().toISOString(),
-    };
-  });
-
-  // Sync with persistent storage on storage / custom update events
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, router, user]);
+
+  // Active Notebook resolution strictly from authenticated user's storage
+  const [activeNotebook, setActiveNotebook] = useState<Notebook>(() => ({
+    ...EMPTY_NOTEBOOK_FALLBACK,
+    id: requestedNotebookId || "default-journal",
+    criadoEm: new Date().toISOString(),
+  }));
+
+  useEffect(() => {
+    const handleClear = () => {
+      setActiveNotebook({
+        ...EMPTY_NOTEBOOK_FALLBACK,
+        id: "default-journal",
+        criadoEm: new Date().toISOString(),
+      });
+    };
+    window.addEventListener(SESSION_CLEARED_EVENT, handleClear);
+    return () => {
+      window.removeEventListener(SESSION_CLEARED_EVENT, handleClear);
+    };
+  }, []);
+
+  // Sync with authenticated user's persistent storage
+  useEffect(() => {
+    if (authLoading || !userId) {
+      if (!authLoading && !userId) {
+        setActiveNotebook({
+          ...EMPTY_NOTEBOOK_FALLBACK,
+          id: "default-journal",
+          criadoEm: new Date().toISOString(),
+        });
+      }
+      return;
+    }
+
     const handleSync = () => {
       if (requestedNotebookId) {
-        const found = getNotebookById(requestedNotebookId);
+        const found = getNotebookById(requestedNotebookId, userId);
         if (found) {
           setActiveNotebook(found);
           return;
@@ -78,25 +104,26 @@ export function InteractiveNotebook() {
       }
       const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
       if (activeId) {
-        const found = getNotebookById(activeId);
+        const found = getNotebookById(activeId, userId);
         if (found) {
           setActiveNotebook(found);
           return;
         }
       }
-      const all = loadAllRawNotebooks();
+      const all = loadUserNotebooks(userId);
       if (all.length > 0) {
         setActiveNotebook(all[0]);
       }
     };
 
+    handleSync();
     window.addEventListener(JOURNAL_UPDATED_EVENT, handleSync);
     window.addEventListener("storage", handleSync);
     return () => {
       window.removeEventListener(JOURNAL_UPDATED_EVENT, handleSync);
       window.removeEventListener("storage", handleSync);
     };
-  }, [requestedNotebookId]);
+  }, [authLoading, requestedNotebookId, userId]);
 
   // Derive theme from active journal's cover color (Brown, Green, Wine, Black)
   const theme = useMemo(
@@ -247,7 +274,7 @@ export function InteractiveNotebook() {
       const maxSingleWidth = (vw - horizontalMargin) / 2;
       const maxBookHeight = vh - controlsReserve - verticalBreathing;
 
-      let pageHeight = Math.min(522, maxBookHeight, maxSingleWidth / aspect);
+      let pageHeight = Math.min(640, maxBookHeight, maxSingleWidth / aspect);
       pageHeight = Math.max(206, pageHeight);
       const pageWidth = Math.round(pageHeight * aspect);
       pageHeight = Math.round(pageHeight);
@@ -668,6 +695,7 @@ export function InteractiveNotebook() {
                       pageNumber={leaf.frontNumber}
                       variant={leaf.frontPage?.tipoPapel === "cream" ? "parchment" : "ruled"}
                       scale={metrics.scale}
+                      hideFolio={Boolean(leaf.frontPage)}
                     >
                       {leaf.frontPage ? (
                         <JournalUserPage
@@ -708,6 +736,7 @@ export function InteractiveNotebook() {
                       pageNumber={leaf.backNumber}
                       variant={leaf.backPage?.tipoPapel === "cream" ? "parchment" : "ruled"}
                       scale={metrics.scale}
+                      hideFolio={Boolean(leaf.backPage)}
                     >
                       {leaf.backPage ? (
                         <JournalUserPage

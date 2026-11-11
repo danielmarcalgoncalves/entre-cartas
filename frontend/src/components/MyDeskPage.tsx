@@ -143,16 +143,24 @@ export default function MyDeskPage() {
   // Load active notebook details for cover personalization
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!user?.id) {
+      setNotebookTitle("Between Letters");
+      setNotebookPageCount(0);
+      return;
+    }
     const syncNotebookMeta = () => {
       try {
         const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
-        const found = activeId ? getNotebookById(activeId) : null;
-        const userNbs = loadUserNotebooks(user?.id);
+        const found = activeId ? getNotebookById(activeId, user.id) : null;
+        const userNbs = loadUserNotebooks(user.id);
         const target = found || (userNbs.length > 0 ? userNbs[0] : null);
         if (target) {
           setNotebookTitle(target.nome?.trim() || "Between Letters");
           setNotebookPageCount(filterWrittenPages(target.paginas).length);
           setNotebookColorId(getNotebookTheme(target.corCapa).id);
+        } else {
+          setNotebookTitle("Between Letters");
+          setNotebookPageCount(0);
         }
       } catch {
         // Keep defaults
@@ -314,6 +322,7 @@ export default function MyDeskPage() {
       rotation: -0.4,
       rotationY: -6,
       rotationX: 3.5,
+      transformPerspective: 1100,
       duration: 0.38,
       ease: "power2.out",
     });
@@ -369,6 +378,7 @@ export default function MyDeskPage() {
       rotation: 1.2,
       rotationX: 4,
       rotationY: 3.5,
+      transformPerspective: 1100,
       duration: 0.36,
       ease: "power2.out",
     });

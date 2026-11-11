@@ -31,6 +31,8 @@ async function listarCartas(req, res) {
       FROM cartas c
       LEFT JOIN carta_favoritos cf ON cf.carta_id = c.id AND cf.usuario_id = ?
       WHERE c.status_curadoria = 'aprovada'
+        AND (c.status_carta IS NULL OR c.status_carta = 'completed')
+        AND (c.na_lixeira IS NULL OR c.na_lixeira = FALSE)
     `;
 
     const params = [usuarioId || 0];
@@ -64,7 +66,7 @@ async function listarCartas(req, res) {
     const [rows] = await pool.query(query, params);
 
     // Contagem total para metadados de paginação
-    let countQuery = 'SELECT COUNT(*) as total FROM cartas c WHERE c.status_curadoria = "aprovada"';
+    let countQuery = 'SELECT COUNT(*) as total FROM cartas c WHERE c.status_curadoria = "aprovada" AND (c.status_carta IS NULL OR c.status_carta = "completed") AND (c.na_lixeira IS NULL OR c.na_lixeira = FALSE)';
     const countParams = [];
     if (categoria && categoria !== 'todas') {
       countQuery += ' AND c.categoria = ?';
@@ -159,25 +161,33 @@ async function obterCartaPorId(req, res) {
 // 3. Enviar uma nova carta para o acervo
 async function criarCarta(req, res) {
   try {
-    const usuarioId = req.usuarioId || null;
-    const papelUsuario = req.usuarioPapel || 'visitante';
+    const usuarioId = req.usuarioId;
+    const papelUsuario = req.usuarioPapel || 'usuario';
     const {
       titulo,
-      conteudo,
+      conteudo = '',
       remetente_anonimo,
       destinatario_anonimo,
       categoria = 'desabafo',
       tipo_papel = 'envelhecido',
       lacre_cera_cor = 'vinho',
-      data_carta
+      data_carta,
+      client_id = null,
+      pasta_client_id = null,
+      pasta_nome = null,
+      fonte = 'caveat',
+      status_carta = 'completed',
+      tema_carta = null,
+      favoritado = false
     } = req.body;
 
     if (!titulo || !titulo.trim()) {
       return res.status(400).json({ error: 'Letter title is required.' });
     }
 
-    if (!conteudo || !conteudo.trim() || conteudo.trim().length < 5) {
-      return res.status(400).json({ error: 'Letter content must contain at least 5 characters.' });
+    const normalizedStatus = status_carta === 'draft' ? 'draft' : 'completed';
+    if (normalizedStatus === 'completed' && !String(conteudo).trim()) {
+      return res.status(400).json({ error: 'Letter content cannot be empty.' });
     }
 
     // Business rule for written letter quotas:
@@ -188,7 +198,7 @@ async function criarCarta(req, res) {
       const limiteCartas = isPremium ? 30 : 10;
 
       const [contagemCartas] = await pool.query(
-        `SELECT COUNT(*) as total FROM cartas WHERE usuario_id = ?`,
+        `SELECT COUNT(*) as total FROM cartas WHERE usuario_id = ? AND (na_lixeira IS NULL OR na_lixeira = FALSE)`,
         [usuarioId]
       );
       const totalEscritas = contagemCartas[0] ? contagemCartas[0].total : 0;
@@ -212,18 +222,25 @@ async function criarCarta(req, res) {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO cartas (usuario_id, titulo, conteudo, remetente_anonimo, destinatario_anonimo, categoria, tipo_papel, lacre_cera_cor, data_carta, status_curadoria)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aprovada')`,
+      `INSERT INTO cartas (usuario_id, titulo, conteudo, remetente_anonimo, destinatario_anonimo, categoria, tipo_papel, lacre_cera_cor, data_carta, client_id, pasta_client_id, pasta_nome, fonte, status_carta, tema_carta, favoritado, na_lixeira, status_curadoria)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, 'aprovada')`,
       [
         usuarioId,
         titulo.trim(),
-        conteudo.trim(),
+        String(conteudo || '').trim(),
         remetente_anonimo ? remetente_anonimo.trim() : 'Anonymous',
         destinatario_anonimo ? destinatario_anonimo.trim() : null,
         categoria,
         tipo_papel,
         lacre_cera_cor,
-        data_carta || 'Today'
+        data_carta || 'Today',
+        client_id,
+        pasta_client_id,
+        pasta_nome,
+        fonte,
+        normalizedStatus,
+        tema_carta,
+        Boolean(favoritado) ? 1 : 0
       ]
     );
 
@@ -235,12 +252,13 @@ async function criarCarta(req, res) {
     });
 
     return res.status(201).json({
-      message: 'Letter sealed and archived in your memory box!',
+      message: normalizedStatus === 'draft' ? 'Draft saved!' : 'Letter sealed and archived in your memory box!',
       carta: {
         id: result.insertId,
-        titulo,
+        titulo: titulo.trim(),
         categoria,
         tipo_papel,
+        status_carta: normalizedStatus,
         remetente_anonimo: remetente_anonimo || 'Anonymous'
       }
     });
@@ -498,8 +516,16 @@ async function atualizarMinhaCarta(req, res) {
       titulo,
       conteudo,
       destinatario_anonimo,
+      remetente_anonimo,
       categoria,
-      tipo_papel
+      tipo_papel,
+      pasta_client_id,
+      pasta_nome,
+      fonte,
+      status_carta,
+      tema_carta,
+      favoritado,
+      na_lixeira
     } = req.body;
 
     if (!titulo || !titulo.trim()) {
@@ -507,7 +533,7 @@ async function atualizarMinhaCarta(req, res) {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, conteudo, destinatario_anonimo, categoria, tipo_papel FROM cartas WHERE id = ? AND usuario_id = ?',
+      'SELECT id, conteudo, destinatario_anonimo, remetente_anonimo, categoria, tipo_papel, pasta_client_id, pasta_nome, fonte, status_carta, tema_carta, favoritado, na_lixeira FROM cartas WHERE id = ? AND usuario_id = ?',
       [id, usuarioId]
     );
 
@@ -516,16 +542,41 @@ async function atualizarMinhaCarta(req, res) {
     }
 
     const existing = rows[0];
-    const nextConteudo = conteudo !== undefined ? conteudo.trim() : existing.conteudo;
+    const nextConteudo = conteudo !== undefined ? String(conteudo).trim() : existing.conteudo;
     const nextDestinatario = destinatario_anonimo !== undefined ? (destinatario_anonimo ? destinatario_anonimo.trim() : null) : existing.destinatario_anonimo;
+    const nextRemetente = remetente_anonimo !== undefined ? (remetente_anonimo ? remetente_anonimo.trim() : 'Anonymous') : existing.remetente_anonimo;
     const nextCategoria = categoria || existing.categoria;
     const nextPapel = tipo_papel || existing.tipo_papel;
+    const nextPastaId = pasta_client_id !== undefined ? pasta_client_id : existing.pasta_client_id;
+    const nextPastaNome = pasta_nome !== undefined ? pasta_nome : existing.pasta_nome;
+    const nextFonte = fonte || existing.fonte;
+    const nextStatus = status_carta || existing.status_carta;
+    const nextTema = tema_carta !== undefined ? tema_carta : existing.tema_carta;
+    const nextFav = favoritado !== undefined ? (Boolean(favoritado) ? 1 : 0) : existing.favoritado;
+    const nextLixeira = na_lixeira !== undefined ? (Boolean(na_lixeira) ? 1 : 0) : existing.na_lixeira;
 
     await pool.query(
       `UPDATE cartas
-       SET titulo = ?, conteudo = ?, destinatario_anonimo = ?, categoria = ?, tipo_papel = ?
+       SET titulo = ?, conteudo = ?, destinatario_anonimo = ?, remetente_anonimo = ?, categoria = ?, tipo_papel = ?,
+           pasta_client_id = ?, pasta_nome = ?, fonte = ?, status_carta = ?, tema_carta = ?, favoritado = ?, na_lixeira = ?
        WHERE id = ? AND usuario_id = ?`,
-      [titulo.trim(), nextConteudo, nextDestinatario, nextCategoria, nextPapel, id, usuarioId]
+      [
+        titulo.trim(),
+        nextConteudo,
+        nextDestinatario,
+        nextRemetente,
+        nextCategoria,
+        nextPapel,
+        nextPastaId,
+        nextPastaNome,
+        nextFonte,
+        nextStatus,
+        nextTema,
+        nextFav,
+        nextLixeira,
+        id,
+        usuarioId
+      ]
     );
 
     return res.json({
@@ -535,13 +586,44 @@ async function atualizarMinhaCarta(req, res) {
         titulo: titulo.trim(),
         conteudo: nextConteudo,
         destinatario_anonimo: nextDestinatario,
+        remetente_anonimo: nextRemetente,
         categoria: nextCategoria,
-        tipo_papel: nextPapel
+        tipo_papel: nextPapel,
+        pasta_client_id: nextPastaId,
+        pasta_nome: nextPastaNome,
+        fonte: nextFonte,
+        status_carta: nextStatus,
+        tema_carta: nextTema,
+        favoritado: Boolean(nextFav),
+        na_lixeira: Boolean(nextLixeira)
       }
     });
   } catch (error) {
     console.error('[Cartas Controller] Erro ao atualizar carta:', error);
     return res.status(500).json({ error: 'Unable to update the letter.' });
+  }
+}
+
+// 10.1 Mover para lixeira / restaurar carta do usuário autenticado
+async function atualizarLixeiraCarta(req, res) {
+  try {
+    const usuarioId = req.usuarioId;
+    const { id } = req.params;
+    const naLixeira = Boolean(req.body?.na_lixeira) ? 1 : 0;
+
+    const [result] = await pool.query(
+      'UPDATE cartas SET na_lixeira = ? WHERE id = ? AND usuario_id = ?',
+      [naLixeira, id, usuarioId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Letter not found for this account.' });
+    }
+
+    return res.json({ message: naLixeira ? 'Letter moved to trash.' : 'Letter restored from trash.', na_lixeira: Boolean(naLixeira) });
+  } catch (error) {
+    console.error('[Cartas Controller] Erro ao atualizar lixeira:', error);
+    return res.status(500).json({ error: 'Unable to update letter discard status.' });
   }
 }
 
@@ -576,6 +658,7 @@ module.exports = {
   listarCartasGuardadas,
   listarMinhasCartas,
   atualizarMinhaCarta,
+  atualizarLixeiraCarta,
   excluirMinhaCarta,
   obterCategorias,
   adicionarNotaCarta

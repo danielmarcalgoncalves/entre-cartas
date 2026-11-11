@@ -802,8 +802,8 @@
   cursor: pointer;
   text-decoration: none;
   outline: none;
-  transform-style: preserve-3d;
-  will-change: transform;
+  isolation: isolate;
+  perspective: 1100px;
   display: block;
 }
 
@@ -813,13 +813,18 @@
   border-radius: 8px;
 }
 
-/* Physical cast shadow resting on the walnut wood beneath the notebook */
+/* Physical cast shadow resting strictly underneath/behind the notebook on the wood */
 .desk-journal-shadow {
   position: absolute;
-  inset: 3% 2% -2% 4%;
-  background: rgba(5, 2, 0, 0.84);
+  inset: 4% 2% -4% 4%;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(5, 2, 0, 0.78) 0%,
+    rgba(5, 2, 0, 0.56) 65%,
+    rgba(5, 2, 0, 0) 100%
+  );
   filter: blur(16px);
-  border-radius: 10px;
+  border-radius: 12px;
   z-index: 0;
   pointer-events: none;
   transform: translate(8px, 14px);
@@ -830,8 +835,8 @@
   position: relative;
   width: 100%;
   height: 100%;
-  z-index: 1;
-  transform-style: preserve-3d;
+  z-index: 2;
+  transform-style: flat;
   will-change: transform;
 }
 
@@ -839,6 +844,7 @@
 .desk-book__backboard {
   position: absolute;
   inset: 2px -8px -7px 3px;
+  z-index: 1;
   border-radius: 4px 11px 11px 4px;
   background: linear-gradient(145deg, #3c1e0a 0%, #281205 100%);
   box-shadow:
@@ -853,6 +859,7 @@
   bottom: 4px;
   right: -5px;
   width: 11px;
+  z-index: 1;
   border-radius: 0 3px 3px 0;
   background: repeating-linear-gradient(
     90deg,
@@ -873,6 +880,7 @@
   right: -3px;
   bottom: -4px;
   height: 9px;
+  z-index: 1;
   border-radius: 0 0 4px 2px;
   background: repeating-linear-gradient(
     0deg,
@@ -895,7 +903,7 @@
   background: linear-gradient(180deg, #7c1f28 0%, #9e2b36 55%, #68171f 100%);
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
   filter: drop-shadow(0 5px 6px rgba(10, 3, 1, 0.65));
-  z-index: 0;
+  z-index: 1;
   transition: transform 0.35s ease;
   pointer-events: none;
 }
@@ -907,6 +915,7 @@
 /* 3. Main Hand-Tooled Leather Cover */
 .desk-book__leather-cover {
   position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   border-radius: 4px 10px 10px 4px;
@@ -1240,8 +1249,8 @@
   cursor: pointer;
   text-decoration: none;
   outline: none;
-  transform-style: preserve-3d;
-  will-change: transform;
+  isolation: isolate;
+  perspective: 1100px;
   display: block;
 }
 
@@ -1251,13 +1260,18 @@
   border-radius: 6px;
 }
 
-/* Separate physical cast shadow beneath the correspondence parcel */
+/* Separate physical cast shadow strictly beneath/behind the correspondence parcel */
 .desk-envelope-shadow {
   position: absolute;
-  inset: 5% 3% -4% 5%;
-  background: rgba(6, 2, 0, 0.78);
+  inset: 6% 3% -5% 5%;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(6, 2, 0, 0.74) 0%,
+    rgba(6, 2, 0, 0.5) 65%,
+    rgba(6, 2, 0, 0) 100%
+  );
   filter: blur(15px);
-  border-radius: 6px;
+  border-radius: 8px;
   z-index: 0;
   pointer-events: none;
   transform: translate(6px, 12px);
@@ -1268,7 +1282,8 @@
   position: relative;
   width: 100%;
   height: 100%;
-  z-index: 1;
+  z-index: 2;
+  transform-style: flat;
   will-change: transform;
 }
 
@@ -1276,6 +1291,7 @@
 .desk-parcel-under-sheet {
   position: absolute;
   inset: -6px 6px 8px -8px;
+  z-index: 1;
   background-color: #e9dac1;
   background-image:
     linear-gradient(180deg, rgba(255, 250, 240, 0.5) 0%, rgba(216, 196, 168, 0.65) 100%),
@@ -1303,6 +1319,7 @@
 /* Main Vintage Parchment Envelope */
 .desk-parcel-envelope {
   position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   background-color: #f3e7d2;

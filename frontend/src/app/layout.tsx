@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import SiteShell from "@/components/SiteShell";
 import { AuthProvider } from "@/hooks/useAuth";
+import { GuestDemoProvider } from "@/hooks/useGuestDemo";
 import { ArchiveProvider } from "@/components/archive-store";
 import { ThemeProvider } from "@/hooks/useTheme";
 import "./globals.css";
@@ -40,9 +41,11 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body>
         <ThemeProvider>
           <AuthProvider>
-            <ArchiveProvider>
-              <SiteShell>{children}</SiteShell>
-            </ArchiveProvider>
+            <GuestDemoProvider>
+              <ArchiveProvider>
+                <SiteShell>{children}</SiteShell>
+              </ArchiveProvider>
+            </GuestDemoProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

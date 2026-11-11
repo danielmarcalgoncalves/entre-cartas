@@ -14,6 +14,7 @@ const commentsRoutes = require('./src/routes/commentsRoutes');
 const listsRoutes = require('./src/routes/listsRoutes');
 const profileRoutes = require('./src/routes/profileRoutes');
 const stripeRoutes = require('./src/routes/stripeRoutes');
+const journalRoutes = require('./src/routes/journalRoutes');
 
 let cookieParser;
 try {
@@ -62,6 +63,7 @@ app.use('/api/favorites', favoritesRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/lists', listsRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/journal', journalRoutes);
 
 // Rota direta de administração para Logs de Auditoria (Atividade 5 - RBAC Admin)
 const authController = require('./src/controllers/authController');

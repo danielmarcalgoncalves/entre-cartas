@@ -1,8 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api, setSession, clearSession } from "@/services/api";
+import {
+  clearAllPrivateBrowserData,
+  hydrateUserDataFromBackend,
+} from "@/lib/journal-storage";
 
 export interface User {
   id: number;
@@ -40,20 +44,39 @@ const AuthContext = createContext<AuthContextType>({
   refreshUser: async () => {},
 });
 
+const LAST_USER_MARKER_KEY = "entre-cartas:last-uid";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const logoutInFlightRef = useRef(false);
+
+  const syncUserAccountScope = async (authenticatedUser: User) => {
+    if (typeof window !== "undefined") {
+      try {
+        const previousUid = window.sessionStorage.getItem(LAST_USER_MARKER_KEY);
+        if (previousUid && previousUid !== String(authenticatedUser.id)) {
+          // Different account authenticated on this browser — wipe prior user's local data completely
+          await clearAllPrivateBrowserData();
+        }
+        window.sessionStorage.setItem(LAST_USER_MARKER_KEY, String(authenticatedUser.id));
+      } catch {}
+    }
+    await hydrateUserDataFromBackend(authenticatedUser.id);
+  };
 
   const refreshUser = async () => {
     try {
       const data = await api.auth.me();
       if (data && data.usuario) {
+        await syncUserAccountScope(data.usuario);
         setUser(data.usuario);
       } else {
         setUser(null);
       }
     } catch {
+      clearSession();
       setUser(null);
     } finally {
       setLoading(false);
@@ -65,42 +88,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, senha: string, rememberMe = true) => {
-    const res = await api.auth.login(email, senha, rememberMe);
-    if (res.token) {
-      setSession(res.token, rememberMe);
+    setLoading(true);
+    try {
+      // Ensure clean slate before hydrating newly signed-in account
+      await clearAllPrivateBrowserData();
+      const res = await api.auth.login(email, senha, rememberMe);
+      if (res.token) {
+        setSession(res.token, rememberMe);
+      }
+      if (res.usuario) {
+        await syncUserAccountScope(res.usuario);
+        setUser(res.usuario);
+      } else {
+        await refreshUser();
+      }
+      return res;
+    } finally {
+      setLoading(false);
     }
-    if (res.usuario) {
-      setUser(res.usuario);
-    }
-    await refreshUser();
-    return res;
   };
 
   const register = async (nome: string, email: string, senha: string) => {
     const res = await api.auth.register(nome, email, senha);
     if (res.token && !res.requireVerification) {
+      await clearAllPrivateBrowserData();
       setSession(res.token, true);
       if (res.usuario) {
+        await syncUserAccountScope(res.usuario);
         setUser(res.usuario);
+      } else {
+        await refreshUser();
       }
-      await refreshUser();
     }
     return res;
   };
 
   const applyTokenSession = async (token: string, persist = true) => {
-    setSession(token, persist);
-    await refreshUser();
+    setLoading(true);
+    try {
+      await clearAllPrivateBrowserData();
+      setSession(token, persist);
+      await refreshUser();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = async () => {
+    if (logoutInFlightRef.current) return;
+    logoutInFlightRef.current = true;
+    let serverLogoutError: Error | null = null;
+
     try {
       await api.auth.logout();
-    } catch {}
-    clearSession();
-    setUser(null);
-    // Smooth client navigation to landing page preserving personal data
-    router.push("/");
+    } catch (err: any) {
+      serverLogoutError = err instanceof Error ? err : new Error("Server logout failed.");
+    } finally {
+      // Fail closed: always purge local auth tokens, private caches, and user state
+      clearSession();
+      await clearAllPrivateBrowserData();
+      setUser(null);
+      logoutInFlightRef.current = false;
+      router.replace("/");
+    }
+
+    if (serverLogoutError) {
+      throw serverLogoutError;
+    }
   };
 
   const isPro = user?.papel === "premium" || user?.papel === "admin";

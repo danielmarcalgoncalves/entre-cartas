@@ -8,7 +8,13 @@ import {
   getPaperColorById,
   getNotebookDates,
 } from "@/lib/journal-storage";
-
+import {
+  JOURNAL_MAX_LINES_PER_PAGE,
+  JOURNAL_PAGE_HEIGHT,
+  JOURNAL_PAGE_LAYOUT,
+  JOURNAL_PAGE_WIDTH,
+  extractJournalPageMedia,
+} from "@/lib/journal-page-layout";
 
 import React, { type ReactNode } from "react";
 
@@ -20,22 +26,24 @@ export interface NotebookPageProps {
   pageNumber?: string;
   variant?: PageVariant;
   scale?: number;
+  hideFolio?: boolean;
   children: ReactNode;
   className?: string;
 }
 
-export const CANONICAL_PAGE_WIDTH = 380;
-export const CANONICAL_PAGE_HEIGHT = 514;
+export const CANONICAL_PAGE_WIDTH = JOURNAL_PAGE_WIDTH;
+export const CANONICAL_PAGE_HEIGHT = JOURNAL_PAGE_HEIGHT;
 
 /**
  * Reusable physical sheet container for each independent page composition.
- * Preserves aspect-ratio layout across desktop, tablet, and mobile viewports without scroll.
+ * Preserves exact 580x820 aspect-ratio layout across desktop, tablet, and mobile viewports without scroll.
  */
 export function NotebookPage({
   side,
   pageNumber,
   variant = "ruled",
   scale = 1,
+  hideFolio = false,
   children,
   className = "",
 }: NotebookPageProps) {
@@ -43,7 +51,7 @@ export function NotebookPage({
     <div
       className={`nb-page nb-page--${side} nb-page--${variant} ${className}`}
     >
-      {/* Scaled canonical canvas so rich scrapbook compositions never overflow on smaller screens */}
+      {/* Scaled canonical canvas so rich compositions & user sheets maintain identical geometry */}
       <div
         className="nb-page__canvas"
         style={{
@@ -54,7 +62,7 @@ export function NotebookPage({
       >
         <div className="nb-page__inner">{children}</div>
 
-        {pageNumber && (
+        {!hideFolio && pageNumber && (
           <span
             className={`nb-page__folio nb-page__folio--${side}`}
             aria-hidden="true"
@@ -539,19 +547,11 @@ export function JournalUserPage({
   const inkColor = getInkColorById(page.corTinta);
   const fontFamily = getFontFamilyById(page.fonte || "caveat");
 
-  // Extract attached photo/polaroid if present in content or properties
-  let imageUrl: string | null = (page as any).polaroid_url || null;
-  let imageCaption: string | null = (page as any).polaroid_legenda || null;
-  let cleanContent = page.conteudo || "";
-
-  const markdownImgMatch = cleanContent.match(/!\[(.*?)\]\((.*?)\)/);
-  if (markdownImgMatch) {
-    if (!imageUrl) {
-      imageUrl = markdownImgMatch[2];
-      imageCaption = markdownImgMatch[1] || null;
-    }
-    cleanContent = cleanContent.replace(/!\[(.*?)\]\((.*?)\)/g, "").trim();
-  }
+  const { imageUrl, imageCaption, cleanContent } = extractJournalPageMedia(
+    page.conteudo || "",
+    (page as any).polaroid_url || null,
+    (page as any).polaroid_legenda || null
+  );
 
   const hasContent = cleanContent.trim().length > 0;
   const hasTitle = Boolean(page.titulo && page.titulo.trim().length > 0);
@@ -560,64 +560,54 @@ export function JournalUserPage({
     <div
       className="nb-user-entry-page"
       style={{
+        width: `${JOURNAL_PAGE_LAYOUT.width}px`,
+        height: `${JOURNAL_PAGE_LAYOUT.height}px`,
+        padding: `${JOURNAL_PAGE_LAYOUT.paddingTop}px ${JOURNAL_PAGE_LAYOUT.paddingRight}px ${JOURNAL_PAGE_LAYOUT.paddingBottom}px ${JOURNAL_PAGE_LAYOUT.paddingLeft}px`,
         backgroundColor: paperColor,
         color: inkColor,
+        fontFamily,
       }}
     >
-      {/* Subtle ruled notebook lines */}
-      <div className="nb-user-ruled-lines" aria-hidden="true">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <span key={i} className="nb-user-rule-line" />
-        ))}
-      </div>
-
       <div className="nb-user-entry-content">
-        {/* Top Header: Date & Favorited Wax Heart Stamp */}
+        {/* Line 1 (28px): Date, Favorite Stamp & Page Counter — matches .caderno-date-line */}
         <div className="nb-user-entry-header">
           <span className="nb-user-entry-date">
-            {page.dataFormatada || "Recorded Entry"}
+            {page.dataFormatada || "Today"}
           </span>
-          {page.favoritado && (
-            <span className="nb-user-favorite-stamp" title="Favorited entry in your archive">
-              ♥ FAVORITED
-            </span>
-          )}
+          <div className="nb-user-entry-header-meta">
+            {page.favoritado && (
+              <span className="nb-user-favorite-stamp" title="Favorited entry in your archive">
+                FAVORITED ♥
+              </span>
+            )}
+            <small className="nb-user-page-counter">
+              page {Number(pageNumber) || 1}
+            </small>
+          </div>
         </div>
 
-        {/* Entry Title */}
-        {hasTitle && (
-          <h3
-            className="nb-user-entry-title"
-            style={{
-              fontFamily: fontFamily.includes("cursive") ? "'Cormorant Garamond', Georgia, serif" : fontFamily,
-              color: inkColor,
-            }}
-          >
-            {page.titulo}
-          </h3>
-        )}
-
-        {/* Optional Attached Polaroid Photograph */}
-        {imageUrl && (
-          <div className={`nb-user-polaroid-wrap ${side === "left" ? "nb-user-polaroid--left" : "nb-user-polaroid--right"}`}>
-            <div className="nb-mini-polaroid">
-              <span className="nb-washi nb-washi--top" aria-hidden="true" />
-              <div className="nb-mini-polaroid__img-wrap">
-                <img src={imageUrl} alt={imageCaption || "Journal photograph"} loading="lazy" />
-              </div>
-              {imageCaption && <span className="nb-mini-polaroid__cap">{imageCaption}</span>}
-            </div>
-          </div>
-        )}
-
-        {/* Written Journal Text */}
+        {/* Line 2 (28px): Always reserves exact title line height so body begins at y=94px */}
         <div
-          className="nb-user-entry-body"
-          style={{
-            fontFamily,
-            color: inkColor,
-          }}
+          className={`nb-user-entry-title ${hasTitle ? "" : "is-empty"}`}
+          aria-hidden={!hasTitle}
         >
+          {hasTitle ? page.titulo : "\u00A0"}
+        </div>
+
+        {/* Lines 3..25 (644px = 23 * 28px): Identical usable writing area, wrapping & typography */}
+        <div className="nb-user-entry-body">
+          {imageUrl && (
+            <div className={`nb-user-polaroid-wrap ${side === "left" ? "nb-user-polaroid--left" : "nb-user-polaroid--right"}`}>
+              <div className="nb-mini-polaroid">
+                <span className="nb-washi nb-washi--top" aria-hidden="true" />
+                <div className="nb-mini-polaroid__img-wrap">
+                  <img src={imageUrl} alt={imageCaption || "Journal photograph"} loading="lazy" />
+                </div>
+                {imageCaption && <span className="nb-mini-polaroid__cap">{imageCaption}</span>}
+              </div>
+            </div>
+          )}
+
           {hasContent ? (
             cleanContent
           ) : (
@@ -627,7 +617,7 @@ export function JournalUserPage({
           )}
         </div>
 
-        {/* Page Footer Folio */}
+        {/* Bottom 38px footer matching .caderno-bottom-corner height */}
         <div className="nb-user-entry-footer">
           <span className="nb-user-volume-tag">VOL · {notebookName}</span>
           <span className="nb-user-page-folio">P. {pageNumber}</span>
@@ -800,7 +790,7 @@ export function JournalEmptyPromptPage({
     <div className="nb-comp nb-comp--first-lines">
       <div className="nb-ruled-sheet">
         <div className="nb-ruled-sheet__lines" aria-hidden="true">
-          {Array.from({ length: 14 }).map((_, i) => (
+          {Array.from({ length: JOURNAL_MAX_LINES_PER_PAGE }).map((_, i) => (
             <span key={i} />
           ))}
         </div>

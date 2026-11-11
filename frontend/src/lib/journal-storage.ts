@@ -1,6 +1,9 @@
 "use client";
 
+import { api } from "@/services/api";
+
 export const JOURNAL_UPDATED_EVENT = "entre-cartas:journal-updated";
+export const SESSION_CLEARED_EVENT = "entre-cartas:session-cleared";
 export const NOTEBOOKS_STORAGE_KEY = "entre-cartas:notebooks:v2";
 export const ACTIVE_NOTEBOOK_ID_KEY = "entre-cartas:active-notebook-id";
 export const ACTIVE_NOTEBOOK_PAGE_KEY = "entre-cartas:active-notebook-page";
@@ -168,10 +171,13 @@ export const getNotebookTheme = (corCapa?: string): NotebookColorOption => {
   return NOTEBOOK_COLOR_OPTIONS[0];
 };
 
-export function getNotebookById(notebookId?: string | null): Notebook | null {
-  if (!notebookId || typeof window === "undefined") return null;
-  const all = loadAllRawNotebooks();
-  return all.find((n) => n.id === notebookId) || null;
+export function getNotebookById(
+  notebookId?: string | null,
+  userId?: string | number | null
+): Notebook | null {
+  if (!notebookId || !userId || typeof window === "undefined") return null;
+  const userNotebooks = loadUserNotebooks(userId);
+  return userNotebooks.find((n) => n.id === notebookId) || null;
 }
 
 export interface FolderColorOption {
@@ -421,9 +427,9 @@ export function loadAllRawNotebooks(): Notebook[] {
 }
 
 export function loadUserNotebooks(userId?: number | string | null): Notebook[] {
+  if (!userId) return [];
   const all = loadAllRawNotebooks();
-  if (!userId) return all;
-  return all.filter((nb) => !nb.ownerId || String(nb.ownerId) === String(userId));
+  return all.filter((nb) => nb.ownerId !== undefined && nb.ownerId !== null && String(nb.ownerId) === String(userId));
 }
 
 export function saveAllNotebooks(notebooks: Notebook[], source?: string) {
@@ -438,10 +444,20 @@ export function renameUserNotebook(notebookId: string, newName: string): Noteboo
   const trimmed = newName.trim();
   if (!trimmed) return loadAllRawNotebooks();
   const nowIso = new Date().toISOString();
+  const target = loadAllRawNotebooks().find((nb) => nb.id === notebookId);
   const updated = loadAllRawNotebooks().map((nb) =>
     nb.id === notebookId ? { ...nb, nome: trimmed, atualizadoEm: nowIso } : nb
   );
   saveAllNotebooks(updated);
+  if (target) {
+    api.journal
+      .upsertNotebook(notebookId, {
+        nome: trimmed,
+        corCapa: target.corCapa || "marrom",
+        paginas: filterWrittenPages(target.paginas),
+      })
+      .catch(() => {});
+  }
   return updated;
 }
 
@@ -455,26 +471,32 @@ export function deleteUserNotebook(notebookId: string): Notebook[] {
     }
   } catch {}
   saveAllNotebooks(remaining);
+  api.journal.deleteNotebook(notebookId).catch(() => {});
   return remaining;
 }
 
 export function loadTrashLetters(userId?: number | string | null): JournalEntry[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !userId) return [];
   try {
     const rawTrash = window.localStorage.getItem(TRASH_STORAGE_KEY);
     if (!rawTrash) return [];
     const parsed = JSON.parse(rawTrash);
     if (!Array.isArray(parsed)) return [];
-    if (!userId) return parsed;
-    return parsed.filter((item: JournalEntry) => !item.usuario_id || String(item.usuario_id) === String(userId));
+    return parsed.filter(
+      (item: JournalEntry) =>
+        item &&
+        item.usuario_id !== undefined &&
+        item.usuario_id !== null &&
+        String(item.usuario_id) === String(userId)
+    );
   } catch {
     return [];
   }
 }
 
 export function loadSavedLetters(userId?: number | string | null): JournalEntry[] {
-  if (typeof window === "undefined") return [];
-  const trash = loadTrashLetters();
+  if (typeof window === "undefined" || !userId) return [];
+  const trash = loadTrashLetters(userId);
   const trashIds = new Set(trash.map((d) => String(d.id)));
   try {
     const raw = window.localStorage.getItem(SAVED_ENTRIES_KEY);
@@ -483,10 +505,14 @@ export function loadSavedLetters(userId?: number | string | null): JournalEntry[
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((e: JournalEntry) => {
       if (!e || trashIds.has(String(e.id))) return false;
-      const isLetterEntry = Boolean(e.selo_carta) || e.status === "draft" || e.status === "completed" || e.humor !== "reflexao";
+      const isLetterEntry =
+        Boolean(e.selo_carta) ||
+        e.status === "draft" ||
+        e.status === "completed" ||
+        e.humor !== "reflexao";
       if (!isLetterEntry) return false;
-      if (userId && e.usuario_id && String(e.usuario_id) !== String(userId)) return false;
-      return true;
+      if (e.usuario_id === undefined || e.usuario_id === null) return false;
+      return String(e.usuario_id) === String(userId);
     });
   } catch {
     return [];
@@ -587,6 +613,10 @@ export function moveLetterToPostalTrash(carta: JournalEntry) {
   } catch {}
 
   dispatchJournalUpdated();
+  const remoteId = carta.remote_id || (!String(carta.id).startsWith("entry-") ? carta.id : null);
+  if (remoteId) {
+    api.cartas.setTrash(remoteId, true).catch(() => {});
+  }
 }
 
 export function restoreLetterFromPostalTrash(carta: JournalEntry) {
@@ -620,6 +650,10 @@ export function restoreLetterFromPostalTrash(carta: JournalEntry) {
   } catch {}
 
   dispatchJournalUpdated();
+  const remoteId = carta.remote_id || (!String(carta.id).startsWith("entry-") ? carta.id : null);
+  if (remoteId) {
+    api.cartas.setTrash(remoteId, false).catch(() => {});
+  }
 }
 
 export function permanentlyDeleteLetterFromStorage(letterId: string) {
@@ -669,15 +703,16 @@ export function emptyAllPostalTrash() {
 }
 
 export function loadLetterFolders(userId?: number | string | null): LetterFolder[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !userId) return [];
   try {
     const raw = window.localStorage.getItem(LETTER_FOLDERS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const valid = parsed.filter((f: LetterFolder) => f && f.id !== "pasta-principal");
-    if (!userId) return valid;
-    return valid.filter((f) => !f.ownerId || String(f.ownerId) === String(userId));
+    return valid.filter(
+      (f) => f.ownerId !== undefined && f.ownerId !== null && String(f.ownerId) === String(userId)
+    );
   } catch {
     return [];
   }
@@ -713,6 +748,11 @@ export function createLetterFolder(
     ownerId: userId || undefined,
   };
   saveLetterFolders([...existing, newFolder]);
+  if (userId) {
+    api.journal
+      .upsertFolder(newFolder.id, { nome: newFolder.nome, cor: newFolder.cor })
+      .catch(() => {});
+  }
   return newFolder;
 }
 
@@ -724,10 +764,17 @@ export function renameLetterFolder(
   const trimmed = novoNome.trim();
   if (!trimmed) return;
   const existing = loadLetterFolders(userId);
+  const target = existing.find((f) => f.id === folderId);
   const updated = existing.map((f) =>
     f.id === folderId ? { ...f, nome: trimmed } : f
   );
   saveLetterFolders(updated);
+
+  if (userId) {
+    api.journal
+      .upsertFolder(folderId, { nome: trimmed, cor: target?.cor || "marrom" })
+      .catch(() => {});
+  }
 
   // Update in saved letters
   const allLetters = loadSavedLetters(userId);
@@ -751,6 +798,10 @@ export function deleteLetterFolder(
   const existing = loadLetterFolders(userId);
   const remaining = existing.filter((f) => f.id !== folderId);
   saveLetterFolders(remaining);
+
+  if (userId) {
+    api.journal.deleteFolder(folderId).catch(() => {});
+  }
 
   // Safeguard: reassign letters in this folder to the first remaining folder or unfiled, so no letters are ever deleted
   const fallback = remaining[0];
@@ -779,16 +830,181 @@ export function moveLetterToFolder(
   userId?: number | string | null
 ) {
   const allLetters = loadSavedLetters(userId);
+  let movedLetter: JournalEntry | null = null;
   const updatedLetters = allLetters.map((l) => {
     if (String(l.id) === String(letterId)) {
-      return {
+      movedLetter = {
         ...l,
         pasta_id: targetFolderId,
         pasta_nome: targetFolderName,
         atualizado_em: new Date().toISOString(),
       };
+      return movedLetter;
     }
     return l;
   });
   saveAllLetters(updatedLetters);
+  if (userId && movedLetter) {
+    const ml = movedLetter as JournalEntry;
+    const remoteId = ml.remote_id || (!String(ml.id).startsWith("entry-") ? ml.id : null);
+    if (remoteId) {
+      api.cartas
+        .atualizar(remoteId, {
+          titulo: ml.titulo || "Untitled",
+          pasta_client_id: targetFolderId,
+          pasta_nome: targetFolderName,
+        })
+        .catch(() => {});
+    }
+  }
+}
+
+/**
+ * COMPLETE CLIENT DATA CLEANUP FOR LOGOUT & SESSION ISOLATION
+ * Removes ALL application-owned private storage across localStorage, sessionStorage,
+ * IndexedDB, and Cache API, and broadcasts session-cleared so in-memory contexts reset.
+ * Leaves non-sensitive theme choice ('entre-cartas:theme') untouched if present.
+ */
+export async function clearAllPrivateBrowserData(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const PRESERVED_KEYS = new Set(["entre-cartas:theme"]);
+
+  // 1. Clear all application-owned private localStorage keys
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (!k || PRESERVED_KEYS.has(k)) continue;
+      if (k.startsWith("entre-cartas:") || k.startsWith("entre_cartas")) {
+        keysToRemove.push(k);
+      }
+    }
+    for (const k of keysToRemove) {
+      window.localStorage.removeItem(k);
+    }
+  } catch {}
+
+  // 2. Clear all application-owned sessionStorage keys
+  try {
+    const sKeysToRemove: string[] = [];
+    for (let i = 0; i < window.sessionStorage.length; i++) {
+      const k = window.sessionStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith("entre-cartas:") || k.startsWith("entre_cartas")) {
+        sKeysToRemove.push(k);
+      }
+    }
+    for (const k of sKeysToRemove) {
+      window.sessionStorage.removeItem(k);
+    }
+  } catch {}
+
+  // 3. Clear any app-owned IndexedDB databases (fail-safe)
+  try {
+    if (typeof window.indexedDB !== "undefined" && typeof window.indexedDB.databases === "function") {
+      const dbs = await window.indexedDB.databases();
+      for (const db of dbs) {
+        if (
+          db?.name &&
+          (db.name.startsWith("entre-cartas") || db.name.startsWith("entre_cartas"))
+        ) {
+          window.indexedDB.deleteDatabase(db.name);
+        }
+      }
+    }
+  } catch {}
+
+  // 4. Clear any app-owned Cache Storage entries
+  try {
+    if (typeof window.caches !== "undefined") {
+      const names = await window.caches.keys();
+      for (const name of names) {
+        if (name.includes("entre-cartas") || name.includes("entre_cartas")) {
+          await window.caches.delete(name);
+        }
+      }
+    }
+  } catch {}
+
+  // 5. Notify all React contexts & editors immediately
+  try {
+    window.dispatchEvent(new Event(SESSION_CLEARED_EVENT));
+    window.dispatchEvent(new Event(JOURNAL_UPDATED_EVENT));
+  } catch {}
+}
+
+/**
+ * Hydrates an authenticated user's persistent notebooks, folders, and letters from
+ * MariaDB directly into clean user-scoped storage. Never touches other users' records.
+ */
+export async function hydrateUserDataFromBackend(userId: number | string): Promise<void> {
+  if (typeof window === "undefined" || !userId) return;
+
+  try {
+    const [nbRes, folderRes, cartasRes] = await Promise.all([
+      api.journal.listNotebooks().catch(() => null),
+      api.journal.listFolders().catch(() => null),
+      api.cartas.minhas().catch(() => null),
+    ]);
+
+    if (nbRes && Array.isArray(nbRes.notebooks)) {
+      const remoteNbs: Notebook[] = nbRes.notebooks.map((nb: any) => ({
+        ...nb,
+        ownerId: userId,
+      }));
+      saveAllNotebooks(remoteNbs, "backend-sync");
+    }
+
+    if (folderRes && Array.isArray(folderRes.folders)) {
+      const remoteFolders: LetterFolder[] = folderRes.folders.map((f: any) => ({
+        ...f,
+        ownerId: userId,
+      }));
+      saveLetterFolders(remoteFolders, "backend-sync");
+    }
+
+    if (cartasRes && Array.isArray(cartasRes.cartas)) {
+      const activeLetters: JournalEntry[] = [];
+      const trashedLetters: JournalEntry[] = [];
+
+      for (const c of cartasRes.cartas) {
+        const mapped: JournalEntry = {
+          id: c.client_id || String(c.id),
+          remote_id: c.id,
+          titulo: c.titulo,
+          destinatario: c.destinatario_anonimo || undefined,
+          assinatura: c.remetente_anonimo || undefined,
+          conteudo: c.conteudo,
+          humor: c.categoria || "desabafo",
+          tema_carta: c.tema_carta || undefined,
+          data_formatada:
+            c.data_carta ||
+            new Date(c.criado_em).toLocaleDateString("en-US"),
+          criado_em: c.criado_em,
+          atualizado_em: c.criado_em,
+          tipo_papel: c.tipo_papel || "ivory",
+          fonte: c.fonte || "caveat",
+          favoritado: Boolean(c.favoritado),
+          selo_carta: c.categoria ? c.categoria.toUpperCase() : "LETTER",
+          pasta_id: c.pasta_client_id || undefined,
+          pasta_nome: c.pasta_nome || undefined,
+          status: c.status_carta === "draft" ? "draft" : "completed",
+          usuario_id: c.usuario_id || userId,
+        };
+        if (c.na_lixeira === 1 || c.na_lixeira === true) {
+          trashedLetters.push(mapped);
+        } else {
+          activeLetters.push(mapped);
+        }
+      }
+
+      try {
+        window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(trashedLetters));
+      } catch {}
+      saveAllLetters(activeLetters, "backend-sync");
+    }
+  } catch {
+    // Silent fallback if transient network issue
+  }
 }

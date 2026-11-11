@@ -784,11 +784,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* Pautas no Modo Caderno (tamanho padrão idêntico em todas as páginas: 580px x 820px) */
 .writing-sheet-card.mode-caderno {
-  width: 100%;
+  width: 580px;
+  min-width: 580px;
   max-width: 580px;
   height: 820px;
   min-height: 820px;
   max-height: 820px;
+  padding: 38px 44px 30px 48px;
   box-sizing: border-box;
   overflow: hidden;
   background-image: repeating-linear-gradient(
@@ -872,6 +874,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   min-height: 644px; /* exatamente 23 linhas de 28px */
   height: 644px;
   font-family: inherit;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: break-word;
   padding: 0;
   margin: 0;
   overflow-y: hidden;
@@ -2020,18 +2026,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .nav-inner { min-height: 68px; flex-wrap: wrap; gap: 10px; }
   .nav-links { width: 100%; justify-content: space-between; order: 3; padding-bottom: 8px; }
   .header-search { display: none; }
-  .writing-sheet-card { padding: 24px 20px 20px; }
-  .caderno-title-input { font-size: 20px; }
-  .caderno-textarea-ruled { font-size: 18px; line-height: 30px; }
-  .writing-sheet-card.mode-caderno {
-    background-image: repeating-linear-gradient(
-      to bottom,
-      transparent 0px,
-      transparent 29px,
-      rgba(140, 160, 185, 0.26) 29px,
-      rgba(140, 160, 185, 0.26) 30px
-    );
-  }
+  .writing-sheet-card:not(.mode-caderno) { padding: 24px 20px 20px; }
+  .writing-sheet-card:not(.mode-caderno) .caderno-title-input { font-size: 20px; }
+  .writing-sheet-card:not(.mode-caderno) .caderno-textarea-ruled { font-size: 18px; line-height: 30px; }
   .letter-shelf { grid-template-columns: 1fr; }
   .folder-shelf { flex-direction: column; }
   .folder { max-width: none; }
@@ -8841,4 +8838,284 @@ body,
     justify-content: space-between;
     padding: 16px 20px;
   }
+}
+
+/* ============================================================================
+   GUEST DEMONSTRATION & ACCOUNT REQUIRED PROMPT
+   ============================================================================ */
+
+.guest-preview-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 8px 24px;
+  background: rgba(31, 25, 19, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(207, 169, 111, 0.25);
+  color: #ebdcb9;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+[data-theme="light"] .guest-preview-topbar {
+  background: rgba(248, 243, 232, 0.94);
+  color: #4b3d2c;
+  border-bottom: 1px solid #dfd3ba;
+}
+
+.guest-preview-topbar__left {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.guest-preview-topbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: #f4ead6;
+}
+
+[data-theme="light"] .guest-preview-topbar__brand {
+  color: #3a2b1d;
+}
+
+.guest-preview-topbar__seal {
+  color: var(--color-pollen, #cfa96f);
+  font-size: 13px;
+}
+
+.guest-preview-topbar__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(207, 169, 111, 0.24);
+  background: rgba(207, 169, 111, 0.08);
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.guest-preview-topbar__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-pollen, #cfa96f);
+  box-shadow: 0 0 6px rgba(207, 169, 111, 0.65);
+  flex-shrink: 0;
+}
+
+.guest-preview-topbar__nav {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guest-preview-topbar__link {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(207, 169, 111, 0.3);
+  color: #e6d4b3;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: all 0.18s ease;
+}
+
+[data-theme="light"] .guest-preview-topbar__link {
+  border-color: rgba(110, 82, 50, 0.28);
+  color: #4b3d2c;
+}
+
+.guest-preview-topbar__link:hover,
+.guest-preview-topbar__link.is-active {
+  background: rgba(207, 169, 111, 0.18);
+  border-color: rgba(207, 169, 111, 0.68);
+  color: #fff6e5;
+}
+
+[data-theme="light"] .guest-preview-topbar__link:hover,
+[data-theme="light"] .guest-preview-topbar__link.is-active {
+  background: rgba(173, 91, 48, 0.14);
+  border-color: rgba(173, 91, 48, 0.5);
+  color: #3d2713;
+}
+
+.guest-preview-topbar__cta {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--color-pollen, #cfa96f);
+  color: #1f170f;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.guest-preview-topbar__cta:hover {
+  background: #e1be86;
+  transform: translateY(-1px);
+}
+
+.guest-account-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgba(18, 13, 8, 0.72);
+  backdrop-filter: blur(5px);
+}
+
+.guest-shelf-gate-wrap {
+  min-height: calc(100vh - 180px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.guest-account-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 34px 30px 28px;
+  background: radial-gradient(ellipse at top, #f9f3e6 0%, #efe4ce 100%);
+  border: 1.5px solid #96774d;
+  border-radius: 6px;
+  box-shadow:
+    0 24px 60px rgba(10, 6, 2, 0.58),
+    inset 0 0 0 4px #f7f0e2,
+    inset 0 0 0 5px rgba(150, 119, 77, 0.35);
+  text-align: center;
+  color: #291c10;
+}
+
+.guest-account-card__seal {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #982b23 0%, #6d1914 100%);
+  color: #f7ead1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(96, 24, 18, 0.35), inset 0 1px 1px rgba(255, 225, 200, 0.35);
+}
+
+.guest-account-card__kicker {
+  display: block;
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #82613b;
+  margin-bottom: 10px;
+}
+
+.guest-account-card__title {
+  margin: 0 0 10px;
+  font-family: var(--serif, "Playfair Display", Georgia, serif);
+  font-size: clamp(23px, 3vw, 29px);
+  font-weight: 600;
+  line-height: 1.18;
+  color: #221509;
+}
+
+.guest-account-card__desc {
+  margin: 0 auto 24px;
+  max-width: 370px;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 15px;
+  line-height: 1.58;
+  color: #543e29;
+}
+
+.guest-account-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guest-account-card__primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  border-radius: 4px;
+  background: #3d2410;
+  border: 1px solid #261407;
+  color: #f8eedb;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.guest-account-card__primary:hover {
+  background: #2b1808;
+  transform: translateY(-1px);
+}
+
+.guest-account-card__secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 4px;
+  background: rgba(110, 78, 42, 0.1);
+  border: 1px solid rgba(110, 78, 42, 0.45);
+  color: #3a2310;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.18s ease;
+}
+
+.guest-account-card__secondary:hover {
+  background: rgba(110, 78, 42, 0.2);
+}
+
+.guest-account-card__ghost {
+  margin-top: 2px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  color: #705234;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 13.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.guest-account-card__ghost:hover {
+  color: #2b1909;
 }

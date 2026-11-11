@@ -76,7 +76,7 @@ const navItems: NavItem[] = [
 
 export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, isPro, logout } = useAuth();
+  const { user, loading, isPro, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === "light";
   const [authOpen, setAuthOpen] = useState(false);
@@ -123,6 +123,8 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   const isPresentationPage =
     pathname === "/" ||
+    pathname === "/explore" ||
+    pathname.startsWith("/explore/") ||
     pathname === "/login" ||
     pathname.startsWith("/login/") ||
     pathname === "/notebook" ||
@@ -149,30 +151,89 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   const isMyDeskPage =
     pathname === "/my-desk" || pathname.startsWith("/my-desk/");
 
+  const showAuthenticatedSidebar = Boolean(user);
+  const isGuestPreview = !loading && !user && !isMyDeskPage;
+
   return (
     <div
-      className={`site-wrap site-wrap--with-sidebar ${
-        isMyDeskPage ? "site-wrap--my-desk" : ""
-      } ${isSidebarExpanded ? "sidebar-is-open" : "sidebar-is-collapsed"}`}
+      className={`site-wrap ${
+        showAuthenticatedSidebar ? "site-wrap--with-sidebar" : "site-wrap--guest"
+      } ${isMyDeskPage ? "site-wrap--my-desk" : ""} ${
+        showAuthenticatedSidebar
+          ? isSidebarExpanded
+            ? "sidebar-is-open"
+            : "sidebar-is-collapsed"
+          : ""
+      }`}
     >
-      {!isMyDeskPage && (
-        <div className="top-note">
-          An intimate digital journal to write your day and cherish memories
-          {isPro && (
-            <span style={{ marginLeft: "12px", color: "var(--color-pollen)" }}>
-              ✦ Pro Sender
-            </span>
-          )}
-        </div>
-      )}
+      {!isMyDeskPage &&
+        (isGuestPreview ? (
+          <header className="guest-preview-topbar" role="banner" aria-label="Guest preview navigation">
+            <div className="guest-preview-topbar__left">
+              <Link href="/" className="guest-preview-topbar__brand" aria-label="Between Letters home">
+                <span className="guest-preview-topbar__seal" aria-hidden="true">✦</span>
+                <span>Between Letters</span>
+              </Link>
+              <span className="guest-preview-topbar__status" title="Temporary demonstration session">
+                <span className="guest-preview-topbar__dot" aria-hidden="true" />
+                <span>Preview Mode</span>
+              </span>
+            </div>
+            <nav className="guest-preview-topbar__nav" aria-label="Guest navigation">
+              <Link
+                href="/journal"
+                className={`guest-preview-topbar__link ${
+                  pathname.startsWith("/journal") ? "is-active" : ""
+                }`}
+              >
+                Journal
+              </Link>
+              <Link
+                href="/letters"
+                className={`guest-preview-topbar__link ${
+                  pathname.startsWith("/letters") ? "is-active" : ""
+                }`}
+              >
+                Letters
+              </Link>
+              <Link
+                href="/explore"
+                className={`guest-preview-topbar__link ${
+                  pathname.startsWith("/explore") ? "is-active" : ""
+                }`}
+              >
+                Back to Intro
+              </Link>
+              <Link href="/" className="guest-preview-topbar__link">
+                Landing
+              </Link>
+              <Link href="/login" className="guest-preview-topbar__link guest-preview-topbar__signin">
+                Sign In
+              </Link>
+              <Link href="/login?mode=register" className="guest-preview-topbar__cta">
+                Create Account
+              </Link>
+            </nav>
+          </header>
+        ) : showAuthenticatedSidebar ? (
+          <div className="top-note">
+            An intimate digital journal to write your day and cherish memories
+            {isPro && (
+              <span style={{ marginLeft: "12px", color: "var(--color-pollen)" }}>
+                ✦ Pro Sender
+              </span>
+            )}
+          </div>
+        ) : null)}
 
-      <header
-        ref={headerRef}
-        className={`site-header site-header--vertical ${isSidebarExpanded ? "is-expanded" : "is-collapsed"}`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocusCapture={() => setIsFocusedInside(true)}
-        onBlurCapture={(e) => {
+      {showAuthenticatedSidebar && (
+        <header
+          ref={headerRef}
+          className={`site-header site-header--vertical ${isSidebarExpanded ? "is-expanded" : "is-collapsed"}`}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onFocusCapture={() => setIsFocusedInside(true)}
+          onBlurCapture={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setIsFocusedInside(false);
           }
@@ -393,7 +454,11 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                   </span>
                   <button
                     type="button"
-                    onClick={logout}
+                    onClick={() => {
+                      logout().catch((err: any) => {
+                        alert(err?.message || "Failed to close server session cleanly. Local session has been cleared.");
+                      });
+                    }}
                     className="sidebar-signout-btn"
                     title="Sign out of account"
                   >
@@ -431,6 +496,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
+      )}
 
       <main className={`site-main ${isMyDeskPage ? "site-main--desk" : ""}`}>
         {children}

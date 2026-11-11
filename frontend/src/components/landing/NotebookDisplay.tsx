@@ -7,7 +7,6 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export interface NotebookItem {
@@ -87,7 +86,6 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
     const router = useRouter();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
-    const [isUpscaleOpen, setIsUpscaleOpen] = useState(false);
     const frameRef = useRef<HTMLDivElement>(null);
     const rafRef = useRef<number | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -106,7 +104,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
     }, []);
 
     useEffect(() => {
-      if (isHovered || isUpscaleOpen) return;
+      if (isHovered) return;
 
       timerRef.current = setInterval(() => {
         advanceNext();
@@ -115,7 +113,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
       return () => {
         if (timerRef.current) clearInterval(timerRef.current);
       };
-    }, [isHovered, isUpscaleOpen, advanceNext]);
+    }, [isHovered, advanceNext]);
 
     // Interactive 3D tilt tracking cursor via rAF without React state re-renders
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -148,7 +146,10 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
     };
 
     const handleOpenNotebookExperience = () => {
-      setIsUpscaleOpen(true);
+      if (onSelectNotebook) {
+        onSelectNotebook(activeNotebook);
+      }
+      router.push("/explore");
     };
 
     return (
@@ -190,22 +191,30 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                       className="notebook-cutout-img"
                       draggable={false}
                       loading="eager"
+                      role="link"
+                      tabIndex={isActive ? 0 : -1}
                       onClick={handleOpenNotebookExperience}
-                      title="Click to inspect plate in high resolution"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleOpenNotebookExperience();
+                        }
+                      }}
+                      title="Explore My Journal & My Letters preview experience"
                     />
                   </div>
                 );
               })}
             </div>
 
-            {/* Quick Open Notebook Badge overlay on hover */}
+            {/* Quick Explore Badge overlay on hover */}
             <button
               type="button"
               className="notebook-inspect-btn"
               onClick={handleOpenNotebookExperience}
-              aria-label="Inspect notebook plate in high resolution"
+              aria-label="Explore My Journal and My Letters experience"
             >
-              <span>Inspect Plate</span>
+              <span>Explore Journal &amp; Letters →</span>
             </button>
           </div>
 
@@ -254,70 +263,6 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
             })}
           </div>
         </div>
-
-        {/* High-Resolution Upscale Inspection Lightbox Modal */}
-        {isUpscaleOpen && (
-          <div
-            className="upscale-modal-backdrop"
-            onClick={() => setIsUpscaleOpen(false)}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Inspecting ${activeNotebook.name}`}
-          >
-            <div
-              className="upscale-modal-card"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="upscale-close-btn"
-                onClick={() => setIsUpscaleOpen(false)}
-                aria-label="Close inspection"
-              >
-                ✕
-              </button>
-
-              <div className="upscale-modal-header">
-                <span className="upscale-badge">{activeNotebook.category}</span>
-                <h3 className="upscale-title">{activeNotebook.name}</h3>
-                <p className="upscale-quote">{activeNotebook.quote}</p>
-              </div>
-
-              <div className="upscale-image-viewport">
-                <img
-                  src={activeNotebook.imageSrc}
-                  alt={activeNotebook.alt}
-                  className="upscale-large-img"
-                />
-              </div>
-
-              <div className="upscale-modal-footer">
-                <div className="upscale-stickers-list">
-                  <span className="stickers-heading">
-                    Featured Cutouts &amp; Ephemera:
-                  </span>
-                  <div className="stickers-tags">
-                    {activeNotebook.stickers.map((stk, i) => (
-                      <span key={i} className="sticker-chip">
-                        ✦ {stk}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="upscale-cta-row">
-                  <Link
-                    href="/journal"
-                    className="upscale-action-btn"
-                    onClick={() => setIsUpscaleOpen(false)}
-                  >
-                    Customize My Journal Now ↝
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }

@@ -18,11 +18,12 @@ router.get('/minhas', authMiddleware, cartasController.listarMinhasCartas);
 // 4. Detalhes de uma carta específica (com contagem de leitura e log)
 router.get('/:id', optionalAuth, cartasController.obterCartaPorId);
 
-// 5. Enviar uma nova carta para o acervo (anônima ou autenticada)
-router.post('/', optionalAuth, cartasController.criarCarta);
+// 5. Enviar/criar carta pessoal (autenticado)
+router.post('/', authMiddleware, cartasController.criarCarta);
 
-// 5.1 Atualizar ou excluir uma carta escrita pelo próprio usuário autenticado
+// 5.1 Atualizar, mover para lixeira/restaurar ou excluir uma carta escrita pelo próprio usuário autenticado
 router.put('/:id', authMiddleware, cartasController.atualizarMinhaCarta);
+router.patch('/:id/trash', authMiddleware, cartasController.atualizarLixeiraCarta);
 router.delete('/:id', authMiddleware, cartasController.excluirMinhaCarta);
 
 // 6. Carimbar e guardar carta na caixa de memórias (com limite do Plano Free)

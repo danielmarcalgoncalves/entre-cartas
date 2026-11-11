@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 import MyJournalCollection from "@/components/MyJournalCollection";
 import MyLettersCollection from "@/components/MyLettersCollection";
+import { GuestAccountPromptCard } from "@/components/GuestSavePromptModal";
 import {
   JOURNAL_UPDATED_EVENT,
   filterWrittenPages,
@@ -20,8 +21,8 @@ import {
   type Notebook,
 } from "@/lib/journal-storage";
 
-export default function MyShelfPage() {
-  const { user, isPro } = useAuth();
+export default function MyShelfPage({ showPageChrome = false }: { showPageChrome?: boolean } = {}) {
+  const { user, loading: authLoading, isPro } = useAuth();
 
   // Internal navigation tab: 'all' | 'journals' | 'letters'
   const [activeSection, setActiveSection] = useState<"all" | "journals" | "letters">("all");
@@ -37,6 +38,7 @@ export default function MyShelfPage() {
   const limitePastas = isPro ? 10 : 3;
 
   const carregarDadosEstante = useCallback(() => {
+    if (authLoading || !user) return;
     const userNbs = loadUserNotebooks(user?.id).map((n) => ({
       ...n,
       paginas: filterWrittenPages(n.paginas),
@@ -96,7 +98,7 @@ export default function MyShelfPage() {
         }
       })
       .catch(() => {});
-  }, [user?.id]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -113,6 +115,7 @@ export default function MyShelfPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     carregarDadosEstante();
     window.addEventListener(JOURNAL_UPDATED_EVENT, carregarDadosEstante);
     window.addEventListener("storage", carregarDadosEstante);
@@ -120,13 +123,50 @@ export default function MyShelfPage() {
       window.removeEventListener(JOURNAL_UPDATED_EVENT, carregarDadosEstante);
       window.removeEventListener("storage", carregarDadosEstante);
     };
-  }, [carregarDadosEstante]);
+  }, [authLoading, user, carregarDadosEstante]);
+
+  if (authLoading) {
+    return (
+      <div className="guest-shelf-gate-wrap">
+        <span
+          style={{
+            fontFamily: "var(--serif, Georgia, serif)",
+            fontSize: "16px",
+            fontStyle: "italic",
+            color: "var(--text-secondary, #b8a995)",
+          }}
+        >
+          Opening archive…
+        </span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="guest-shelf-gate-wrap">
+        <GuestAccountPromptCard variant="shelf" />
+      </div>
+    );
+  }
 
   const isShelfCompletelyEmpty =
     notebooks.length === 0 && lettersWritten.length === 0;
 
   return (
-    <div className="personal-journal-shelf-wrap" id="my-shelf-archive">
+    <>
+      {showPageChrome && (
+        <section className="journal-intro" aria-labelledby="my-shelf-page-title">
+          <span className="eyebrow">PERSONAL ARCHIVE · KEPT VOLUMES &amp; CORRESPONDENCE</span>
+          <h1 id="my-shelf-page-title">
+            My <em>Shelf.</em>
+          </h1>
+          <p className="journal-intro-sub">
+            Every leather-bound journal and personal letter you have written rests here, ready to be reopened, reread, or continued whenever memory calls.
+          </p>
+        </section>
+      )}
+      <div className="personal-journal-shelf-wrap" id="my-shelf-archive">
       {/* Top Quota & Archive Summary Bar */}
       <div className="my-shelf-overview-bar">
         <div className="my-shelf-internal-nav" role="tablist" aria-label="My Shelf sections">
@@ -274,5 +314,15 @@ export default function MyShelfPage() {
         />
       )}
     </div>
+      {showPageChrome && (
+        <section className="closing-note" aria-label="A note for the collector">
+          <span className="closing-note__ornament" aria-hidden="true">❧</span>
+          <p>What is written with care never truly fades.</p>
+          <span className="closing-note__sign">
+            — Between Letters <span aria-hidden="true">✦</span>
+          </span>
+        </section>
+      )}
+    </>
   );
 }

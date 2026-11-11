@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
 
@@ -46,6 +47,21 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({
         error: 'Invalid authentication token: missing user identifier.'
       });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    try {
+      const [revoked] = await pool.query(
+        'SELECT 1 FROM revoked_tokens WHERE token_hash = ? LIMIT 1',
+        [tokenHash]
+      );
+      if (revoked.length > 0) {
+        return res.status(401).json({
+          error: 'Session has ended or been logged out. Please sign in again.'
+        });
+      }
+    } catch (revokeCheckErr) {
+      // If table not yet initialized, allow fallback only cleanly; once initialized it is enforced
     }
 
     // Consulta no MariaDB para validar em tempo real (Defesa Anti-IDOR e Anti-Privilege Escalation)
@@ -163,13 +179,25 @@ async function optionalAuth(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded && decoded.id) {
-      const [rows] = await pool.query(
-        'SELECT id, papel FROM usuarios WHERE id = ?',
-        [decoded.id]
-      );
-      if (rows.length > 0) {
-        req.usuarioId = Number(rows[0].id);
-        req.usuarioPapel = rows[0].papel || 'usuario';
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      let isRevoked = false;
+      try {
+        const [revoked] = await pool.query(
+          'SELECT 1 FROM revoked_tokens WHERE token_hash = ? LIMIT 1',
+          [tokenHash]
+        );
+        isRevoked = revoked.length > 0;
+      } catch (e) {}
+
+      if (!isRevoked) {
+        const [rows] = await pool.query(
+          'SELECT id, papel FROM usuarios WHERE id = ?',
+          [decoded.id]
+        );
+        if (rows.length > 0) {
+          req.usuarioId = Number(rows[0].id);
+          req.usuarioPapel = rows[0].papel || 'usuario';
+        }
       }
     }
   } catch (err) {
