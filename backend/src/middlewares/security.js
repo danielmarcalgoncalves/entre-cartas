@@ -7,19 +7,37 @@
  */
 
 const rateLimitStores = new Map();
+const MAX_RATE_LIMIT_ENTRIES = 10000;
+
+function evictStaleRateLimitEntries(now) {
+  for (const [k, rec] of rateLimitStores.entries()) {
+    if (now - rec.resetTime > (rec.windowMs || 15 * 60 * 1000)) {
+      rateLimitStores.delete(k);
+    }
+  }
+}
 
 function createRateLimiter({ windowMs, max, message }) {
   return (req, res, next) => {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection?.remoteAddress || 'unknown-ip';
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown-ip';
     const key = `${req.baseUrl || ""}${req.path}:${ip}`;
     const now = Date.now();
 
     let record = rateLimitStores.get(key);
 
     if (!record || now - record.resetTime > windowMs) {
+      if (!record && rateLimitStores.size >= MAX_RATE_LIMIT_ENTRIES) {
+        evictStaleRateLimitEntries(now);
+        while (rateLimitStores.size >= MAX_RATE_LIMIT_ENTRIES) {
+          const oldestKey = rateLimitStores.keys().next().value;
+          if (oldestKey === undefined) break;
+          rateLimitStores.delete(oldestKey);
+        }
+      }
       record = {
         count: 1,
-        resetTime: now
+        resetTime: now,
+        windowMs
       };
       rateLimitStores.set(key, record);
     } else {
@@ -43,13 +61,8 @@ function createRateLimiter({ windowMs, max, message }) {
 }
 
 setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of rateLimitStores.entries()) {
-    if (now - record.resetTime > 15 * 60 * 1000) {
-      rateLimitStores.delete(key);
-    }
-  }
-}, 10 * 60 * 1000);
+  evictStaleRateLimitEntries(Date.now());
+}, 10 * 60 * 1000).unref();
 
 // 1. Account registration limiter
 const registerLimiter = createRateLimiter({

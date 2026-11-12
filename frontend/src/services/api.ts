@@ -4,24 +4,28 @@
  */
 
 const API_BASE = '/api';
-const SESSION_TOKEN_STORAGE_KEY = 'entre-cartas:auth:token';
+export const SESSION_TOKEN_STORAGE_KEY = 'entre-cartas:auth:token';
 
 let inMemoryToken: string | null = null;
 
-export function getToken(): string | null {
-  if (inMemoryToken) return inMemoryToken;
+export function syncInMemoryTokenFromStorage(): string | null {
   if (typeof window !== 'undefined') {
     try {
       const saved =
         window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
         window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
-      if (saved) {
-        inMemoryToken = saved;
-        return saved;
-      }
+      inMemoryToken = saved || null;
+      return inMemoryToken;
     } catch {}
   }
-  return null;
+  return inMemoryToken;
+}
+
+export function getToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return syncInMemoryTokenFromStorage();
+  }
+  return inMemoryToken;
 }
 
 export function setSession(token: string | null, persist = true) {
@@ -75,6 +79,9 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}):
   if (!response.ok) {
     if (response.status === 401) {
       clearSession();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('entre-cartas:unauthorized'));
+      }
     }
     const errorMsg = data.error || data.message || `Request failed (${response.status})`;
     const err: any = new Error(errorMsg);

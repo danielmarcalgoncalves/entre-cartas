@@ -93,6 +93,10 @@ async function initDb(retries = 15, delay = 2000) {
       await connection.query(`ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE;`);
     } catch (e) {}
 
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD COLUMN token_version INT NOT NULL DEFAULT 1;`);
+    } catch (e) {}
+
     // 3. Códigos de verificação OTP
     await connection.query(`
       CREATE TABLE IF NOT EXISTS codigos_verificacao (
@@ -125,11 +129,13 @@ async function initDb(retries = 15, delay = 2000) {
         lacre_cera_cor VARCHAR(30) DEFAULT 'vinho',
         data_carta VARCHAR(100) DEFAULT NULL,
         status_curadoria VARCHAR(30) DEFAULT 'aprovada',
+        is_public BOOLEAN NOT NULL DEFAULT FALSE,
         leituras_count INT DEFAULT 0,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
         INDEX idx_categoria (categoria),
-        INDEX idx_status (status_curadoria)
+        INDEX idx_status (status_curadoria),
+        INDEX idx_public (is_public)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
@@ -237,13 +243,19 @@ async function initDb(retries = 15, delay = 2000) {
       `ALTER TABLE cartas ADD COLUMN status_carta VARCHAR(30) DEFAULT 'completed'`,
       `ALTER TABLE cartas ADD COLUMN tema_carta VARCHAR(60) DEFAULT NULL`,
       `ALTER TABLE cartas ADD COLUMN favoritado BOOLEAN DEFAULT FALSE`,
-      `ALTER TABLE cartas ADD COLUMN na_lixeira BOOLEAN DEFAULT FALSE`
+      `ALTER TABLE cartas ADD COLUMN na_lixeira BOOLEAN DEFAULT FALSE`,
+      `ALTER TABLE cartas ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE`
     ];
     for (const q of cartasAlters) {
       try {
         await connection.query(q);
       } catch (e) {}
     }
+
+    // Ensure seeded/curated archive letters (without an author user) are marked public
+    await connection.query(
+      `UPDATE cartas SET is_public = TRUE WHERE usuario_id IS NULL AND status_curadoria = 'aprovada' AND is_public = FALSE`
+    );
 
     // ========================================================
     // TABELAS STRIPE (Plano Pro & Assinaturas)
@@ -309,8 +321,8 @@ async function initDb(retries = 15, delay = 2000) {
       console.log('[Database] Tabela cartas vazia. Inserindo acervo epistolar inicial...');
       for (const carta of cartasIniciais) {
         await connection.query(
-          `INSERT INTO cartas (titulo, conteudo, remetente_anonimo, destinatario_anonimo, categoria, tipo_papel, lacre_cera_cor, data_carta, leituras_count, status_curadoria)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aprovada')`,
+          `INSERT INTO cartas (titulo, conteudo, remetente_anonimo, destinatario_anonimo, categoria, tipo_papel, lacre_cera_cor, data_carta, leituras_count, status_curadoria, is_public)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aprovada', TRUE)`,
           [
             carta.titulo,
             carta.conteudo,

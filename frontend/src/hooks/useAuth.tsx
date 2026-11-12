@@ -2,7 +2,13 @@
 
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { api, setSession, clearSession } from "@/services/api";
+import {
+  api,
+  setSession,
+  clearSession,
+  SESSION_TOKEN_STORAGE_KEY,
+  syncInMemoryTokenFromStorage,
+} from "@/services/api";
 import {
   clearAllPrivateBrowserData,
   hydrateUserDataFromBackend,
@@ -55,11 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const syncUserAccountScope = async (authenticatedUser: User) => {
     if (typeof window !== "undefined") {
       try {
-        const previousUid = window.sessionStorage.getItem(LAST_USER_MARKER_KEY);
+        const previousUid =
+          window.localStorage.getItem(LAST_USER_MARKER_KEY) ||
+          window.sessionStorage.getItem(LAST_USER_MARKER_KEY);
         if (previousUid && previousUid !== String(authenticatedUser.id)) {
           // Different account authenticated on this browser — wipe prior user's local data completely
           await clearAllPrivateBrowserData();
         }
+        window.localStorage.setItem(LAST_USER_MARKER_KEY, String(authenticatedUser.id));
         window.sessionStorage.setItem(LAST_USER_MARKER_KEY, String(authenticatedUser.id));
       } catch {}
     }
@@ -85,6 +94,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refreshUser();
+
+    if (typeof window === "undefined") return;
+
+    const handleUnauthorized = async () => {
+      clearSession();
+      await clearAllPrivateBrowserData();
+      setUser(null);
+    };
+
+    const handleStorage = async (e: StorageEvent) => {
+      if (e.key === SESSION_TOKEN_STORAGE_KEY) {
+        syncInMemoryTokenFromStorage();
+        if (!e.newValue) {
+          await clearAllPrivateBrowserData();
+          setUser(null);
+        } else if (e.newValue !== e.oldValue) {
+          await clearAllPrivateBrowserData();
+          await refreshUser();
+        }
+      } else if (e.key === LAST_USER_MARKER_KEY) {
+        if (!e.newValue) {
+          clearSession();
+          await clearAllPrivateBrowserData();
+          setUser(null);
+        } else if (e.newValue !== e.oldValue) {
+          await clearAllPrivateBrowserData();
+          await refreshUser();
+        }
+      }
+    };
+
+    window.addEventListener("entre-cartas:unauthorized", handleUnauthorized);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("entre-cartas:unauthorized", handleUnauthorized);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const login = async (email: string, senha: string, rememberMe = true) => {

@@ -1,6 +1,10 @@
 const axios = require('axios');
+const crypto = require('crypto');
 
 const LOG_SERVICE_URL = process.env.LOG_SERVICE_URL || 'http://log-service:3000';
+const INTERNAL_LOG_SECRET = process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32
+  ? crypto.createHmac('sha256', process.env.JWT_SECRET.trim()).update('internal-log-service').digest('hex')
+  : '';
 
 /**
  * Cliente de Envio de Logs de Auditoria para o microserviço log-service (Redis Streams).
@@ -27,7 +31,6 @@ function sendLog(acao, req = null, detalhes = {}) {
       }
 
       clientIp =
-        req.headers['x-forwarded-for']?.split(',')[0].trim() ||
         req.ip ||
         req.socket?.remoteAddress ||
         '127.0.0.1';
@@ -53,7 +56,10 @@ function sendLog(acao, req = null, detalhes = {}) {
     };
 
     // Chamada assíncrona desacoplada com timeout curto (fire-and-forget)
-    axios.post(`${LOG_SERVICE_URL}/logs`, logEntry, { timeout: 2500 })
+    axios.post(`${LOG_SERVICE_URL}/logs`, logEntry, {
+      timeout: 2500,
+      headers: INTERNAL_LOG_SECRET ? { 'X-Internal-Log-Secret': INTERNAL_LOG_SECRET } : {}
+    })
       .catch((err) => {
         // Log silencioso no console do backend sem propagar erro para o controller
         console.warn(`[LogClient WARN] Não foi possível registrar evento "${acao}" no log-service: ${err.message}`);
@@ -71,7 +77,8 @@ async function getAuditLogs(params = {}) {
   try {
     const response = await axios.get(`${LOG_SERVICE_URL}/logs`, {
       params,
-      timeout: 5000
+      timeout: 5000,
+      headers: INTERNAL_LOG_SECRET ? { 'X-Internal-Log-Secret': INTERNAL_LOG_SECRET } : {}
     });
     return response.data;
   } catch (error) {

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   email VARCHAR(150) UNIQUE NOT NULL,
   senha_hash VARCHAR(255) NOT NULL,
   papel VARCHAR(50) DEFAULT 'usuario',
+  token_version INT NOT NULL DEFAULT 1,
   email_verificado BOOLEAN DEFAULT FALSE,
   foto_url VARCHAR(500) DEFAULT NULL,
   bio TEXT DEFAULT NULL,
@@ -50,11 +51,21 @@ CREATE TABLE IF NOT EXISTS cartas (
   lacre_cera_cor VARCHAR(30) DEFAULT 'vinho',
   data_carta VARCHAR(100) DEFAULT NULL,
   status_curadoria VARCHAR(30) DEFAULT 'aprovada',
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
   leituras_count INT DEFAULT 0,
   criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
   INDEX idx_categoria (categoria),
-  INDEX idx_status (status_curadoria)
+  INDEX idx_status (status_curadoria),
+  INDEX idx_public (is_public)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+  token_hash VARCHAR(64) PRIMARY KEY,
+  usuario_id INT NULL,
+  expira_em DATETIME NOT NULL,
+  revogado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_expira (expira_em)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Cartas favoritadas/guardadas na caixa de memórias com carimbo físico

@@ -88,24 +88,44 @@ async function createCheckoutSession(req, res) {
       });
     }
 
-    // Recupera ou usa customer_id existente para evitar duplicar clientes no Stripe
-    const [existingCustomer] = await pool.query(
-      'SELECT stripe_customer_id FROM stripe_subscriptions WHERE usuario_id = ? AND stripe_customer_id IS NOT NULL LIMIT 1',
-      [usuarioId]
-    );
+    // Serializa criação de customer por usuário para evitar duplicatas concorrentes
+    let customerId = null;
+    const customerConn = await pool.getConnection();
+    try {
+      await customerConn.beginTransaction();
+      await customerConn.query('SELECT id FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
 
-    let customerId = existingCustomer[0]?.stripe_customer_id || null;
+      const [existingCustomer] = await customerConn.query(
+        'SELECT stripe_customer_id FROM stripe_subscriptions WHERE usuario_id = ? AND stripe_customer_id IS NOT NULL LIMIT 1 FOR UPDATE',
+        [usuarioId]
+      );
+      customerId = existingCustomer[0]?.stripe_customer_id || null;
 
-    // Se não existir customer no Stripe, cria um novo vinculado ao usuário
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: usuario.email,
-        name: usuario.nome,
-        metadata: {
-          usuario_id: String(usuarioId)
-        }
-      });
-      customerId = customer.id;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: usuario.email,
+          name: usuario.nome,
+          metadata: {
+            usuario_id: String(usuarioId)
+          }
+        });
+        customerId = customer.id;
+
+        await customerConn.query(
+          `INSERT INTO stripe_subscriptions (usuario_id, stripe_customer_id, status)
+           VALUES (?, ?, 'inactive')
+           ON DUPLICATE KEY UPDATE
+             stripe_customer_id = COALESCE(stripe_customer_id, VALUES(stripe_customer_id))`,
+          [usuarioId, customerId]
+        );
+      }
+
+      await customerConn.commit();
+    } catch (custErr) {
+      await customerConn.rollback();
+      throw custErr;
+    } finally {
+      customerConn.release();
     }
 
     // Cria a Checkout Session em modo de assinatura mensal
@@ -193,20 +213,21 @@ async function handleWebhook(req, res) {
     return res.status(400).json({ error: 'Assinatura do webhook inválida.' });
   }
 
-  // Idempotência: verifica se o evento já foi processado
+  // Idempotência atômica: reivindica o event.id ANTES de processar para evitar corrida
+  let claimed = false;
   try {
-    const [existing] = await pool.query(
-      'SELECT id FROM stripe_webhook_events WHERE stripe_event_id = ?',
-      [event.id]
+    await pool.query(
+      'INSERT INTO stripe_webhook_events (stripe_event_id, tipo, processado_em) VALUES (?, ?, NOW())',
+      [event.id, event.type]
     );
-    if (existing.length > 0) {
-      // Evento já processado — retorna 200 para o Stripe não reenviar
-      console.log(`[Webhook] Evento ${event.id} (${event.type}) já processado. Ignorando.`);
+    claimed = true;
+  } catch (dbErr) {
+    if (dbErr && dbErr.code === 'ER_DUP_ENTRY') {
+      console.log(`[Webhook] Evento ${event.id} (${event.type}) já processado ou em processamento. Ignorando.`);
       return res.json({ received: true, idempotent: true });
     }
-  } catch (dbErr) {
-    console.error('[Webhook] Erro ao verificar idempotência:', dbErr.message);
-    // Continua processamento (não bloqueia por falha de leitura de idempotência)
+    console.error('[Webhook] Erro ao reivindicar idempotência:', dbErr.message);
+    return res.status(500).json({ error: 'Database error verifying webhook idempotency.' });
   }
 
   console.log(`[Webhook] Processando evento: ${event.type} (${event.id})`);
@@ -220,8 +241,21 @@ async function handleWebhook(req, res) {
         if (session.mode === 'subscription' && session.payment_status === 'paid') {
           await _ativarPremiumPorSessao(session);
         } else if (session.mode === 'subscription' && session.payment_status === 'unpaid') {
-          // Assinatura criada mas pagamento pendente (boleto/pix) — aguarda invoice.paid
-          console.log(`[Webhook] Checkout ${session.id}: aguardando confirmação de pagamento.`);
+          // Assinatura criada mas pagamento pendente (boleto/pix) — persiste vínculo pendente para invoice.paid futuro
+          const pendingUserId = session.client_reference_id || session.metadata?.usuario_id;
+          if (pendingUserId) {
+            await pool.query(
+              `INSERT INTO stripe_subscriptions (usuario_id, stripe_customer_id, stripe_subscription_id, status)
+               VALUES (?, ?, ?, 'incomplete')
+               ON DUPLICATE KEY UPDATE
+                 stripe_customer_id = COALESCE(VALUES(stripe_customer_id), stripe_customer_id),
+                 stripe_subscription_id = COALESCE(VALUES(stripe_subscription_id), stripe_subscription_id),
+                 status = IF(status IN ('active', 'trialing'), status, 'incomplete'),
+                 atualizado_em = NOW()`,
+              [Number(pendingUserId), session.customer || null, session.subscription || null]
+            );
+          }
+          console.log(`[Webhook] Checkout ${session.id}: aguardando confirmação de pagamento (vinculado como incomplete).`);
         }
         break;
       }
@@ -264,15 +298,12 @@ async function handleWebhook(req, res) {
         console.log(`[Webhook] Evento não tratado: ${event.type}`);
     }
 
-    // Registra evento como processado (idempotência)
-    await pool.query(
-      'INSERT INTO stripe_webhook_events (stripe_event_id, tipo, processado_em) VALUES (?, ?, NOW())',
-      [event.id, event.type]
-    ).catch(err => console.warn('[Webhook] Erro ao registrar idempotência:', err.message));
-
     return res.json({ received: true });
 
   } catch (processingError) {
+    if (claimed) {
+      await pool.query('DELETE FROM stripe_webhook_events WHERE stripe_event_id = ?', [event.id]).catch(() => {});
+    }
     console.error(`[Webhook] Erro ao processar evento ${event.type}:`, processingError.message);
     // Retorna 500 para o Stripe tentar novamente (falha transitória)
     return res.status(500).json({ error: 'Erro interno ao processar evento.' });
@@ -346,18 +377,31 @@ async function _ativarPremiumPorSessao(session) {
  * Ativa ou renova o Premium para o usuário identificado pelo subscription_id e customer_id do Stripe.
  */
 async function _ativarPremiumPorSubscription(subscriptionId, customerId) {
-  // Localiza usuário pelo customer_id na tabela de assinaturas
+  // Localiza usuário pelo subscription_id ou customer_id na tabela de assinaturas
   const [rows] = await pool.query(
-    'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_customer_id = ? OR stripe_subscription_id = ? LIMIT 1',
-    [customerId, subscriptionId]
+    'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_subscription_id = ? OR stripe_customer_id = ? LIMIT 1',
+    [subscriptionId, customerId]
   );
 
-  if (rows.length === 0) {
+  let usuarioId = rows[0]?.usuario_id || null;
+
+  if (!usuarioId && customerId) {
+    try {
+      const stripe = getStripe();
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer && !customer.deleted && customer.metadata?.usuario_id) {
+        usuarioId = Number(customer.metadata.usuario_id);
+      }
+    } catch (lookupErr) {
+      console.warn('[Webhook] invoice.paid: fallback customer lookup failed:', lookupErr.message);
+    }
+  }
+
+  if (!usuarioId) {
     console.warn('[Webhook] invoice.paid: customer/subscription não encontrado no banco:', customerId, subscriptionId);
     return;
   }
 
-  const usuarioId = rows[0].usuario_id;
   await _persistirPremium(usuarioId, customerId, subscriptionId, 'active', null);
 }
 
@@ -442,15 +486,16 @@ async function _atualizarStatusSubscription(subscriptionId, status) {
  * Apenas promove/revoga baseado no status atual.
  */
 async function _sincronizarSubscription(subscription) {
-  const { id: subscriptionId, customer: customerId, status } = subscription;
+  const { id: subscriptionId, status } = subscription;
 
+  // Correspondência estrita por stripe_subscription_id para evitar que assinatura antiga/cancelada revogue assinatura ativa
   const [rows] = await pool.query(
-    'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_subscription_id = ? OR stripe_customer_id = ? LIMIT 1',
-    [subscriptionId, customerId]
+    'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_subscription_id = ? LIMIT 1',
+    [subscriptionId]
   );
 
   if (rows.length === 0) {
-    console.warn('[Webhook] subscription.updated: assinatura não encontrada no banco:', subscriptionId);
+    console.warn('[Webhook] subscription.updated: assinatura não encontrada no banco (ou já substituída):', subscriptionId);
     return;
   }
 
@@ -482,15 +527,16 @@ async function _sincronizarSubscription(subscription) {
  * Revoga o acesso Premium quando a assinatura é cancelada definitivamente.
  */
 async function _revogarPremium(subscription) {
-  const { id: subscriptionId, customer: customerId } = subscription;
+  const { id: subscriptionId } = subscription;
 
+  // Correspondência estrita por stripe_subscription_id para não revogar assinatura nova do mesmo customer
   const [rows] = await pool.query(
-    'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_subscription_id = ? OR stripe_customer_id = ? LIMIT 1',
-    [subscriptionId, customerId]
+    'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_subscription_id = ? LIMIT 1',
+    [subscriptionId]
   );
 
   if (rows.length === 0) {
-    console.warn('[Webhook] subscription.deleted: assinatura não encontrada:', subscriptionId);
+    console.warn('[Webhook] subscription.deleted: assinatura não encontrada (ou já substituída):', subscriptionId);
     return;
   }
 
@@ -507,16 +553,18 @@ async function _rebaixarParaUsuarioComum(usuarioId, subscriptionId, motivo) {
   try {
     await conn.beginTransaction();
 
-    const [currentUser] = await conn.query('SELECT papel FROM usuarios WHERE id = ?', [usuarioId]);
-    if (currentUser.length > 0 && currentUser[0].papel === 'premium') {
-      await conn.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['usuario', usuarioId]);
-      console.log(`[Stripe] Usuário ID ${usuarioId} revertido para 'usuario' (motivo: ${motivo}).`);
-    }
-
-    await conn.query(
-      'UPDATE stripe_subscriptions SET status = ?, atualizado_em = NOW() WHERE stripe_subscription_id = ?',
-      [motivo, subscriptionId]
+    const [subUpdate] = await conn.query(
+      'UPDATE stripe_subscriptions SET status = ?, atualizado_em = NOW() WHERE usuario_id = ? AND stripe_subscription_id = ?',
+      [motivo, usuarioId, subscriptionId]
     );
+
+    if (subUpdate.affectedRows > 0) {
+      const [currentUser] = await conn.query('SELECT papel FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      if (currentUser.length > 0 && currentUser[0].papel === 'premium') {
+        await conn.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['usuario', usuarioId]);
+        console.log(`[Stripe] Usuário ID ${usuarioId} revertido para 'usuario' (motivo: ${motivo}).`);
+      }
+    }
 
     await conn.commit();
 

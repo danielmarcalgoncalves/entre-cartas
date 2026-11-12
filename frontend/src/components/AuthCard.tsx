@@ -47,7 +47,7 @@ export default function AuthCard({
 }: AuthCardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, login, register, applyTokenSession, logout } = useAuth();
+  const { user, login, register, applyTokenSession, refreshUser, logout } = useAuth();
 
   const resolvedInitialMode: AuthMode =
     initialMode === "choice" ? "login" : (initialMode as AuthMode);
@@ -84,11 +84,14 @@ export default function AuthCard({
     const urlMode = searchParams.get("mode");
     const urlError = searchParams.get("error");
 
-    // 1. Handle Google OAuth callback completion
-    if (oauthStatus === "success" && oauthToken) {
+    // 1. Handle Google OAuth callback completion (HttpOnly cookie session or token)
+    if (oauthStatus === "success") {
       setLoading(true);
       setSuccess("Authenticated with Google. Opening your desk...");
-      applyTokenSession(oauthToken, true)
+      const finalizeOAuth = oauthToken
+        ? applyTokenSession(oauthToken, true)
+        : refreshUser();
+      finalizeOAuth
         .then(() => {
           if (onSuccess) onSuccess();
           else router.replace("/my-desk");

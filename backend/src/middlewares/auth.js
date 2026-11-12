@@ -3,14 +3,10 @@ const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
 
-const JWT_STRONG_FALLBACK = 'XSfvtJaid8X39mPyO3i8iHE6cCrGZZYHJ_FM7KsfXRqJhtqj9tnYkZMv2uFkuOWV_2026';
-const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32)
-  ? process.env.JWT_SECRET.trim()
-  : JWT_STRONG_FALLBACK;
-
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
-  console.warn('[SEGURANÇA] JWT_SECRET não configurado ou menor que 32 caracteres. Utilizando segredo aleatório seguro de 70 caracteres.');
+  throw new Error('[SECURITY] JWT_SECRET must be configured and at least 32 characters long.');
 }
+const JWT_SECRET = process.env.JWT_SECRET.trim();
 
 /**
  * Middleware de Autenticação com Blindagem Anti-IDOR e Anti-Falsificação de Privilégios:
@@ -61,12 +57,15 @@ async function authMiddleware(req, res, next) {
         });
       }
     } catch (revokeCheckErr) {
-      // If table not yet initialized, allow fallback only cleanly; once initialized it is enforced
+      console.error('[Auth Middleware] Failed to verify token revocation status:', revokeCheckErr.message);
+      return res.status(503).json({
+        error: 'Authentication service temporarily unavailable. Please try again.'
+      });
     }
 
     // Consulta no MariaDB para validar em tempo real (Defesa Anti-IDOR e Anti-Privilege Escalation)
     const [rows] = await pool.query(
-      'SELECT id, nome, email, papel, email_verificado, foto_url, bio, onboarding_concluido FROM usuarios WHERE id = ?',
+      'SELECT id, nome, email, papel, token_version, email_verificado, foto_url, bio, onboarding_concluido FROM usuarios WHERE id = ?',
       [decoded.id]
     );
 
@@ -77,6 +76,11 @@ async function authMiddleware(req, res, next) {
     }
 
     const usuarioDb = rows[0];
+    if ((decoded.tv || 1) !== (usuarioDb.token_version || 1)) {
+      return res.status(401).json({
+        error: 'Session invalidated due to password change or security update. Please sign in again.'
+      });
+    }
 
     // Bloqueia contas se a verificação de e-mail estiver explicitamente ativada
     const requireVerification = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
@@ -180,21 +184,24 @@ async function optionalAuth(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded && decoded.id) {
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-      let isRevoked = false;
+      let isRevoked = true;
       try {
         const [revoked] = await pool.query(
           'SELECT 1 FROM revoked_tokens WHERE token_hash = ? LIMIT 1',
           [tokenHash]
         );
         isRevoked = revoked.length > 0;
-      } catch (e) {}
+      } catch (e) {
+        console.error('[OptionalAuth] Failed to verify token revocation status:', e.message);
+        isRevoked = true;
+      }
 
       if (!isRevoked) {
         const [rows] = await pool.query(
-          'SELECT id, papel FROM usuarios WHERE id = ?',
+          'SELECT id, papel, token_version FROM usuarios WHERE id = ?',
           [decoded.id]
         );
-        if (rows.length > 0) {
+        if (rows.length > 0 && (decoded.tv || 1) === (rows[0].token_version || 1)) {
           req.usuarioId = Number(rows[0].id);
           req.usuarioPapel = rows[0].papel || 'usuario';
         }

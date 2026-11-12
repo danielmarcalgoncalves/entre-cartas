@@ -14,7 +14,7 @@ services:
       - DB_USER=${DB_USER:-root}
       - DB_PASSWORD=${DB_PASSWORD:-root_password}
       - DB_NAME=${DB_NAME:-filmes_db}
-      - JWT_SECRET=${JWT_SECRET:-XSfvtJaid8X39mPyO3i8iHE6cCrGZZYHJ_FM7KsfXRqJhtqj9tnYkZMv2uFkuOWV_2026}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be configured}
       - AUTH_SERVICE_URL=http://auth-service:3000
       - LOG_SERVICE_URL=http://log-service:3000
       # Google OAuth 2.0
@@ -51,7 +51,7 @@ services:
       - DB_USER=${DB_USER:-root}
       - DB_PASSWORD=${DB_PASSWORD:-root_password}
       - DB_NAME=${DB_NAME:-filmes_db}
-      - JWT_SECRET=${JWT_SECRET:-XSfvtJaid8X39mPyO3i8iHE6cCrGZZYHJ_FM7KsfXRqJhtqj9tnYkZMv2uFkuOWV_2026}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be configured}
       - MAIL_HOST=${MAIL_HOST:-smtp-relay.brevo.com}
       - MAIL_PORT=${MAIL_PORT:-587}
       - MAIL_USER=${MAIL_USER:-}
@@ -75,13 +75,14 @@ services:
     environment:
       - PORT=3000
       - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be configured}
     depends_on:
       - redis
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
 

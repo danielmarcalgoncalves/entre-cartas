@@ -110,11 +110,44 @@ async function updateProfile(req, res) {
   }
 }
 
+const MAX_CONCURRENT_AVATAR_UPLOADS = 4;
+let activeAvatarUploads = 0;
+
+function hasValidImageMagicBytes(buffer, mimetype) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return false;
+  if (mimetype === 'image/jpeg') {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimetype === 'image/png') {
+    return (
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47 &&
+      buffer[4] === 0x0d &&
+      buffer[5] === 0x0a &&
+      buffer[6] === 0x1a &&
+      buffer[7] === 0x0a
+    );
+  }
+  if (mimetype === 'image/webp') {
+    return (
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    );
+  }
+  return false;
+}
+
 /**
  * POST /api/profile/avatar
  * Receives multipart image upload, stores in MinIO, updates DB, and returns new URL and user profile.
  */
 async function uploadAvatar(req, res) {
+  if (activeAvatarUploads >= MAX_CONCURRENT_AVATAR_UPLOADS) {
+    return res.status(503).json({ error: 'Too many concurrent image uploads. Please try again in a moment.' });
+  }
+  activeAvatarUploads += 1;
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded. Please select an image using the "avatar" field.' });
@@ -127,9 +160,9 @@ async function uploadAvatar(req, res) {
       return res.status(400).json({ error: 'Image file too large. Maximum size allowed is 5 MB.' });
     }
 
-    // Accept only JPEG, PNG, and WebP
+    // Accept only JPEG, PNG, and WebP (MIME + magic-byte signature)
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(mimetype)) {
+    if (!allowedTypes.includes(mimetype) || !hasValidImageMagicBytes(buffer, mimetype)) {
       return res.status(400).json({ error: 'Invalid image format. Please upload JPEG, PNG, or WebP.' });
     }
 
@@ -176,6 +209,8 @@ async function uploadAvatar(req, res) {
     console.error('[profileController] uploadAvatar error:', err.message);
     sendLog('AVATAR_UPLOAD_ERRO', req, { usuario_id: req.usuarioId, error: err.message });
     return res.status(500).json({ error: 'Failed to upload photograph: ' + (err.message || 'Internal error.') });
+  } finally {
+    activeAvatarUploads = Math.max(0, activeAvatarUploads - 1);
   }
 }
 

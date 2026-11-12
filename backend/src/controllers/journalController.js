@@ -70,44 +70,58 @@ async function upsertNotebook(req, res) {
     const safePages = Array.isArray(paginas) ? paginas : [];
     const pagesJson = JSON.stringify(safePages);
 
-    const [existing] = await pool.query(
-      'SELECT id FROM cadernos WHERE usuario_id = ? AND client_id = ?',
-      [usuarioId, clientId]
-    );
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [userRows] = await conn.query('SELECT id, papel FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      const papelEfetivo = (userRows[0] && userRows[0].papel) || papelUsuario;
 
-    if (existing.length === 0) {
-      const isPro = papelUsuario === 'premium' || papelUsuario === 'admin';
-      const limit = isPro ? 10 : 3;
-      const [countRows] = await pool.query(
-        'SELECT COUNT(*) as total FROM cadernos WHERE usuario_id = ?',
-        [usuarioId]
+      const [existing] = await conn.query(
+        'SELECT id FROM cadernos WHERE usuario_id = ? AND client_id = ? FOR UPDATE',
+        [usuarioId, clientId]
       );
-      const total = countRows[0] ? countRows[0].total : 0;
-      if (total >= limit) {
-        return res.status(403).json({
-          error: isPro
-            ? `You have reached the limit of ${limit} journals on the Premium Plan.`
-            : `You have reached the limit of ${limit} journals on the Standard Plan. Join Pro Club for up to 10 journals!`,
-          isLimitReached: true,
-          limite: limit,
-        });
+
+      if (existing.length === 0) {
+        const isPro = papelEfetivo === 'premium' || papelEfetivo === 'admin';
+        const limit = isPro ? 10 : 3;
+        const [countRows] = await conn.query(
+          'SELECT COUNT(*) as total FROM cadernos WHERE usuario_id = ?',
+          [usuarioId]
+        );
+        const total = countRows[0] ? countRows[0].total : 0;
+        if (total >= limit) {
+          await conn.rollback();
+          return res.status(403).json({
+            error: isPro
+              ? `You have reached the limit of ${limit} journals on the Premium Plan.`
+              : `You have reached the limit of ${limit} journals on the Standard Plan. Join Pro Club for up to 10 journals!`,
+            isLimitReached: true,
+            limite: limit,
+          });
+        }
+
+        await conn.query(
+          `INSERT INTO cadernos (client_id, usuario_id, nome, cor_capa, paginas_json)
+           VALUES (?, ?, ?, ?, ?)`,
+          [clientId, usuarioId, String(nome).trim().slice(0, 120), String(corCapa).slice(0, 30), pagesJson]
+        );
+      } else {
+        await conn.query(
+          `UPDATE cadernos
+           SET nome = ?, cor_capa = ?, paginas_json = ?
+           WHERE usuario_id = ? AND client_id = ?`,
+          [String(nome).trim().slice(0, 120), String(corCapa).slice(0, 30), pagesJson, usuarioId, clientId]
+        );
       }
 
-      await pool.query(
-        `INSERT INTO cadernos (client_id, usuario_id, nome, cor_capa, paginas_json)
-         VALUES (?, ?, ?, ?, ?)`,
-        [clientId, usuarioId, String(nome).trim().slice(0, 120), String(corCapa).slice(0, 30), pagesJson]
-      );
-    } else {
-      await pool.query(
-        `UPDATE cadernos
-         SET nome = ?, cor_capa = ?, paginas_json = ?
-         WHERE usuario_id = ? AND client_id = ?`,
-        [String(nome).trim().slice(0, 120), String(corCapa).slice(0, 30), pagesJson, usuarioId, clientId]
-      );
+      await conn.commit();
+      return res.json({ message: 'Journal saved.', id: clientId });
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
     }
-
-    return res.json({ message: 'Journal saved.', id: clientId });
   } catch (err) {
     console.error('[journalController] upsertNotebook error:', err.message);
     return res.status(500).json({ error: 'Failed to save journal to database.' });
@@ -186,45 +200,59 @@ async function upsertFolder(req, res) {
       return res.status(400).json({ error: 'Folder name is required.' });
     }
 
-    const [existing] = await pool.query(
-      'SELECT id FROM pastas_cartas WHERE usuario_id = ? AND client_id = ?',
-      [usuarioId, clientId]
-    );
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [userRows] = await conn.query('SELECT id, papel FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      const papelEfetivo = (userRows[0] && userRows[0].papel) || papelUsuario;
 
-    if (existing.length === 0) {
-      const isPro = papelUsuario === 'premium' || papelUsuario === 'admin';
-      const limit = isPro ? 10 : 3;
-      const [countRows] = await pool.query(
-        'SELECT COUNT(*) as total FROM pastas_cartas WHERE usuario_id = ?',
-        [usuarioId]
+      const [existing] = await conn.query(
+        'SELECT id FROM pastas_cartas WHERE usuario_id = ? AND client_id = ? FOR UPDATE',
+        [usuarioId, clientId]
       );
-      const total = countRows[0] ? countRows[0].total : 0;
-      if (total >= limit) {
-        return res.status(403).json({
-          error: isPro
-            ? `You have reached the limit of ${limit} folders on the Premium Plan.`
-            : `You have reached the limit of ${limit} folders on the Standard Plan. Join Pro Club for up to 10 folders!`,
-          isLimitReached: true,
-          limite: limit,
-        });
+
+      if (existing.length === 0) {
+        const isPro = papelEfetivo === 'premium' || papelEfetivo === 'admin';
+        const limit = isPro ? 10 : 3;
+        const [countRows] = await conn.query(
+          'SELECT COUNT(*) as total FROM pastas_cartas WHERE usuario_id = ?',
+          [usuarioId]
+        );
+        const total = countRows[0] ? countRows[0].total : 0;
+        if (total >= limit) {
+          await conn.rollback();
+          return res.status(403).json({
+            error: isPro
+              ? `You have reached the limit of ${limit} folders on the Premium Plan.`
+              : `You have reached the limit of ${limit} folders on the Standard Plan. Join Pro Club for up to 10 folders!`,
+            isLimitReached: true,
+            limite: limit,
+          });
+        }
+
+        await conn.query(
+          `INSERT INTO pastas_cartas (client_id, usuario_id, nome, cor) VALUES (?, ?, ?, ?)`,
+          [clientId, usuarioId, String(nome).trim().slice(0, 120), String(cor).slice(0, 30)]
+        );
+      } else {
+        await conn.query(
+          `UPDATE pastas_cartas SET nome = ?, cor = ? WHERE usuario_id = ? AND client_id = ?`,
+          [String(nome).trim().slice(0, 120), String(cor).slice(0, 30), usuarioId, clientId]
+        );
+        await conn.query(
+          `UPDATE cartas SET pasta_nome = ? WHERE usuario_id = ? AND pasta_client_id = ?`,
+          [String(nome).trim().slice(0, 120), usuarioId, clientId]
+        );
       }
 
-      await pool.query(
-        `INSERT INTO pastas_cartas (client_id, usuario_id, nome, cor) VALUES (?, ?, ?, ?)`,
-        [clientId, usuarioId, String(nome).trim().slice(0, 120), String(cor).slice(0, 30)]
-      );
-    } else {
-      await pool.query(
-        `UPDATE pastas_cartas SET nome = ?, cor = ? WHERE usuario_id = ? AND client_id = ?`,
-        [String(nome).trim().slice(0, 120), String(cor).slice(0, 30), usuarioId, clientId]
-      );
-      await pool.query(
-        `UPDATE cartas SET pasta_nome = ? WHERE usuario_id = ? AND pasta_client_id = ?`,
-        [String(nome).trim().slice(0, 120), usuarioId, clientId]
-      );
+      await conn.commit();
+      return res.json({ message: 'Folder saved.', id: clientId });
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
     }
-
-    return res.json({ message: 'Folder saved.', id: clientId });
   } catch (err) {
     console.error('[journalController] upsertFolder error:', err.message);
     return res.status(500).json({ error: 'Failed to save folder.' });

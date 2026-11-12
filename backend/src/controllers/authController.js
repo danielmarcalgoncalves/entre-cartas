@@ -5,6 +5,9 @@ const { sendLog, getAuditLogs } = require('../services/logClient');
 
 const PRIMARY_AUTH_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3000';
 const FALLBACK_LOCAL_AUTH_URL = 'http://127.0.0.1:3001';
+const INTERNAL_AUTH_SECRET = process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32
+  ? crypto.createHmac('sha256', process.env.JWT_SECRET.trim()).update('internal-auth-service').digest('hex')
+  : '';
 
 async function requestAuthService(config) {
   try {
@@ -36,15 +39,17 @@ function isSecureConnection(req) {
 }
 
 function setAuthCookie(res, token, rememberMe = false, req = null) {
-  const days = rememberMe ? 30 : 7;
   const isHttps = isSecureConnection(req);
-  res.cookie('access_token', token, {
+  const cookieOpts = {
     httpOnly: true,
     secure: Boolean(isHttps),
     sameSite: 'lax',
-    path: '/',
-    maxAge: days * 24 * 60 * 60 * 1000
-  });
+    path: '/'
+  };
+  if (rememberMe) {
+    cookieOpts.maxAge = 30 * 24 * 60 * 60 * 1000;
+  }
+  res.cookie('access_token', token, cookieOpts);
 }
 
 function clearAuthCookie(res, req = null) {
@@ -65,6 +70,24 @@ function getBearerToken(req) {
     if (parts.length === 2 && parts[0] === 'Bearer') return parts[1];
   }
   return null;
+}
+
+function getAllAuthTokens(req) {
+  const tokens = new Set();
+  if (req.token && typeof req.token === 'string') tokens.add(req.token.trim());
+  if (req.cookies && req.cookies.access_token && typeof req.cookies.access_token === 'string') {
+    tokens.add(req.cookies.access_token.trim());
+  }
+  if (req.headers && req.headers.authorization) {
+    const parts = req.headers.authorization.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer' && parts[1]) {
+      tokens.add(parts[1].trim());
+    }
+  }
+  if (req.body && typeof req.body.token === 'string' && req.body.token.trim()) {
+    tokens.add(req.body.token.trim());
+  }
+  return Array.from(tokens).filter(Boolean);
 }
 
 function isGoogleConfigured() {
@@ -164,27 +187,30 @@ async function login(req, res) {
 
 async function logout(req, res) {
   const motivo = req.body?.motivo || 'user_action';
-  const token = getBearerToken(req);
+  const tokens = getAllAuthTokens(req);
+  const primaryToken = tokens[0] || null;
 
   try {
-    if (token) {
+    if (tokens.length > 0) {
       let revokedOk = false;
       try {
         await requestAuthService({
           method: 'POST',
           path: '/logout',
-          data: { token, motivo },
-          headers: { Authorization: `Bearer ${token}` }
+          data: { token: primaryToken, tokens, motivo },
+          headers: primaryToken ? { Authorization: `Bearer ${primaryToken}` } : {}
         });
         revokedOk = true;
       } catch (svcErr) {
-        // Fallback: revoke directly in MariaDB if auth-service is momentarily unreachable
-        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        // Fallback: revoke all presented tokens directly in MariaDB if auth-service is momentarily unreachable
         const expDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        await pool.query(
-          `INSERT IGNORE INTO revoked_tokens (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)`,
-          [tokenHash, req.usuarioId || null, expDate]
-        );
+        for (const t of tokens) {
+          const tokenHash = crypto.createHash('sha256').update(t).digest('hex');
+          await pool.query(
+            `INSERT IGNORE INTO revoked_tokens (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)`,
+            [tokenHash, req.usuarioId || null, expDate]
+          );
+        }
         revokedOk = true;
       }
 
@@ -349,7 +375,7 @@ async function googleAuthCallback(req, res) {
     const storedState = req.cookies ? req.cookies.oauth_state : null;
     res.clearCookie('oauth_state');
 
-    if (storedState && state && storedState !== state) {
+    if (!storedState || !state || storedState !== state) {
       return res.redirect('/login?error=google_state_mismatch');
     }
 
@@ -393,6 +419,9 @@ async function googleAuthCallback(req, res) {
     const authRes = await requestAuthService({
       method: 'POST',
       path: '/oauth/google',
+      headers: {
+        'X-Internal-Auth-Secret': INTERNAL_AUTH_SECRET
+      },
       data: {
         googleId: profile.sub,
         email: profile.email,
@@ -413,7 +442,7 @@ async function googleAuthCallback(req, res) {
       email: usuario?.email
     });
 
-    return res.redirect(`/login?oauth=success&token=${encodeURIComponent(token)}`);
+    return res.redirect('/login?oauth=success');
   } catch (error) {
     console.error('[GOOGLE CALLBACK ERROR]:', error.response?.data || error.message);
     return res.redirect('/login?error=google_auth_failed');

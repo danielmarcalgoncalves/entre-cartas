@@ -8,18 +8,17 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
 const app = express();
-app.set('trust proxy', 1);
+const trustProxyEnv = process.env.TRUST_PROXY;
+app.set('trust proxy', trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) : false);
 app.use(cors());
 app.use(express.json());
 
-const JWT_STRONG_FALLBACK = 'XSfvtJaid8X39mPyO3i8iHE6cCrGZZYHJ_FM7KsfXRqJhtqj9tnYkZMv2uFkuOWV_2026';
-const JWT_SECRET = (process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32)
-  ? process.env.JWT_SECRET.trim()
-  : JWT_STRONG_FALLBACK;
-
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
-  console.warn('[SECURITY] JWT_SECRET not configured or shorter than 32 characters. Using secure 70-character fallback.');
+  throw new Error('[SECURITY] JWT_SECRET must be configured and at least 32 characters long.');
 }
+const JWT_SECRET = process.env.JWT_SECRET.trim();
+const INTERNAL_AUTH_SECRET = crypto.createHmac('sha256', JWT_SECRET).update('internal-auth-service').digest('hex');
+const INTERNAL_LOG_SECRET = crypto.createHmac('sha256', JWT_SECRET).update('internal-log-service').digest('hex');
 
 const LOG_SERVICE_URL = process.env.LOG_SERVICE_URL || 'http://log-service:3000';
 
@@ -39,7 +38,6 @@ function sendLog(acao, req = null, detalhes = {}) {
       }
 
       clientIp =
-        req.headers['x-forwarded-for']?.split(',')[0].trim() ||
         req.ip ||
         req.socket?.remoteAddress ||
         '127.0.0.1';
@@ -65,7 +63,10 @@ function sendLog(acao, req = null, detalhes = {}) {
 
     fetch(`${LOG_SERVICE_URL}/logs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Log-Secret': INTERNAL_LOG_SECRET
+      },
       body: JSON.stringify(payload),
       signal: controller.signal
     })
@@ -154,7 +155,8 @@ async function ensureAuthSchema(retries = 15, delay = 2000) {
           `ALTER TABLE usuarios ADD COLUMN google_id VARCHAR(255) DEFAULT NULL`,
           `ALTER TABLE usuarios ADD COLUMN ultimo_login TIMESTAMP NULL DEFAULT NULL`,
           `ALTER TABLE usuarios ADD COLUMN status_conta VARCHAR(30) DEFAULT 'ativo'`,
-          `ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE`
+          `ALTER TABLE usuarios ADD COLUMN onboarding_concluido BOOLEAN DEFAULT FALSE`,
+          `ALTER TABLE usuarios ADD COLUMN token_version INT NOT NULL DEFAULT 1`
         ];
 
         for (const q of alterQueries) {
@@ -189,7 +191,7 @@ const transporter = nodemailer.createTransport({
     pass: process.env.MAIL_PASS || 'fake_pass'
   },
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: true
   }
 });
 
@@ -509,12 +511,15 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ error: 'Session has been logged out or revoked.' });
     }
 
-    const [users] = await pool.query('SELECT id, nome, email, papel, email_verificado, foto_url, bio, auth_provider, onboarding_concluido FROM usuarios WHERE id = ?', [decoded.id]);
+    const [users] = await pool.query('SELECT id, nome, email, papel, token_version, email_verificado, foto_url, bio, auth_provider, onboarding_concluido FROM usuarios WHERE id = ?', [decoded.id]);
     if (users.length === 0) {
       return res.status(401).json({ error: 'User account not found or revoked.' });
     }
 
     const usuarioDb = users[0];
+    if ((decoded.tv || 1) !== (usuarioDb.token_version || 1)) {
+      return res.status(401).json({ error: 'Session invalidated due to password change or security update.' });
+    }
     const papelFinal = usuarioDb.papel || 'usuario';
     req.usuarioId = usuarioDb.id;
     req.usuarioPapel = papelFinal;
@@ -562,17 +567,18 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
     const papelFinal = 'usuario';
     const requireOtpFlow = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 
-    const [existing] = await pool.query('SELECT id, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
+    const [existing] = await pool.query('SELECT id, nome, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
 
     if (existing.length > 0) {
       if (requireOtpFlow && (existing[0].email_verificado === 0 || existing[0].email_verificado === false)) {
-        const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+        const codigo = crypto.randomInt(100000, 1000000).toString();
         const expiraEm = new Date(Date.now() + 15 * 60000);
 
         await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
         await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
+        failedVerifyAttempts.delete(emailTrimmed);
 
-        sendVerificationEmail(emailTrimmed, trimmedName, codigo).catch(err => {
+        sendVerificationEmail(emailTrimmed, existing[0].nome || trimmedName, codigo).catch(err => {
           console.warn('[Auth-Service] Failed to send verification email:', err.message);
         });
 
@@ -594,10 +600,11 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
         [trimmedName, emailTrimmed, senhaHash, papelFinal]
       );
 
-      const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+      const codigo = crypto.randomInt(100000, 1000000).toString();
       const expiraEm = new Date(Date.now() + 15 * 60000);
 
       await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
+      failedVerifyAttempts.delete(emailTrimmed);
 
       sendVerificationEmail(emailTrimmed, trimmedName, codigo).catch(err => {
         console.warn('[Auth-Service] Failed to send verification email:', err.message);
@@ -619,7 +626,7 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
 
     const newUserId = insertResult.insertId;
     const token = jwt.sign(
-      { id: newUserId, nome: trimmedName, email: emailTrimmed, papel: papelFinal },
+      { id: newUserId, nome: trimmedName, email: emailTrimmed, papel: papelFinal, tv: 1 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -681,31 +688,32 @@ async function handleVerifyCode(req, res) {
       });
     }
 
-    const [codigos] = await pool.query(
-      'SELECT * FROM codigos_verificacao WHERE email = ? AND codigo = ? AND usado = FALSE ORDER BY id DESC LIMIT 1',
-      [emailTrimmed, codigoTrimmed]
-    );
-
-    if (codigos.length === 0) {
-      failedVerifyAttempts.set(emailTrimmed, attempts + 1);
-      return res.status(400).json({
-        error: `Invalid or already used verification code. Remaining attempts: ${Math.max(0, 5 - (attempts + 1))}`
-      });
-    }
-
-    failedVerifyAttempts.delete(emailTrimmed);
-
-    const regCodigo = codigos[0];
-    if (new Date() > new Date(regCodigo.expira_em)) {
-      return res.status(400).json({ error: 'This verification code has expired (15-minute limit). Please request a new code.' });
-    }
-
     const conn = await pool.getConnection();
+    let verificationError = null;
     try {
       await conn.beginTransaction();
-      await conn.query('UPDATE codigos_verificacao SET usado = TRUE WHERE id = ?', [regCodigo.id]);
-      await conn.query('UPDATE usuarios SET email_verificado = TRUE, ultimo_login = CURRENT_TIMESTAMP WHERE email = ?', [emailTrimmed]);
-      await conn.commit();
+      const [codigos] = await conn.query(
+        'SELECT * FROM codigos_verificacao WHERE email = ? AND codigo = ? AND usado = FALSE ORDER BY id DESC LIMIT 1 FOR UPDATE',
+        [emailTrimmed, codigoTrimmed]
+      );
+
+      if (codigos.length === 0) {
+        await conn.rollback();
+        failedVerifyAttempts.set(emailTrimmed, attempts + 1);
+        return res.status(400).json({
+          error: `Invalid or already used verification code. Remaining attempts: ${Math.max(0, 5 - (attempts + 1))}`
+        });
+      }
+
+      const regCodigo = codigos[0];
+      if (new Date() > new Date(regCodigo.expira_em)) {
+        await conn.rollback();
+        verificationError = 'This verification code has expired (15-minute limit). Please request a new code.';
+      } else {
+        await conn.query('UPDATE codigos_verificacao SET usado = TRUE WHERE id = ?', [regCodigo.id]);
+        await conn.query('UPDATE usuarios SET email_verificado = TRUE, ultimo_login = CURRENT_TIMESTAMP WHERE email = ?', [emailTrimmed]);
+        await conn.commit();
+      }
     } catch (err) {
       await conn.rollback();
       throw err;
@@ -713,14 +721,20 @@ async function handleVerifyCode(req, res) {
       conn.release();
     }
 
-    const [users] = await pool.query('SELECT id, nome, email, papel, foto_url, bio FROM usuarios WHERE email = ?', [emailTrimmed]);
+    if (verificationError) {
+      return res.status(400).json({ error: verificationError });
+    }
+
+    failedVerifyAttempts.delete(emailTrimmed);
+
+    const [users] = await pool.query('SELECT id, nome, email, papel, token_version, foto_url, bio FROM usuarios WHERE email = ?', [emailTrimmed]);
     if (users.length === 0) {
       return res.status(404).json({ error: 'User account not found.' });
     }
 
     const usuario = users[0];
     const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel || 'usuario' },
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel || 'usuario', tv: usuario.token_version || 1 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -771,10 +785,11 @@ async function handleResendCode(req, res) {
 
     await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
 
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const codigo = crypto.randomInt(100000, 1000000).toString();
     const expiraEm = new Date(Date.now() + 15 * 60000);
 
     await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
+    failedVerifyAttempts.delete(emailTrimmed);
 
     await sendVerificationEmail(emailTrimmed, users[0].nome, codigo);
 
@@ -832,7 +847,7 @@ app.post('/login', async (req, res) => {
     const papelFinal = usuario.papel || 'usuario';
     const expiresIn = rememberMe ? '30d' : '7d';
     const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal },
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tv: usuario.token_version || 1 },
       JWT_SECRET,
       { expiresIn }
     );
@@ -868,13 +883,20 @@ app.post('/login', async (req, res) => {
 // =========================================================================
 app.post('/oauth/google', async (req, res) => {
   try {
+    const providedSecret = String(req.headers['x-internal-auth-secret'] || '');
+    const expectedBuf = Buffer.from(INTERNAL_AUTH_SECRET, 'utf8');
+    const providedBuf = Buffer.from(providedSecret, 'utf8');
+    if (expectedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(expectedBuf, providedBuf)) {
+      return res.status(403).json({ error: 'Forbidden: internal OAuth endpoint requires service authentication.' });
+    }
+
     const { googleId, email, nome, fotoUrl, emailVerified } = req.body;
 
     if (!googleId || !email) {
       return res.status(400).json({ error: 'Verified Google account details are required.' });
     }
 
-    if (emailVerified === false) {
+    if (emailVerified !== true) {
       return res.status(403).json({ error: 'Your Google email address must be verified to sign in.' });
     }
 
@@ -891,18 +913,36 @@ app.post('/oauth/google', async (req, res) => {
     let isNewUser = false;
 
     if (existingUsers.length > 0) {
-      // Link/update existing account
       usuario = existingUsers[0];
+      if (usuario.google_id && String(usuario.google_id) !== String(googleId)) {
+        return res.status(409).json({ error: 'This email is already linked to a different Google account.' });
+      }
       const updatedFoto = usuario.foto_url || fotoUrl || null;
-      await pool.query(
-        `UPDATE usuarios
-         SET google_id = COALESCE(google_id, ?),
-             foto_url = ?,
-             email_verificado = TRUE,
-             ultimo_login = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [String(googleId), updatedFoto, usuario.id]
-      );
+      // If an unverified local account existed for this email (potential pre-takeover), rotate its password hash
+      const wasUnverifiedLocal = !usuario.google_id && (usuario.email_verificado === 0 || usuario.email_verificado === false);
+      if (wasUnverifiedLocal) {
+        const rotatedHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        await pool.query(
+          `UPDATE usuarios
+           SET google_id = COALESCE(google_id, ?),
+               foto_url = ?,
+               senha_hash = ?,
+               email_verificado = TRUE,
+               ultimo_login = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [String(googleId), updatedFoto, rotatedHash, usuario.id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE usuarios
+           SET google_id = COALESCE(google_id, ?),
+               foto_url = ?,
+               email_verificado = TRUE,
+               ultimo_login = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [String(googleId), updatedFoto, usuario.id]
+        );
+      }
       usuario.google_id = usuario.google_id || String(googleId);
       usuario.foto_url = updatedFoto;
       usuario.email_verificado = true;
@@ -942,7 +982,7 @@ app.post('/oauth/google', async (req, res) => {
 
     const papelFinal = usuario.papel || 'usuario';
     const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal },
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tv: usuario.token_version || 1 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -1160,8 +1200,8 @@ app.get('/validate-reset-token', async (req, res) => {
 
     const tokenHash = hashRecoveryToken(rawToken);
     const [tokens] = await pool.query(
-      'SELECT usuario_id, expira_em, usado FROM reset_tokens WHERE token = ? OR token = ? LIMIT 1',
-      [tokenHash, rawToken]
+      'SELECT usuario_id, expira_em, usado FROM reset_tokens WHERE token = ? LIMIT 1',
+      [tokenHash]
     );
 
     if (tokens.length === 0) {
@@ -1195,8 +1235,8 @@ app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password rese
     const tokenHash = hashRecoveryToken(rawToken);
 
     const [tokens] = await pool.query(
-      'SELECT * FROM reset_tokens WHERE token = ? OR token = ? LIMIT 1',
-      [tokenHash, rawToken]
+      'SELECT * FROM reset_tokens WHERE token = ? LIMIT 1',
+      [tokenHash]
     );
     if (tokens.length === 0) {
       return res.status(400).json({ error: 'This password recovery link is invalid.' });
@@ -1216,7 +1256,7 @@ app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password rese
     try {
       await conn.beginTransaction();
       await conn.query(
-        'UPDATE usuarios SET senha_hash = ?, email_verificado = TRUE WHERE id = ?',
+        'UPDATE usuarios SET senha_hash = ?, email_verificado = TRUE, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?',
         [senhaHash, resetRequest.usuario_id]
       );
       await conn.query(
@@ -1242,19 +1282,29 @@ app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password rese
 
 app.post('/logout', async (req, res) => {
   try {
-    let token = null;
+    const tokenSet = new Set();
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.slice(7).trim();
-    } else if (req.body && req.body.token) {
-      token = String(req.body.token).trim();
+      const t = authHeader.slice(7).trim();
+      if (t) tokenSet.add(t);
+    }
+    if (req.body && typeof req.body.token === 'string' && req.body.token.trim()) {
+      tokenSet.add(req.body.token.trim());
+    }
+    if (req.body && Array.isArray(req.body.tokens)) {
+      for (const t of req.body.tokens) {
+        if (typeof t === 'string' && t.trim()) tokenSet.add(t.trim());
+      }
     }
 
-    if (token) {
+    let lastUserId = null;
+    for (const token of tokenSet) {
       let decoded = null;
       try {
         decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true });
-      } catch {}
+      } catch {
+        continue;
+      }
 
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       const expDate =
@@ -1262,13 +1312,17 @@ app.post('/logout', async (req, res) => {
           ? new Date(decoded.exp * 1000)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       const userId = decoded && decoded.id ? Number(decoded.id) : null;
+      if (userId) lastUserId = userId;
 
       await pool.query(
         `INSERT IGNORE INTO revoked_tokens (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)`,
         [tokenHash, userId, expDate]
       );
+    }
+
+    if (tokenSet.size > 0) {
       await pool.query(`DELETE FROM revoked_tokens WHERE expira_em < NOW()`);
-      sendLog('LOGOUT', req, { usuario_id: userId || 'anonimo', motivo: req.body?.motivo || 'user_action' });
+      sendLog('LOGOUT', req, { usuario_id: lastUserId || 'anonimo', motivo: req.body?.motivo || 'user_action' });
     }
 
     return res.json({ message: 'Session invalidated.' });
