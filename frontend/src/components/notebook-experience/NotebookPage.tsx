@@ -14,6 +14,8 @@ import {
   JOURNAL_PAGE_LAYOUT,
   JOURNAL_PAGE_WIDTH,
   extractJournalPageMedia,
+  hasMeaningfulJournalText,
+  isJournalPageMeaningful,
 } from "@/lib/journal-page-layout";
 
 import React, { type ReactNode } from "react";
@@ -553,8 +555,8 @@ export function JournalUserPage({
     (page as any).polaroid_legenda || null
   );
 
-  const hasContent = cleanContent.trim().length > 0;
-  const hasTitle = Boolean(page.titulo && page.titulo.trim().length > 0);
+  const hasContent = hasMeaningfulJournalText(cleanContent);
+  const hasTitle = hasMeaningfulJournalText(page.titulo);
 
   return (
     <div
@@ -636,8 +638,8 @@ export interface JournalFrontispiecePageProps {
  */
 export function JournalFrontispiecePage({ notebook }: JournalFrontispiecePageProps) {
   const dates = getNotebookDates(notebook);
-  const writtenCount = (notebook.paginas || []).filter(
-    (p) => Boolean(p.conteudo && p.conteudo.trim().length > 0) || Boolean(p.titulo && p.titulo.trim().length > 0)
+  const writtenCount = (notebook.paginas || []).filter((p) =>
+    isJournalPageMeaningful(p)
   ).length;
 
   return (
@@ -719,8 +721,8 @@ export function JournalColophonPage({
   onBackToShelf,
 }: JournalColophonPageProps) {
   const dates = getNotebookDates(notebook);
-  const writtenCount = (notebook.paginas || []).filter(
-    (p) => Boolean(p.conteudo && p.conteudo.trim().length > 0) || Boolean(p.titulo && p.titulo.trim().length > 0)
+  const writtenCount = (notebook.paginas || []).filter((p) =>
+    isJournalPageMeaningful(p)
   ).length;
 
   return (

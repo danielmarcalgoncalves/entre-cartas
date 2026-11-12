@@ -1,6 +1,10 @@
 "use client";
 
 import { api } from "@/services/api";
+import {
+  isJournalPageMeaningful,
+  normalizeJournalContentForStorage,
+} from "@/lib/journal-page-layout";
 
 export const JOURNAL_UPDATED_EVENT = "entre-cartas:journal-updated";
 export const SESSION_CLEARED_EVENT = "entre-cartas:session-cleared";
@@ -380,13 +384,17 @@ export function dispatchJournalUpdated(source?: string) {
   }
 }
 
+export function normalizeNotebookPageForStorage(page: NotebookPage): NotebookPage {
+  return {
+    ...page,
+    titulo: (page.titulo || "").trim(),
+    conteudo: normalizeJournalContentForStorage(page.conteudo || ""),
+  };
+}
+
 export function filterWrittenPages(pages?: NotebookPage[]): NotebookPage[] {
   if (!Array.isArray(pages)) return [];
-  return pages.filter(
-    (p) =>
-      Boolean(p?.conteudo && p.conteudo.trim().length > 0) ||
-      Boolean(p?.titulo && p.titulo.trim().length > 0)
-  );
+  return pages.filter((p) => isJournalPageMeaningful(p));
 }
 
 export function getNotebookDates(nb: Notebook): { created: string; updated: string } {

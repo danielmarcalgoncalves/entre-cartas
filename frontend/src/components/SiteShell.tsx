@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import AuthModal from "@/components/AuthModal";
+import { guardJournalNavigation } from "@/lib/journal-navigation-guard";
 
 interface NavItem {
   href: string;
@@ -76,6 +77,7 @@ const navItems: NavItem[] = [
 
 export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading, isPro, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === "light";
@@ -410,6 +412,14 @@ export default function SiteShell({ children }: { children: ReactNode }) {
               action="/discover"
               method="get"
               role="search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = searchInputRef.current?.value?.trim() || "";
+                const target = q ? `/discover?q=${encodeURIComponent(q)}` : "/discover";
+                void guardJournalNavigation(() => {
+                  router.push(target);
+                });
+              }}
               onClick={() => {
                 if (!isSidebarExpanded) {
                   setIsPinnedOpen(true);
@@ -455,8 +465,10 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     onClick={() => {
-                      logout().catch((err: any) => {
-                        alert(err?.message || "Failed to close server session cleanly. Local session has been cleared.");
+                      void guardJournalNavigation(() => {
+                        logout().catch((err: any) => {
+                          alert(err?.message || "Failed to close server session cleanly. Local session has been cleared.");
+                        });
                       });
                     }}
                     className="sidebar-signout-btn"

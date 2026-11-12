@@ -18,6 +18,7 @@ import {
   renameUserNotebook,
   type Notebook,
 } from "@/lib/journal-storage";
+import { hasMeaningfulJournalText } from "@/lib/journal-page-layout";
 
 interface MyJournalCollectionProps {
   notebooks: Notebook[];
@@ -411,7 +412,9 @@ export default function MyJournalCollection({
                     color: getInkColorById(paginaAtual.corTinta),
                   }}
                 >
-                  {paginaAtual.conteudo || (
+                  {hasMeaningfulJournalText(paginaAtual.conteudo) ? (
+                    paginaAtual.conteudo
+                  ) : (
                     <em style={{ color: "#8a7c6c" }}>
                       This journal has no written entries yet. Click &ldquo;Continue Writing&rdquo; to begin your first page.
                     </em>

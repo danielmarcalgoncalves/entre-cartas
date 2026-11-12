@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { letters, type Letter } from "@/lib/letters";
 import { Tape, Sticker } from "@/components/paper-kit";
@@ -9,12 +10,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { useGuestDemo } from "@/hooks/useGuestDemo";
 import { api } from "@/services/api";
 import GuestSavePromptModal, { type GuestPromptVariant } from "@/components/GuestSavePromptModal";
+import { registerJournalNavigationGuard } from "@/lib/journal-navigation-guard";
 import {
   JOURNAL_MAX_CHARS_PER_PAGE,
   JOURNAL_MAX_LINES_PER_PAGE,
   JOURNAL_PAGE_HEIGHT,
   JOURNAL_PAGE_WIDTH,
+  countNonNewlineChars,
+  hasMeaningfulJournalText,
+  isJournalPageMeaningful,
+  normalizeJournalContentForStorage,
+  normalizeJournalLineEndings,
   splitJournalPageOverflow,
+  splitJournalPagesRecursive,
 } from "@/lib/journal-page-layout";
 import {
   ACTIVE_LETTER_EDIT_ID_KEY,
@@ -43,6 +51,7 @@ import {
   getNotebookTheme,
   getPaperColorById,
   loadUserNotebooks,
+  normalizeNotebookPageForStorage,
   playPaperSound,
   renameUserNotebook,
   saveAllNotebooks,
@@ -133,7 +142,56 @@ function SaveIcon({ className = "" }: { className?: string }) {
   );
 }
 
+type AutosaveStatus = "idle" | "saving" | "saved" | "error";
+
+interface PageSignatureEntry {
+  contentSig: string;
+  fullSig: string;
+}
+
+interface ConfirmedNotebookSnapshot {
+  pagesById: Map<string, PageSignatureEntry>;
+  orderedIds: string[];
+}
+
+function getPageQualifyingContentSignature(page: NotebookPage): string {
+  return JSON.stringify({
+    titulo: (page.titulo || "").trim(),
+    conteudo: normalizeJournalContentForStorage(page.conteudo || ""),
+    polaroid: (page as any).polaroid_url || "",
+  });
+}
+
+function getPageFullPersistenceSignature(page: NotebookPage): string {
+  return JSON.stringify({
+    titulo: (page.titulo || "").trim(),
+    conteudo: normalizeJournalContentForStorage(page.conteudo || ""),
+    favoritado: Boolean(page.favoritado),
+    tipoPapel: page.tipoPapel || "",
+    corTinta: page.corTinta || "",
+    fonte: page.fonte || "",
+    polaroid: (page as any).polaroid_url || "",
+    polaroidLegenda: (page as any).polaroid_legenda || "",
+  });
+}
+
+function buildSnapshotFromWrittenPages(
+  writtenPages: NotebookPage[]
+): ConfirmedNotebookSnapshot {
+  const pagesById = new Map<string, PageSignatureEntry>();
+  const orderedIds: string[] = [];
+  for (const p of writtenPages) {
+    pagesById.set(p.id, {
+      contentSig: getPageQualifyingContentSignature(p),
+      fullSig: getPageFullPersistenceSignature(p),
+    });
+    orderedIds.push(p.id);
+  }
+  return { pagesById, orderedIds };
+}
+
 export default function JournalEditor() {
+  const router = useRouter();
   const { user, loading: authLoading, isPro } = useAuth();
   const isGuestMode = !authLoading && !user;
   const {
@@ -180,7 +238,9 @@ export default function JournalEditor() {
   const [currentPageIndex, setCurrentPageIndex] = useState<number>(0);
   const [notebookDrawerOpen, setNotebookDrawerOpen] = useState(false);
   const [newNotebookTitle, setNewNotebookTitle] = useState("");
+  const [newNotebookNameError, setNewNotebookNameError] = useState<string | null>(null);
   const [newNotebookCover, setNewNotebookCover] = useState<NotebookCoverColor>("marrom");
+  const [creatingNotebook, setCreatingNotebook] = useState(false);
   const [cadernoPromptNotice, setCadernoPromptNotice] = useState<string | null>(null);
   const [pendingSaveAfterCreation, setPendingSaveAfterCreation] = useState(false);
 
@@ -212,15 +272,28 @@ export default function JournalEditor() {
   const [cartaInspiracao, setCartaInspiracao] = useState<Letter | null>(null);
   const [promptTexto, setPromptTexto] = useState("");
 
-  // Feedback & Saving
+  // Feedback, Autosave & Navigation Protection
   const [salvando, setSalvando] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>("idle");
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [navFailureModalOpen, setNavFailureModalOpen] = useState(false);
+  const [navFailureContextLabel, setNavFailureContextLabel] = useState("leaving the editor");
+  const [retryingNavSave, setRetryingNavSave] = useState(false);
+  const [editRevision, setEditRevision] = useState(0);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const newNotebookInputRef = useRef<HTMLInputElement>(null);
   const hasInitialLoadedRef = useRef(false);
+  const appliedUrlNotebookRef = useRef<string | null>(null);
   const activeNotebookIdRef = useRef(activeNotebookId);
   activeNotebookIdRef.current = activeNotebookId;
+
+  const editRevisionRef = useRef(0);
+  const confirmedSnapshotsRef = useRef<Record<string, ConfirmedNotebookSnapshot>>({});
+  const inFlightSavePromiseRef = useRef<Promise<boolean> | null>(null);
+  const pendingNavActionRef = useRef<(() => void) | null>(null);
 
   const createBlankPage = (dateLabel?: string): NotebookPage => ({
     id: "pag-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
@@ -355,9 +428,14 @@ export default function JournalEditor() {
 
     const currentId = activeNotebookIdRef.current;
     const notebookAindaExiste = userOnlyNotebooks.some((n: Notebook) => n.id === currentId);
+    const shouldApplyUrlNotebook =
+      Boolean(urlNotebookId) && appliedUrlNotebookRef.current !== urlNotebookId;
 
-    if (!hasInitialLoadedRef.current || !notebookAindaExiste || urlNotebookId) {
+    if (!hasInitialLoadedRef.current || !notebookAindaExiste || shouldApplyUrlNotebook) {
       hasInitialLoadedRef.current = true;
+      if (urlNotebookId) {
+        appliedUrlNotebookRef.current = urlNotebookId;
+      }
       if (userOnlyNotebooks.length > 0) {
         let savedActiveId: string | null = null;
         let savedPageIdx: number | null = null;
@@ -384,6 +462,10 @@ export default function JournalEditor() {
           userOnlyNotebooks.find((n: Notebook) => n.id === targetActiveId) ||
           userOnlyNotebooks[0];
         const paginasEscritas = filterWrittenPages(active?.paginas);
+        if (!confirmedSnapshotsRef.current[targetActiveId]) {
+          confirmedSnapshotsRef.current[targetActiveId] =
+            buildSnapshotFromWrittenPages(paginasEscritas);
+        }
         const writtenPages =
           paginasEscritas.length > 0 ? paginasEscritas : [createBlankPage()];
 
@@ -411,11 +493,20 @@ export default function JournalEditor() {
 
   useEffect(() => {
     hasInitialLoadedRef.current = false;
+    appliedUrlNotebookRef.current = null;
+    confirmedSnapshotsRef.current = {};
+    setAutosaveStatus("idle");
+    setSaveErrorMessage(null);
   }, [user?.id, isGuestMode]);
 
   useEffect(() => {
     const resetEditorMemory = () => {
       hasInitialLoadedRef.current = false;
+      appliedUrlNotebookRef.current = null;
+      confirmedSnapshotsRef.current = {};
+      inFlightSavePromiseRef.current = null;
+      setAutosaveStatus("idle");
+      setSaveErrorMessage(null);
       setNotebooks([]);
       setActiveNotebookId("");
       setCadernoPaginas([createBlankPage()]);
@@ -442,155 +533,473 @@ export default function JournalEditor() {
     };
   }, [user?.id, authLoading, isGuestMode]);
 
+  const activeNotebook: Notebook | null =
+    notebooks.find((n) => n.id === activeNotebookId) ||
+    (notebooks.length > 0 ? notebooks[0] : null);
+
+  // Authoritative synchronous mirror of latest editor state to prevent stale-closure races
+  const latestStateRef = useRef({
+    user,
+    isGuestMode,
+    activeNotebook,
+    cadernoPaginas,
+    currentPageIndex,
+    cadernoTitulo,
+    cadernoConteudo,
+    cadernoFavoritado,
+    sheetBgId,
+    inkColorId,
+    fontFamilyId,
+  });
+  latestStateRef.current = {
+    user,
+    isGuestMode,
+    activeNotebook,
+    cadernoPaginas,
+    currentPageIndex,
+    cadernoTitulo,
+    cadernoConteudo,
+    cadernoFavoritado,
+    sheetBgId,
+    inkColorId,
+    fontFamilyId,
+  };
+
+  const getMergedPagesSnapshot = useCallback(
+    (overridePages?: NotebookPage[]): NotebookPage[] => {
+      const s = latestStateRef.current;
+      const basePages = overridePages ? [...overridePages] : [...s.cadernoPaginas];
+      if (!overridePages && basePages[s.currentPageIndex]) {
+        basePages[s.currentPageIndex] = {
+          ...basePages[s.currentPageIndex],
+          titulo: s.cadernoTitulo,
+          conteudo: s.cadernoConteudo,
+          favoritado: s.cadernoFavoritado,
+          atualizadoEm: basePages[s.currentPageIndex].atualizadoEm || new Date().toISOString(),
+          tipoPapel: s.sheetBgId,
+          corTinta: s.inkColorId,
+          fonte: s.fontFamilyId,
+        };
+      }
+      return basePages;
+    },
+    []
+  );
+
+  const getQualifyingModifiedPagesCount = useCallback(
+    (nbId: string, pages: NotebookPage[]): number => {
+      const confirmed = confirmedSnapshotsRef.current[nbId];
+      let count = 0;
+      for (const p of pages) {
+        if (!isJournalPageMeaningful(p)) continue;
+        const currentSig = getPageQualifyingContentSignature(p);
+        const savedSig = confirmed?.pagesById.get(p.id)?.contentSig;
+        if (savedSig !== currentSig) {
+          count++;
+        }
+      }
+      return count;
+    },
+    []
+  );
+
+  const hasUnsavedBackendChanges = useCallback((): boolean => {
+    const s = latestStateRef.current;
+    if (s.isGuestMode || !s.user?.id) return false;
+    if (!s.activeNotebook) {
+      return (
+        hasMeaningfulJournalText(s.cadernoConteudo) ||
+        hasMeaningfulJournalText(s.cadernoTitulo)
+      );
+    }
+    const confirmed = confirmedSnapshotsRef.current[s.activeNotebook.id];
+    const merged = getMergedPagesSnapshot();
+    const written = filterWrittenPages(merged).map(normalizeNotebookPageForStorage);
+    if (!confirmed) {
+      return written.length > 0;
+    }
+    if (written.length !== confirmed.orderedIds.length) {
+      return true;
+    }
+    for (let i = 0; i < written.length; i++) {
+      const p = written[i];
+      if (confirmed.orderedIds[i] !== p.id) return true;
+      const entry = confirmed.pagesById.get(p.id);
+      if (!entry || entry.fullSig !== getPageFullPersistenceSignature(p)) {
+        return true;
+      }
+    }
+    return false;
+  }, [getMergedPagesSnapshot]);
+
+  const hasPendingSaveWork = useCallback((): boolean => {
+    const s = latestStateRef.current;
+    if (s.isGuestMode || !s.user?.id) return false;
+    return Boolean(inFlightSavePromiseRef.current) || hasUnsavedBackendChanges();
+  }, [hasUnsavedBackendChanges]);
+
+  const syncLocalNotebooksStorage = useCallback(
+    (
+      targetNotebookId: string,
+      paginasAtuais: NotebookPage[],
+      markUpdatedTimestamp = true
+    ) => {
+      const s = latestStateRef.current;
+      if (authLoading) return;
+      const nowIso = new Date().toISOString();
+
+      if (s.isGuestMode) {
+        const paginasTemp = paginasAtuais.map((p) => ({
+          ...p,
+          atualizadoEm: p.atualizadoEm || nowIso,
+        }));
+        setNotebooks((prev) => {
+          const updatedGuest = prev.map((nb) =>
+            nb.id === targetNotebookId
+              ? {
+                  ...nb,
+                  paginas: paginasTemp,
+                  criadoEm: nb.criadoEm || nowIso,
+                  atualizadoEm: markUpdatedTimestamp ? nowIso : nb.atualizadoEm || nowIso,
+                }
+              : nb
+          );
+          setGuestNotebooks(updatedGuest);
+          return updatedGuest;
+        });
+        return;
+      }
+
+      if (!s.user?.id) return;
+
+      const paginasEscritas = filterWrittenPages(paginasAtuais).map((p) => ({
+        ...normalizeNotebookPageForStorage(p),
+        atualizadoEm: p.atualizadoEm || nowIso,
+      }));
+
+      const allStored = loadAllRawNotebooks();
+      const atualizados = allStored.map((nb) => {
+        if (nb.id === targetNotebookId) {
+          return {
+            ...nb,
+            paginas: paginasEscritas,
+            criadoEm: nb.criadoEm || nowIso,
+            atualizadoEm: markUpdatedTimestamp ? nowIso : nb.atualizadoEm || nowIso,
+            ownerId: nb.ownerId || s.user!.id,
+          };
+        }
+        return nb;
+      });
+
+      setNotebooks(
+        atualizados.filter((nb) =>
+          Boolean(nb.ownerId && String(nb.ownerId) === String(s.user!.id))
+        )
+      );
+      saveAllNotebooks(atualizados, "editor");
+    },
+    [authLoading, setGuestNotebooks]
+  );
+
+  // Single-flight backend persistence queue: guarantees no conflicting concurrent writes,
+  // preserves newer edits made while saving, and resets counter only after backend confirmation.
+  const flushBackendSave = useCallback(
+    async (overridePages?: NotebookPage[]): Promise<boolean> => {
+      const s = latestStateRef.current;
+      if (s.isGuestMode || !s.user?.id) return true;
+      if (!s.activeNotebook) {
+        return !(
+          hasMeaningfulJournalText(s.cadernoConteudo) ||
+          hasMeaningfulJournalText(s.cadernoTitulo)
+        );
+      }
+
+      if (inFlightSavePromiseRef.current) {
+        const prevOk = await inFlightSavePromiseRef.current;
+        if (!prevOk) return false;
+        if (!hasUnsavedBackendChanges() && !overridePages) {
+          return true;
+        }
+      }
+
+      const runSaveChain = async (): Promise<boolean> => {
+        let loopOverride = overridePages;
+        while (true) {
+          const cur = latestStateRef.current;
+          const targetNb = cur.activeNotebook;
+          const curUser = cur.user;
+          if (cur.isGuestMode || !curUser?.id || !targetNb) {
+            return true;
+          }
+
+          const capturedRevision = editRevisionRef.current;
+          const mergedPages = getMergedPagesSnapshot(loopOverride);
+          loopOverride = undefined;
+          const nowIso = new Date().toISOString();
+          const paginasParaPersistir = filterWrittenPages(mergedPages).map((p) => ({
+            ...normalizeNotebookPageForStorage(p),
+            atualizadoEm: p.atualizadoEm || nowIso,
+          }));
+          const nextSnapshot = buildSnapshotFromWrittenPages(paginasParaPersistir);
+
+          setAutosaveStatus("saving");
+          setSaveErrorMessage(null);
+
+          try {
+            await api.journal.upsertNotebook(targetNb.id, {
+              nome: targetNb.nome,
+              corCapa: targetNb.corCapa,
+              paginas: paginasParaPersistir,
+            });
+
+            // Confirm snapshot only after backend responds 2xx
+            confirmedSnapshotsRef.current[targetNb.id] = nextSnapshot;
+            syncLocalNotebooksStorage(targetNb.id, paginasParaPersistir, true);
+
+            // If user continued writing while this save request was in flight,
+            // immediately save the newer pending changes before marking "Saved".
+            if (editRevisionRef.current !== capturedRevision && hasUnsavedBackendChanges()) {
+              continue;
+            }
+
+            setAutosaveStatus("saved");
+            setSaveErrorMessage(null);
+            return true;
+          } catch (err: any) {
+            const msg =
+              err?.message || "Unable to save your latest journal changes to the server.";
+            setAutosaveStatus("error");
+            setSaveErrorMessage(msg);
+            return false;
+          }
+        }
+      };
+
+      const promise = runSaveChain();
+      inFlightSavePromiseRef.current = promise;
+      try {
+        return await promise;
+      } finally {
+        if (inFlightSavePromiseRef.current === promise) {
+          inFlightSavePromiseRef.current = null;
+        }
+      }
+    },
+    [getMergedPagesSnapshot, hasUnsavedBackendChanges, syncLocalNotebooksStorage]
+  );
+
+  // Two-page autosave trigger: automatically saves once 2 qualifying pages have new/modified meaningful content
+  useEffect(() => {
+    if (authLoading || isGuestMode || !user?.id || !activeNotebook) return;
+    if (editRevision === 0) return;
+
+    const merged = getMergedPagesSnapshot();
+    const qualifyingModified = getQualifyingModifiedPagesCount(
+      activeNotebook.id,
+      merged
+    );
+
+    if (qualifyingModified >= 2 && !inFlightSavePromiseRef.current) {
+      void flushBackendSave();
+      return;
+    }
+
+    if (autosaveStatus === "saved" && hasUnsavedBackendChanges()) {
+      setAutosaveStatus("idle");
+    }
+  }, [
+    editRevision,
+    authLoading,
+    isGuestMode,
+    user?.id,
+    activeNotebook,
+    autosaveStatus,
+    getMergedPagesSnapshot,
+    getQualifyingModifiedPagesCount,
+    hasUnsavedBackendChanges,
+    flushBackendSave,
+  ]);
+
+  const openNavFailureModal = useCallback(
+    (pendingAction: () => void, contextLabel = "leaving the editor") => {
+      pendingNavActionRef.current = pendingAction;
+      setNavFailureContextLabel(contextLabel);
+      setNavFailureModalOpen(true);
+    },
+    []
+  );
+
+  const handleRetryNavSave = async () => {
+    if (retryingNavSave) return;
+    setRetryingNavSave(true);
+    try {
+      const ok = await flushBackendSave();
+      if (ok) {
+        setNavFailureModalOpen(false);
+        const action = pendingNavActionRef.current;
+        pendingNavActionRef.current = null;
+        if (action) action();
+      }
+    } finally {
+      setRetryingNavSave(false);
+    }
+  };
+
+  const handleStayInEditor = () => {
+    pendingNavActionRef.current = null;
+    setNavFailureModalOpen(false);
+  };
+
+  // Register navigation guard for SiteShell actions (search, Sign Out) and intercept all internal <Link> clicks
+  useEffect(() => {
+    if (authLoading || isGuestMode) return;
+
+    const unregister = registerJournalNavigationGuard({
+      hasPendingChanges: hasPendingSaveWork,
+      flushBeforeNavigation: () => flushBackendSave(),
+      promptSaveFailureModal: (pendingAction) =>
+        openNavFailureModal(pendingAction, "leaving the editor"),
+    });
+
+    const handleDocumentLinkClick = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      if (anchor.hasAttribute("download")) return;
+
+      const rawHref = anchor.getAttribute("href") || "";
+      if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) {
+        return;
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(anchor.href, window.location.origin);
+      } catch {
+        return;
+      }
+      if (parsed.origin !== window.location.origin) return;
+
+      const nextPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (nextPath === currentPath) return;
+
+      if (!hasPendingSaveWork()) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!latestStateRef.current.activeNotebook) {
+        setSaveErrorMessage(
+          "Your writing is not yet saved inside a journal. Create a journal to keep it before leaving."
+        );
+        openNavFailureModal(() => router.push(nextPath), "leaving the editor");
+        return;
+      }
+
+      void (async () => {
+        const ok = await flushBackendSave();
+        if (ok) {
+          router.push(nextPath);
+        } else {
+          openNavFailureModal(() => router.push(nextPath), "leaving the editor");
+        }
+      })();
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasPendingSaveWork()) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    document.addEventListener("click", handleDocumentLinkClick, true);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      unregister();
+      document.removeEventListener("click", handleDocumentLinkClick, true);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [
+    authLoading,
+    isGuestMode,
+    hasPendingSaveWork,
+    flushBackendSave,
+    openNavFailureModal,
+    router,
+  ]);
+
   // Listen to EDIT request from reading room
   useEffect(() => {
     const handleEditRequest = (e: any) => {
       const { notebookId, pageIndex } = e.detail || {};
       if (!notebookId) return;
 
-      setActiveNotebookId(notebookId);
-      try {
-        window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, notebookId);
-      } catch {}
+      const applyTarget = () => {
+        setActiveNotebookId(notebookId);
+        try {
+          window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, notebookId);
+        } catch {}
 
-      const targetNb = notebooks.find((n) => n.id === notebookId);
-      if (targetNb) {
-        const paginas =
-          targetNb.paginas && targetNb.paginas.length > 0
-            ? targetNb.paginas
-            : [createBlankPage()];
-        setCadernoPaginas(paginas);
-        const idx = typeof pageIndex === "number" && paginas[pageIndex] ? pageIndex : 0;
-        setCurrentPageIndex(idx);
-        const pag = paginas[idx];
-        if (pag) {
-          setCadernoTitulo(pag.titulo || "");
-          setCadernoConteudo(pag.conteudo || "");
-          setCadernoFavoritado(Boolean(pag.favoritado));
-          applyPageFormatting(pag);
+        const targetNb = notebooks.find((n) => n.id === notebookId);
+        if (targetNb) {
+          const written = filterWrittenPages(targetNb.paginas);
+          confirmedSnapshotsRef.current[targetNb.id] =
+            buildSnapshotFromWrittenPages(written);
+          const paginas =
+            written.length > 0 ? written : [createBlankPage()];
+          setCadernoPaginas(paginas);
+          const idx = typeof pageIndex === "number" && paginas[pageIndex] ? pageIndex : 0;
+          setCurrentPageIndex(idx);
+          const pag = paginas[idx];
+          if (pag) {
+            setCadernoTitulo(pag.titulo || "");
+            setCadernoConteudo(pag.conteudo || "");
+            setCadernoFavoritado(Boolean(pag.favoritado));
+            applyPageFormatting(pag);
+          }
         }
+
+        const deskElem = document.getElementById("mesa-de-escrita");
+        if (deskElem) {
+          deskElem.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+          }
+        }, 350);
+      };
+
+      if (activeNotebookIdRef.current !== notebookId && hasPendingSaveWork()) {
+        void (async () => {
+          const ok = await flushBackendSave();
+          if (ok) {
+            applyTarget();
+          } else {
+            openNavFailureModal(applyTarget, "switching journals");
+          }
+        })();
+        return;
       }
 
-      const deskElem = document.getElementById("mesa-de-escrita");
-      if (deskElem) {
-        deskElem.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        }
-      }, 350);
+      applyTarget();
     };
 
     window.addEventListener("entre-cartas:abrir-edicao-caderno", handleEditRequest);
     return () => {
       window.removeEventListener("entre-cartas:abrir-edicao-caderno", handleEditRequest);
     };
-  }, [notebooks]);
+  }, [notebooks, hasPendingSaveWork, flushBackendSave, openNavFailureModal]);
 
-  const activeNotebook: Notebook | null =
-    notebooks.find((n) => n.id === activeNotebookId) ||
-    (notebooks.length > 0 ? notebooks[0] : null);
-
-  // CRITICAL RULE: Only save written pages to persistent storage (isolated in memory during guest demo)
-  const backendNotebookSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const syncNotebookToBackend = (nb: Notebook, paginasEscritas: NotebookPage[]) => {
-    if (!user?.id || isGuestMode) return;
-    api.journal
-      .upsertNotebook(nb.id, {
-        nome: nb.nome,
-        corCapa: nb.corCapa,
-        paginas: paginasEscritas,
-      })
-      .catch(() => {});
-  };
-
-  const salvarCadernosNoStorage = (paginasAtuais: NotebookPage[], immediateBackendSync = false) => {
+  const salvarCadernosNoStorage = (paginasAtuais: NotebookPage[]) => {
     if (!activeNotebook || authLoading) return;
-
-    const nowIso = new Date().toISOString();
-
-    if (isGuestMode) {
-      const paginasTemp = paginasAtuais.map((p) => ({
-        ...p,
-        atualizadoEm: p.atualizadoEm || nowIso,
-      }));
-      const updatedGuest = notebooks.map((nb) =>
-        nb.id === activeNotebook.id
-          ? {
-              ...nb,
-              paginas: paginasTemp,
-              criadoEm: nb.criadoEm || nowIso,
-              atualizadoEm: nowIso,
-            }
-          : nb
-      );
-      setNotebooks(updatedGuest);
-      setGuestNotebooks(updatedGuest);
-      return;
-    }
-
-    if (!user?.id) return;
-
-    const paginasEscritas = filterWrittenPages(paginasAtuais).map((p) => ({
-      ...p,
-      atualizadoEm: p.atualizadoEm || nowIso,
-    }));
-
-    const allStored = loadAllRawNotebooks();
-    let updatedNotebook: Notebook | null = null;
-    const atualizados = allStored.map((nb) => {
-      if (nb.id === activeNotebook.id) {
-        updatedNotebook = {
-          ...nb,
-          paginas: paginasEscritas,
-          criadoEm: nb.criadoEm || nowIso,
-          atualizadoEm: nowIso,
-          ownerId: nb.ownerId || user.id,
-        };
-        return updatedNotebook;
-      }
-      return nb;
-    });
-
-    setNotebooks(
-      atualizados.filter((nb) => Boolean(nb.ownerId && String(nb.ownerId) === String(user.id)))
-    );
-    saveAllNotebooks(atualizados, "editor");
-
-    if (updatedNotebook) {
-      const target = updatedNotebook;
-      if (backendNotebookSyncRef.current) {
-        clearTimeout(backendNotebookSyncRef.current);
-      }
-      if (immediateBackendSync) {
-        syncNotebookToBackend(target, paginasEscritas);
-      } else {
-        backendNotebookSyncRef.current = setTimeout(() => {
-          syncNotebookToBackend(target, paginasEscritas);
-        }, 550);
-      }
-    }
-  };
-
-  const salvarCadernoAtualNoStorage = () => {
-    if (!activeNotebook) return;
-    const copy = [...cadernoPaginas];
-    if (copy[currentPageIndex]) {
-      copy[currentPageIndex] = {
-        ...copy[currentPageIndex],
-        titulo: cadernoTitulo,
-        conteudo: cadernoConteudo,
-        favoritado: cadernoFavoritado,
-        atualizadoEm: new Date().toISOString(),
-        tipoPapel: sheetBgId,
-        corTinta: inkColorId,
-        fonte: fontFamilyId,
-      };
-    }
-    salvarCadernosNoStorage(copy);
+    syncLocalNotebooksStorage(activeNotebook.id, paginasAtuais, true);
   };
 
   const atualizarRascunhoCaderno = (
@@ -599,28 +1008,36 @@ export default function JournalEditor() {
     novoFav?: boolean,
     customStyle?: { tipoPapel?: string; corTinta?: string; fonte?: string }
   ) => {
-    if (!activeNotebook) return;
-    const textoSalvar = novoTexto !== undefined ? novoTexto : cadernoConteudo;
-    const tituloSalvar = novoTitulo !== undefined ? novoTitulo : cadernoTitulo;
-    const favSalvar = novoFav !== undefined ? novoFav : cadernoFavoritado;
+    const cur = latestStateRef.current;
+    const textoSalvar = novoTexto !== undefined ? novoTexto : cur.cadernoConteudo;
+    const tituloSalvar = novoTitulo !== undefined ? novoTitulo : cur.cadernoTitulo;
+    const favSalvar = novoFav !== undefined ? novoFav : cur.cadernoFavoritado;
 
-    setCadernoPaginas((prev) => {
-      const copy = [...prev];
-      if (copy[currentPageIndex]) {
-        copy[currentPageIndex] = {
-          ...copy[currentPageIndex],
-          titulo: tituloSalvar,
-          conteudo: textoSalvar,
-          favoritado: favSalvar,
-          atualizadoEm: new Date().toISOString(),
-          tipoPapel: customStyle?.tipoPapel ?? sheetBgId,
-          corTinta: customStyle?.corTinta ?? inkColorId,
-          fonte: customStyle?.fonte ?? fontFamilyId,
-        };
-      }
-      salvarCadernosNoStorage(copy);
-      return copy;
-    });
+    const nextPages = [...cur.cadernoPaginas];
+    if (nextPages[cur.currentPageIndex]) {
+      nextPages[cur.currentPageIndex] = {
+        ...nextPages[cur.currentPageIndex],
+        titulo: tituloSalvar,
+        conteudo: textoSalvar,
+        favoritado: favSalvar,
+        atualizadoEm: new Date().toISOString(),
+        tipoPapel: customStyle?.tipoPapel ?? cur.sheetBgId,
+        corTinta: customStyle?.corTinta ?? cur.inkColorId,
+        fonte: customStyle?.fonte ?? cur.fontFamilyId,
+      };
+    }
+
+    latestStateRef.current.cadernoPaginas = nextPages;
+    latestStateRef.current.cadernoTitulo = tituloSalvar;
+    latestStateRef.current.cadernoConteudo = textoSalvar;
+    latestStateRef.current.cadernoFavoritado = favSalvar;
+
+    setCadernoPaginas(nextPages);
+    if (cur.activeNotebook) {
+      syncLocalNotebooksStorage(cur.activeNotebook.id, nextPages, true);
+    }
+    editRevisionRef.current += 1;
+    setEditRevision((r) => r + 1);
   };
 
   // Pagination rule: allow advancing up to 3 blank pages beyond the last written page
@@ -630,11 +1047,11 @@ export default function JournalEditor() {
       const isCurrent = idx === currentPageIndex;
       const texto = isCurrent ? cadernoConteudo : pag.conteudo || "";
       const titulo = isCurrent ? cadernoTitulo : pag.titulo || "";
-      if (texto.trim().length > 0 || titulo.trim().length > 0) {
+      if (hasMeaningfulJournalText(texto) || hasMeaningfulJournalText(titulo)) {
         if (idx > ultimo) ultimo = idx;
       }
     });
-    if (cadernoConteudo.trim().length > 0 || cadernoTitulo.trim().length > 0) {
+    if (hasMeaningfulJournalText(cadernoConteudo) || hasMeaningfulJournalText(cadernoTitulo)) {
       if (currentPageIndex > ultimo) ultimo = currentPageIndex;
     }
     return ultimo;
@@ -661,9 +1078,15 @@ export default function JournalEditor() {
     }
 
     const anteriorIndex = currentPageIndex - 1;
+    const antPag = paginasAtuais[anteriorIndex];
+    latestStateRef.current.cadernoPaginas = paginasAtuais;
+    latestStateRef.current.currentPageIndex = anteriorIndex;
+    latestStateRef.current.cadernoTitulo = antPag?.titulo || "";
+    latestStateRef.current.cadernoConteudo = antPag?.conteudo || "";
+    latestStateRef.current.cadernoFavoritado = Boolean(antPag?.favoritado);
+
     setCadernoPaginas(paginasAtuais);
     setCurrentPageIndex(anteriorIndex);
-    const antPag = paginasAtuais[anteriorIndex];
     setCadernoTitulo(antPag?.titulo || "");
     setCadernoConteudo(antPag?.conteudo || "");
     setCadernoFavoritado(Boolean(antPag?.favoritado));
@@ -692,9 +1115,15 @@ export default function JournalEditor() {
     const proximoIndex = currentPageIndex + 1;
 
     if (proximoIndex < paginasAtuais.length) {
+      const proxPag = paginasAtuais[proximoIndex];
+      latestStateRef.current.cadernoPaginas = paginasAtuais;
+      latestStateRef.current.currentPageIndex = proximoIndex;
+      latestStateRef.current.cadernoTitulo = proxPag?.titulo || "";
+      latestStateRef.current.cadernoConteudo = proxPag?.conteudo || "";
+      latestStateRef.current.cadernoFavoritado = Boolean(proxPag?.favoritado);
+
       setCadernoPaginas(paginasAtuais);
       setCurrentPageIndex(proximoIndex);
-      const proxPag = paginasAtuais[proximoIndex];
       setCadernoTitulo(proxPag?.titulo || "");
       setCadernoConteudo(proxPag?.conteudo || "");
       setCadernoFavoritado(Boolean(proxPag?.favoritado));
@@ -704,6 +1133,12 @@ export default function JournalEditor() {
     } else {
       const novaPagina = createBlankPage();
       const novasPaginas = [...paginasAtuais, novaPagina];
+      latestStateRef.current.cadernoPaginas = novasPaginas;
+      latestStateRef.current.currentPageIndex = proximoIndex;
+      latestStateRef.current.cadernoTitulo = "";
+      latestStateRef.current.cadernoConteudo = "";
+      latestStateRef.current.cadernoFavoritado = false;
+
       setCadernoPaginas(novasPaginas);
       setCurrentPageIndex(proximoIndex);
       setCadernoTitulo("");
@@ -720,7 +1155,8 @@ export default function JournalEditor() {
   ) => {
     playPaperSound();
 
-    if (!activeNotebook) {
+    const cur = latestStateRef.current;
+    if (!cur.activeNotebook) {
       setCadernoPromptNotice(
         "Please create a journal first to save and advance to the next page."
       );
@@ -730,68 +1166,104 @@ export default function JournalEditor() {
     }
 
     const textoAtual =
-      textoAtualPreenchido !== undefined ? textoAtualPreenchido : cadernoConteudo;
-    const tituloAtual = cadernoTitulo;
+      textoAtualPreenchido !== undefined ? textoAtualPreenchido : cur.cadernoConteudo;
+    const tituloAtual = cur.cadernoTitulo;
 
-    const paginasAtualizadas = [...cadernoPaginas];
-    if (paginasAtualizadas[currentPageIndex]) {
-      paginasAtualizadas[currentPageIndex] = {
-        ...paginasAtualizadas[currentPageIndex],
+    const paginasAtualizadas = [...cur.cadernoPaginas];
+    if (paginasAtualizadas[cur.currentPageIndex]) {
+      paginasAtualizadas[cur.currentPageIndex] = {
+        ...paginasAtualizadas[cur.currentPageIndex],
         titulo: tituloAtual,
         conteudo: textoAtual,
-        favoritado: cadernoFavoritado,
+        favoritado: cur.cadernoFavoritado,
         atualizadoEm: new Date().toISOString(),
-        tipoPapel: sheetBgId,
-        corTinta: inkColorId,
-        fonte: fontFamilyId,
+        tipoPapel: cur.sheetBgId,
+        corTinta: cur.inkColorId,
+        fonte: cur.fontFamilyId,
       };
     }
 
-    if (currentPageIndex < paginasAtualizadas.length - 1) {
-      const proximoIndex = currentPageIndex + 1;
-      const proximaPag = paginasAtualizadas[proximoIndex];
-      const textoFinalProxima = textoExcedente
+    const chunks = hasMeaningfulJournalText(textoExcedente)
+      ? splitJournalPagesRecursive(textoExcedente)
+      : [textoExcedente];
+
+    let targetIndex = cur.currentPageIndex + 1;
+    let finalNextTitle = "";
+    let finalNextContent = chunks[0] ?? "";
+    let finalNextFav = false;
+    let pageForFormatting: NotebookPage | undefined;
+
+    if (targetIndex < paginasAtualizadas.length && chunks.length === 1) {
+      const proximaPag = paginasAtualizadas[targetIndex];
+      const combined = chunks[0]
         ? proximaPag.conteudo
-          ? textoExcedente + "\n" + proximaPag.conteudo
-          : textoExcedente
+          ? chunks[0] + "\n" + proximaPag.conteudo
+          : chunks[0]
         : proximaPag.conteudo;
 
-      paginasAtualizadas[proximoIndex] = {
+      const splitCombined = splitJournalPagesRecursive(combined);
+      paginasAtualizadas[targetIndex] = {
         ...proximaPag,
-        conteudo: textoFinalProxima,
+        conteudo: splitCombined[0],
+        atualizadoEm: new Date().toISOString(),
       };
-
-      setCadernoPaginas(paginasAtualizadas);
-      setCurrentPageIndex(proximoIndex);
-      setCadernoTitulo(proximaPag.titulo || "");
-      setCadernoConteudo(textoFinalProxima);
-      setCadernoFavoritado(Boolean(proximaPag.favoritado));
-      applyPageFormatting(proximaPag);
-
-      salvarCadernosNoStorage(paginasAtualizadas);
+      for (let i = 1; i < splitCombined.length; i++) {
+        paginasAtualizadas.splice(targetIndex + i, 0, {
+          ...createBlankPage(),
+          conteudo: splitCombined[i],
+        });
+      }
+      finalNextTitle = proximaPag.titulo || "";
+      finalNextContent = splitCombined[0];
+      finalNextFav = Boolean(proximaPag.favoritado);
+      pageForFormatting = proximaPag;
     } else {
-      const novaPagina: NotebookPage = {
-        ...createBlankPage(),
-        conteudo: textoExcedente,
-      };
-
-      const novasPaginas = [...paginasAtualizadas, novaPagina];
-      setCadernoPaginas(novasPaginas);
-      setCurrentPageIndex(novasPaginas.length - 1);
-      setCadernoTitulo("");
-      setCadernoConteudo(textoExcedente);
-      setCadernoFavoritado(false);
-
-      salvarCadernosNoStorage(novasPaginas);
+      for (let i = 0; i < chunks.length; i++) {
+        const insertAt = targetIndex + i;
+        if (insertAt < paginasAtualizadas.length && !isJournalPageMeaningful(paginasAtualizadas[insertAt])) {
+          paginasAtualizadas[insertAt] = {
+            ...paginasAtualizadas[insertAt],
+            conteudo: chunks[i],
+            atualizadoEm: new Date().toISOString(),
+          };
+        } else {
+          paginasAtualizadas.splice(insertAt, 0, {
+            ...createBlankPage(),
+            conteudo: chunks[i],
+          });
+        }
+      }
+      targetIndex = targetIndex + chunks.length - 1;
+      finalNextTitle = paginasAtualizadas[targetIndex]?.titulo || "";
+      finalNextContent = paginasAtualizadas[targetIndex]?.conteudo || "";
+      finalNextFav = Boolean(paginasAtualizadas[targetIndex]?.favoritado);
+      pageForFormatting = paginasAtualizadas[targetIndex];
     }
+
+    latestStateRef.current.cadernoPaginas = paginasAtualizadas;
+    latestStateRef.current.currentPageIndex = targetIndex;
+    latestStateRef.current.cadernoTitulo = finalNextTitle;
+    latestStateRef.current.cadernoConteudo = finalNextContent;
+    latestStateRef.current.cadernoFavoritado = finalNextFav;
+
+    setCadernoPaginas(paginasAtualizadas);
+    setCurrentPageIndex(targetIndex);
+    setCadernoTitulo(finalNextTitle);
+    setCadernoConteudo(finalNextContent);
+    setCadernoFavoritado(finalNextFav);
+    if (pageForFormatting) {
+      applyPageFormatting(pageForFormatting);
+    }
+
+    salvarCadernosNoStorage(paginasAtualizadas);
+    editRevisionRef.current += 1;
+    setEditRevision((r) => r + 1);
 
     setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(
-          textoExcedente.length,
-          textoExcedente.length
-        );
+        const cursorEnd = finalNextContent.length;
+        textareaRef.current.setSelectionRange(cursorEnd, cursorEnd);
       }
     }, 50);
   };
@@ -800,11 +1272,24 @@ export default function JournalEditor() {
     text: string,
     textareaEl?: HTMLTextAreaElement | null
   ): boolean => {
-    if (text.length >= MAX_CHARS_PER_PAGE) return true;
-    const linhas = text.split("\n");
-    if (linhas.length >= MAX_LINES_PER_PAGE) return true;
-    if (textareaEl) {
-      if (textareaEl.scrollHeight > textareaEl.clientHeight + 2) return true;
+    if (!hasMeaningfulJournalText(text)) return false;
+    if (countNonNewlineChars(text) >= MAX_CHARS_PER_PAGE) return true;
+
+    const normalizedContent = normalizeJournalContentForStorage(text);
+    const meaningfulLines = normalizedContent.split("\n");
+    if (
+      meaningfulLines.length >= MAX_LINES_PER_PAGE &&
+      hasMeaningfulJournalText(meaningfulLines[MAX_LINES_PER_PAGE - 1])
+    ) {
+      return true;
+    }
+
+    if (textareaEl && textareaEl.scrollHeight > textareaEl.clientHeight + 2) {
+      const rawLines = normalizeJournalLineEndings(text).split("\n");
+      const lastRawLine = rawLines[rawLines.length - 1] ?? "";
+      if (hasMeaningfulJournalText(lastRawLine) || rawLines.length <= MAX_LINES_PER_PAGE) {
+        return true;
+      }
     }
     return false;
   };
@@ -828,18 +1313,98 @@ export default function JournalEditor() {
       return;
     }
 
-    const textarea = textareaRef.current;
-    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+    // Never trigger overflow on modifier/control/function keys (Shift, CapsLock, Escape, etc.)
+    if (e.key !== "Enter" && e.key.length !== 1) {
       return;
     }
 
-    const folhaCheia = isSheetFull(cadernoConteudo, textarea);
+    const textarea = textareaRef.current;
+    if (!textarea || textarea.selectionStart !== textarea.selectionEnd) {
+      return;
+    }
 
-    if (folhaCheia) {
+    const pos = textarea.selectionStart ?? cadernoConteudo.length;
+    const normalized = normalizeJournalLineEndings(cadernoConteudo);
+    const beforeCursor = normalized.slice(0, pos);
+    const afterCursor = normalized.slice(pos);
+    const currentLineStart = beforeCursor.lastIndexOf("\n") + 1;
+    const nextNewlineOffset = afterCursor.indexOf("\n");
+    const currentLineEnd =
+      nextNewlineOffset === -1 ? normalized.length : pos + nextNewlineOffset;
+    const currentLineText = normalized.slice(currentLineStart, currentLineEnd);
+    const isCursorOnEmptyLine = !hasMeaningfulJournalText(currentLineText);
+    const hasContentAfterCursor = hasMeaningfulJournalText(afterCursor);
+    const lines = normalized.split("\n");
+
+    if (e.key === "Enter") {
+      // An empty / whitespace-only page must never overflow into a new page on Enter.
+      if (!hasMeaningfulJournalText(normalized)) {
+        if (lines.length >= MAX_LINES_PER_PAGE) {
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if (
+        lines.length >= MAX_LINES_PER_PAGE ||
+        textarea.scrollHeight > textarea.clientHeight + 2
+      ) {
+        // Stay on the current page when pressing Enter on a trailing empty line.
+        if (isCursorOnEmptyLine && !hasContentAfterCursor) {
+          e.preventDefault();
+          return;
+        }
+
+        // If inserting a blank line mid-page when trailing empty lines exist at the bottom,
+        // absorb one trailing empty line so the user stays on this sheet without creating a ghost page.
+        const lastLine = lines[lines.length - 1] ?? "";
+        if (!hasMeaningfulJournalText(lastLine) && lines.length >= MAX_LINES_PER_PAGE) {
+          const lastNewlineIdx = normalized.lastIndexOf("\n");
+          if (lastNewlineIdx >= pos) {
+            e.preventDefault();
+            const nextText =
+              normalized.slice(0, pos) +
+              "\n" +
+              normalized.slice(pos, lastNewlineIdx) +
+              normalized.slice(lastNewlineIdx + 1);
+            setCadernoConteudo(nextText);
+            atualizarRascunhoCaderno(nextText);
+            requestAnimationFrame(() => {
+              if (textareaRef.current) {
+                textareaRef.current.selectionStart = pos + 1;
+                textareaRef.current.selectionEnd = pos + 1;
+              }
+            });
+            return;
+          }
+        }
+
+        // Actual content reaches/exceeds the 23-line writing area -> advance cleanly to next page.
+        if (
+          textarea.scrollHeight > textarea.clientHeight + 2 ||
+          (lines.length >= MAX_LINES_PER_PAGE && !hasContentAfterCursor)
+        ) {
+          e.preventDefault();
+          avancarParaProximaPaginaComTexto("", normalized);
+          return;
+        }
+      }
+      return;
+    }
+
+    // Printable character: an empty line is ALWAYS reusable for typing.
+    if (isCursorOnEmptyLine) {
+      return;
+    }
+
+    const atBottomWithOverflow =
+      (textarea.scrollHeight > textarea.clientHeight + 2 ||
+        countNonNewlineChars(normalized) >= MAX_CHARS_PER_PAGE) &&
+      !hasContentAfterCursor;
+
+    if (atBottomWithOverflow) {
       e.preventDefault();
-      const charInserido =
-        e.key === "Enter" ? "\n" : e.key.length === 1 ? e.key : "";
-      avancarParaProximaPaginaComTexto(charInserido);
+      avancarParaProximaPaginaComTexto(e.key, normalized);
     }
   };
 
@@ -858,7 +1423,14 @@ export default function JournalEditor() {
       e.preventDefault();
       setCadernoConteudo(overflow.currentPageText);
       atualizarRascunhoCaderno(overflow.currentPageText);
-      avancarParaProximaPaginaComTexto(overflow.overflowText);
+      avancarParaProximaPaginaComTexto(
+        overflow.overflowText,
+        overflow.currentPageText
+      );
+    } else if (overflow.currentPageText !== normalizeJournalLineEndings(textoProjetado)) {
+      e.preventDefault();
+      setCadernoConteudo(overflow.currentPageText);
+      atualizarRascunhoCaderno(overflow.currentPageText);
     }
   };
 
@@ -876,28 +1448,63 @@ export default function JournalEditor() {
     if (overflow.exceeded) {
       setCadernoConteudo(overflow.currentPageText);
       atualizarRascunhoCaderno(overflow.currentPageText);
-      avancarParaProximaPaginaComTexto(overflow.overflowText);
+      avancarParaProximaPaginaComTexto(
+        overflow.overflowText,
+        overflow.currentPageText
+      );
       return;
     }
 
-    setCadernoConteudo(novoTexto);
-    atualizarRascunhoCaderno(novoTexto);
+    setCadernoConteudo(overflow.currentPageText);
+    atualizarRascunhoCaderno(overflow.currentPageText);
   };
 
   const handleKeyUp = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    if (textarea.scrollHeight > textarea.clientHeight + 2) {
-      const texto = textarea.value;
-      const palavras = texto.split(" ");
-      if (palavras.length > 1) {
-        const ultimaPalavra = palavras.pop() || "";
-        const textoQueCabe = palavras.join(" ");
+    const texto = normalizeJournalLineEndings(textarea.value);
+    if (!hasMeaningfulJournalText(texto)) {
+      const lines = texto.split("\n");
+      if (lines.length > MAX_LINES_PER_PAGE) {
+        const clamped = lines.slice(0, MAX_LINES_PER_PAGE).join("\n");
+        setCadernoConteudo(clamped);
+        atualizarRascunhoCaderno(clamped);
+      }
+      return;
+    }
 
-        setCadernoConteudo(textoQueCabe);
-        atualizarRascunhoCaderno(textoQueCabe);
-        avancarParaProximaPaginaComTexto(ultimaPalavra);
+    if (textarea.scrollHeight > textarea.clientHeight + 2) {
+      const cursorPos = textarea.selectionStart ?? texto.length;
+      const lines = texto.split("\n");
+      const lastLine = lines[lines.length - 1] ?? "";
+
+      // Absorb trailing empty lines at the bottom before overflowing real text.
+      if (!hasMeaningfulJournalText(lastLine)) {
+        const lastNewlineIdx = texto.lastIndexOf("\n");
+        if (lastNewlineIdx !== -1 && cursorPos <= lastNewlineIdx) {
+          const reduced = texto.slice(0, lastNewlineIdx);
+          setCadernoConteudo(reduced);
+          atualizarRascunhoCaderno(reduced);
+          requestAnimationFrame(() => {
+            if (textareaRef.current) {
+              const safePos = Math.min(cursorPos, reduced.length);
+              textareaRef.current.setSelectionRange(safePos, safePos);
+            }
+          });
+          return;
+        }
+      }
+
+      const lastBreak = Math.max(texto.lastIndexOf(" "), texto.lastIndexOf("\n"));
+      if (lastBreak > 0) {
+        const textoQueCabe = texto.slice(0, lastBreak);
+        const excedente = texto.slice(lastBreak + 1);
+        if (hasMeaningfulJournalText(excedente)) {
+          setCadernoConteudo(textoQueCabe);
+          atualizarRascunhoCaderno(textoQueCabe);
+          avancarParaProximaPaginaComTexto(excedente, textoQueCabe);
+        }
       }
     }
   };
@@ -916,7 +1523,10 @@ export default function JournalEditor() {
       return;
     }
 
-    if (!cadernoConteudo.trim() && !cadernoTitulo.trim()) {
+    if (
+      !hasMeaningfulJournalText(cadernoConteudo) &&
+      !hasMeaningfulJournalText(cadernoTitulo)
+    ) {
       alert("Please write something on the page before saving.");
       return;
     }
@@ -934,6 +1544,7 @@ export default function JournalEditor() {
 
     const tituloFinal =
       cadernoTitulo.trim() || `Memory of ${dataFormatada || "Today"}`;
+    const conteudoNormalizado = normalizeJournalContentForStorage(cadernoConteudo);
     setCadernoTitulo(tituloFinal);
 
     const paginasAtualizadas = [...cadernoPaginas];
@@ -941,7 +1552,7 @@ export default function JournalEditor() {
       paginasAtualizadas[currentPageIndex] = {
         ...paginasAtualizadas[currentPageIndex],
         titulo: tituloFinal,
-        conteudo: cadernoConteudo.trim(),
+        conteudo: conteudoNormalizado,
         favoritado: cadernoFavoritado,
         atualizadoEm: new Date().toISOString(),
         tipoPapel: sheetBgId,
@@ -949,35 +1560,37 @@ export default function JournalEditor() {
         fonte: fontFamilyId,
       };
     }
+
+    latestStateRef.current.cadernoTitulo = tituloFinal;
+    latestStateRef.current.cadernoPaginas = paginasAtualizadas;
     setCadernoPaginas(paginasAtualizadas);
 
-    salvarCadernosNoStorage(paginasAtualizadas, true);
+    const savedOk = await flushBackendSave(paginasAtualizadas);
 
     setSalvando(false);
-    setMensagemSucesso(
-      `Page saved in journal "${activeNotebook.nome}".`
-    );
-    setTimeout(() => setMensagemSucesso(""), 3000);
+    if (savedOk) {
+      setMensagemSucesso(
+        `Page saved in journal "${activeNotebook.nome}".`
+      );
+      setTimeout(() => setMensagemSucesso(""), 3000);
+    }
   };
 
-  const selecionarCaderno = (nb: Notebook) => {
-    if (isGuestMode) {
-      playPaperSound();
-      openGuestPrompt("notebook-open");
-      return;
-    }
-
-    if (activeNotebook && activeNotebook.id !== nb.id) {
-      salvarCadernoAtualNoStorage();
-    }
-
+  const applyNotebookSelection = (nb: Notebook) => {
     setActiveNotebookId(nb.id);
     try {
       window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, nb.id);
     } catch {}
 
-    const paginas =
-      nb.paginas && nb.paginas.length > 0 ? nb.paginas : [createBlankPage()];
+    const written = filterWrittenPages(nb.paginas);
+    confirmedSnapshotsRef.current[nb.id] = buildSnapshotFromWrittenPages(written);
+    const paginas = written.length > 0 ? written : [createBlankPage()];
+
+    latestStateRef.current.cadernoPaginas = paginas;
+    latestStateRef.current.currentPageIndex = 0;
+    latestStateRef.current.cadernoTitulo = paginas[0]?.titulo || "";
+    latestStateRef.current.cadernoConteudo = paginas[0]?.conteudo || "";
+    latestStateRef.current.cadernoFavoritado = Boolean(paginas[0]?.favoritado);
 
     setCadernoPaginas(paginas);
     setCurrentPageIndex(0);
@@ -985,19 +1598,50 @@ export default function JournalEditor() {
     setCadernoConteudo(paginas[0]?.conteudo || "");
     setCadernoFavoritado(Boolean(paginas[0]?.favoritado));
     applyPageFormatting(paginas[0]);
+    setAutosaveStatus("idle");
+    setSaveErrorMessage(null);
 
     setNotebookDrawerOpen(false);
+    setNewNotebookNameError(null);
     playPaperSound();
   };
 
-  const criarNovoCaderno = (e: React.FormEvent) => {
+  const selecionarCaderno = async (nb: Notebook) => {
+    if (isGuestMode) {
+      playPaperSound();
+      openGuestPrompt("notebook-open");
+      return;
+    }
+
+    if (activeNotebook && activeNotebook.id !== nb.id && hasPendingSaveWork()) {
+      const ok = await flushBackendSave();
+      if (!ok) {
+        setNotebookDrawerOpen(false);
+        openNavFailureModal(() => applyNotebookSelection(nb), "switching journals");
+        return;
+      }
+    }
+
+    applyNotebookSelection(nb);
+  };
+
+  const criarNovoCaderno = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creatingNotebook) return;
+
     if (isGuestMode) {
       playPaperSound();
       openGuestPrompt("notebook-manage");
       return;
     }
-    if (!newNotebookTitle.trim()) return;
+
+    const trimmedName = newNotebookTitle.trim();
+    if (!trimmedName) {
+      setNewNotebookNameError("Notebook name is required.");
+      newNotebookInputRef.current?.focus();
+      return;
+    }
+    setNewNotebookNameError(null);
 
     const limiteCadernos = isPro ? 10 : 3;
     if (notebooks.length >= limiteCadernos) {
@@ -1009,112 +1653,137 @@ export default function JournalEditor() {
       return;
     }
 
-    const nowIso = new Date().toISOString();
+    const proceedCreateNotebook = async () => {
+      setCreatingNotebook(true);
+      try {
+        const cur = latestStateRef.current;
+        const nowIso = new Date().toISOString();
 
-    // 1. Save whatever was written on screen to the old journal (written pages only)
-    let allStored = loadAllRawNotebooks();
-    if (activeNotebook) {
-      allStored = allStored.map((nb) => {
-        if (nb.id === activeNotebook.id) {
-          const paginasAtualizadas = [...cadernoPaginas];
-          if (paginasAtualizadas[currentPageIndex]) {
-            paginasAtualizadas[currentPageIndex] = {
-              ...paginasAtualizadas[currentPageIndex],
-              titulo: cadernoTitulo,
-              conteudo: cadernoConteudo,
-              favoritado: cadernoFavoritado,
-              atualizadoEm: nowIso,
-              tipoPapel: sheetBgId,
-              corTinta: inkColorId,
-              fonte: fontFamilyId,
-            };
-          }
-          const paginasEscritas = filterWrittenPages(paginasAtualizadas);
-          return {
-            ...nb,
-            paginas: paginasEscritas,
-            atualizadoEm: nowIso,
-          };
+        // If user had written text before creating their very first journal, preserve that page into the new journal
+        const hasPendingWrittenText =
+          !cur.activeNotebook &&
+          (hasMeaningfulJournalText(cur.cadernoConteudo) ||
+            hasMeaningfulJournalText(cur.cadernoTitulo));
+
+        const initialPagesForNewNotebook: NotebookPage[] = hasPendingWrittenText
+          ? [
+              {
+                id: "pag-" + Date.now(),
+                titulo:
+                  cur.cadernoTitulo.trim() || `Memory of ${dataFormatada || "Today"}`,
+                conteudo: normalizeJournalContentForStorage(cur.cadernoConteudo),
+                dataFormatada: dataFormatada || "Today",
+                favoritado: cur.cadernoFavoritado,
+                criadoEm: nowIso,
+                atualizadoEm: nowIso,
+                tipoPapel: cur.sheetBgId,
+                corTinta: cur.inkColorId,
+                fonte: cur.fontFamilyId,
+              },
+            ]
+          : [];
+
+        const novoCaderno: Notebook = {
+          id: "caderno-" + Date.now(),
+          nome: trimmedName,
+          corCapa: newNotebookCover,
+          paginas: initialPagesForNewNotebook,
+          criadoEm: nowIso,
+          atualizadoEm: nowIso,
+          ownerId: user?.id,
+        };
+
+        await api.journal.upsertNotebook(novoCaderno.id, {
+          nome: novoCaderno.nome,
+          corCapa: novoCaderno.corCapa,
+          paginas: initialPagesForNewNotebook,
+        });
+
+        const allStored = loadAllRawNotebooks();
+        const listaFinal = [...allStored, novoCaderno];
+        saveAllNotebooks(listaFinal, "editor");
+        setNotebooks(
+          listaFinal.filter(
+            (nb) => Boolean(user?.id && nb.ownerId && String(nb.ownerId) === String(user.id))
+          )
+        );
+
+        confirmedSnapshotsRef.current[novoCaderno.id] =
+          buildSnapshotFromWrittenPages(initialPagesForNewNotebook);
+
+        try {
+          window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, novoCaderno.id);
+        } catch {}
+
+        setActiveNotebookId(novoCaderno.id);
+        setCurrentPageIndex(0);
+
+        if (hasPendingWrittenText && initialPagesForNewNotebook[0]) {
+          latestStateRef.current.cadernoPaginas = initialPagesForNewNotebook;
+          latestStateRef.current.cadernoTitulo = initialPagesForNewNotebook[0].titulo;
+          latestStateRef.current.cadernoConteudo = initialPagesForNewNotebook[0].conteudo;
+          latestStateRef.current.cadernoFavoritado = initialPagesForNewNotebook[0].favoritado;
+
+          setCadernoPaginas(initialPagesForNewNotebook);
+          setCadernoTitulo(initialPagesForNewNotebook[0].titulo);
+          setCadernoConteudo(initialPagesForNewNotebook[0].conteudo);
+          setCadernoFavoritado(initialPagesForNewNotebook[0].favoritado);
+        } else {
+          const blank = createBlankPage();
+          latestStateRef.current.cadernoPaginas = [blank];
+          latestStateRef.current.cadernoTitulo = "";
+          latestStateRef.current.cadernoConteudo = "";
+          latestStateRef.current.cadernoFavoritado = false;
+
+          setCadernoPaginas([blank]);
+          setCadernoTitulo("");
+          setCadernoConteudo("");
+          setCadernoFavoritado(false);
         }
-        return nb;
-      });
-    }
 
-    // 2. If user had written text before creating their very first journal, preserve that page into the new journal
-    const hasPendingWrittenText =
-      !activeNotebook &&
-      Boolean(cadernoConteudo.trim().length > 0 || cadernoTitulo.trim().length > 0);
+        setAutosaveStatus(hasPendingWrittenText ? "saved" : "idle");
+        setSaveErrorMessage(null);
+        setNewNotebookTitle("");
+        setNewNotebookNameError(null);
+        setNewNotebookCover("marrom");
+        setNotebookDrawerOpen(false);
+        setCadernoPromptNotice(null);
+        setPendingSaveAfterCreation(false);
+        playPaperSound();
 
-    const initialPagesForNewNotebook: NotebookPage[] = hasPendingWrittenText
-      ? [
-          {
-            id: "pag-" + Date.now(),
-            titulo:
-              cadernoTitulo.trim() || `Memory of ${dataFormatada || "Today"}`,
-            conteudo: cadernoConteudo.trim(),
-            dataFormatada: dataFormatada || "Today",
-            favoritado: cadernoFavoritado,
-            criadoEm: nowIso,
-            atualizadoEm: nowIso,
-            tipoPapel: sheetBgId,
-            corTinta: inkColorId,
-            fonte: fontFamilyId,
-          },
-        ]
-      : [];
-
-    const novoCaderno: Notebook = {
-      id: "caderno-" + Date.now(),
-      nome: newNotebookTitle.trim(),
-      corCapa: newNotebookCover,
-      paginas: initialPagesForNewNotebook,
-      criadoEm: nowIso,
-      atualizadoEm: nowIso,
-      ownerId: user?.id,
+        setMensagemSucesso(
+          hasPendingWrittenText
+            ? `Journal "${novoCaderno.nome}" created and your page was saved!`
+            : `Journal "${novoCaderno.nome}" created and ready for your story.`
+        );
+        setTimeout(() => setMensagemSucesso(""), 3200);
+      } catch (err: any) {
+        setCadernoPromptNotice(
+          err?.message || "Unable to create journal on the server. Please try again."
+        );
+      } finally {
+        setCreatingNotebook(false);
+      }
     };
 
-    const listaFinal = [...allStored, novoCaderno];
-    saveAllNotebooks(listaFinal, "editor");
-    syncNotebookToBackend(novoCaderno, initialPagesForNewNotebook);
-    setNotebooks(
-      listaFinal.filter(
-        (nb) => Boolean(user?.id && nb.ownerId && String(nb.ownerId) === String(user.id))
-      )
-    );
-
-    try {
-      window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, novoCaderno.id);
-    } catch {}
-
-    setActiveNotebookId(novoCaderno.id);
-    setCurrentPageIndex(0);
-
-    if (hasPendingWrittenText && initialPagesForNewNotebook[0]) {
-      setCadernoPaginas(initialPagesForNewNotebook);
-      setCadernoTitulo(initialPagesForNewNotebook[0].titulo);
-      setCadernoConteudo(initialPagesForNewNotebook[0].conteudo);
-      setCadernoFavoritado(initialPagesForNewNotebook[0].favoritado);
-    } else {
-      const blank = createBlankPage();
-      setCadernoPaginas([blank]);
-      setCadernoTitulo("");
-      setCadernoConteudo("");
-      setCadernoFavoritado(false);
+    // Save any pending changes in the currently active notebook BEFORE creating & switching to a new one
+    if (activeNotebook && hasPendingSaveWork()) {
+      setCreatingNotebook(true);
+      const savedCurrentOk = await flushBackendSave();
+      setCreatingNotebook(false);
+      if (!savedCurrentOk) {
+        setNotebookDrawerOpen(false);
+        openNavFailureModal(
+          () => {
+            void proceedCreateNotebook();
+          },
+          "creating a new journal"
+        );
+        return;
+      }
     }
 
-    setNewNotebookTitle("");
-    setNewNotebookCover("marrom");
-    setNotebookDrawerOpen(false);
-    setCadernoPromptNotice(null);
-    setPendingSaveAfterCreation(false);
-    playPaperSound();
-
-    setMensagemSucesso(
-      hasPendingWrittenText
-        ? `Journal "${novoCaderno.nome}" created and your page was saved!`
-        : `Journal "${novoCaderno.nome}" created and ready for your story.`
-    );
-    setTimeout(() => setMensagemSucesso(""), 3200);
+    await proceedCreateNotebook();
   };
 
   const confirmarRenomearCaderno = (notebookId: string) => {
@@ -1454,6 +2123,34 @@ export default function JournalEditor() {
               <SaveIcon className="save-btn-icon" />
               <span>{salvando ? "SAVING..." : "SAVE JOURNAL PAGE"}</span>
             </button>
+
+            {!isGuestMode && autosaveStatus !== "idle" && (
+              <div
+                className={`journal-autosave-status is-${autosaveStatus}`}
+                role={autosaveStatus === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {autosaveStatus === "saving" && (
+                  <>
+                    <span className="journal-autosave-dot" aria-hidden="true" />
+                    <span>Saving...</span>
+                  </>
+                )}
+                {autosaveStatus === "saved" && <span>✓ Saved</span>}
+                {autosaveStatus === "error" && (
+                  <>
+                    <span>Unable to save —</span>
+                    <button
+                      type="button"
+                      className="journal-autosave-retry-btn"
+                      onClick={() => void flushBackendSave()}
+                    >
+                      Retry
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1696,6 +2393,7 @@ export default function JournalEditor() {
             onClick={() => {
               setNotebookDrawerOpen(false);
               setCadernoPromptNotice(null);
+              setNewNotebookNameError(null);
               setPendingSaveAfterCreation(false);
               setRenamingNotebookId(null);
             }}
@@ -1713,6 +2411,7 @@ export default function JournalEditor() {
                 onClick={() => {
                   setNotebookDrawerOpen(false);
                   setCadernoPromptNotice(null);
+                  setNewNotebookNameError(null);
                   setPendingSaveAfterCreation(false);
                   setRenamingNotebookId(null);
                 }}
@@ -1879,17 +2578,40 @@ export default function JournalEditor() {
                 )}
               </div>
 
-              <form onSubmit={criarNovoCaderno} className="new-notebook-form">
-                <label className="new-notebook-label">NEW JOURNAL TITLE</label>
+              <form onSubmit={criarNovoCaderno} className="new-notebook-form" noValidate>
+                <label className="new-notebook-label" htmlFor="new-notebook-title-input">
+                  NEW JOURNAL TITLE
+                </label>
                 <input
+                  id="new-notebook-title-input"
+                  ref={newNotebookInputRef}
                   type="text"
-                  className="new-notebook-input"
+                  className={`new-notebook-input${newNotebookNameError ? " is-invalid" : ""}`}
                   placeholder="Name of new volume (e.g., Autumn Reflections, Quiet Days)..."
                   value={newNotebookTitle}
-                  onChange={(e) => setNewNotebookTitle(e.target.value)}
+                  onChange={(e) => {
+                    const nextVal = e.target.value;
+                    setNewNotebookTitle(nextVal);
+                    if (newNotebookNameError && nextVal.trim().length > 0) {
+                      setNewNotebookNameError(null);
+                    }
+                  }}
+                  aria-invalid={Boolean(newNotebookNameError)}
+                  aria-describedby={
+                    newNotebookNameError ? "new-notebook-name-error" : undefined
+                  }
                   maxLength={50}
                   autoFocus
                 />
+                {newNotebookNameError && (
+                  <p
+                    id="new-notebook-name-error"
+                    className="new-notebook-error"
+                    role="alert"
+                  >
+                    {newNotebookNameError}
+                  </p>
+                )}
 
                 <label
                   className="new-notebook-label"
@@ -1940,6 +2662,7 @@ export default function JournalEditor() {
                   type="submit"
                   className="new-notebook-btn"
                   style={{ marginTop: "14px" }}
+                  disabled={creatingNotebook}
                   onClick={(e) => {
                     if (isGuestMode) {
                       e.preventDefault();
@@ -1948,7 +2671,7 @@ export default function JournalEditor() {
                     }
                   }}
                 >
-                  + Create Journal
+                  {creatingNotebook ? "Creating Journal..." : "+ Create Journal"}
                 </button>
               </form>
             </motion.div>
@@ -2030,6 +2753,72 @@ export default function JournalEditor() {
           >
             <Sticker>{mensagemSucesso}</Sticker>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Navigation Save Failure Warning Modal */}
+      <AnimatePresence>
+        {navFailureModalOpen && (
+          <div
+            className="delete-notebook-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="journal-save-warning-title"
+          >
+            <motion.div
+              className="delete-notebook-modal-sheet journal-save-warning-modal"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="delete-modal-warning-header">
+                <span className="delete-modal-icon" aria-hidden="true">
+                  !
+                </span>
+                <h3
+                  id="journal-save-warning-title"
+                  className="delete-modal-title"
+                >
+                  Unable to Save Latest Changes
+                </h3>
+              </div>
+
+              <div className="delete-modal-body">
+                <p className="delete-modal-notice-text">
+                  Your latest journal changes could not be saved before{" "}
+                  {navFailureContextLabel}. Your writing is still safe in the
+                  editor.
+                </p>
+                {saveErrorMessage && (
+                  <div className="delete-modal-danger-box">
+                    <strong>Details:</strong>
+                    <p>{saveErrorMessage}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="delete-modal-actions">
+                <button
+                  type="button"
+                  className="delete-modal-cancel-btn"
+                  onClick={handleStayInEditor}
+                  disabled={retryingNavSave}
+                >
+                  Stay in the editor
+                </button>
+                <button
+                  type="button"
+                  className="journal-save-retry-modal-btn"
+                  onClick={() => void handleRetryNavSave()}
+                  disabled={retryingNavSave}
+                >
+                  {retryingNavSave ? "Retrying..." : "Retry saving"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
