@@ -71,12 +71,8 @@ app.set('trust proxy', trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) 
 // Headers de segurança e proteção HTTP
 app.use(securityHeaders);
 
-// ⚠️ IMPORTANTE: O webhook do Stripe DEVE ser registrado ANTES do express.json() global.
-// A rota /api/stripe/webhook usa express.raw() internamente para preservar o corpo
-// original da requisição, necessário para validação criptográfica da assinatura do Stripe.
-app.use('/api/stripe', stripeRoutes);
-
-// Configuração de CORS (permitindo envio de cookies/credentials apenas para origens confiáveis) e Parsers
+// Configuração de CORS, cookies e proteção CSRF ANTES de /api/stripe
+// para que req.cookies.access_token e validações de origem funcionem em /api/stripe/*
 app.use(cors({
   origin(origin, callback) {
     if (isAllowedCorsOrigin(origin)) {
@@ -88,6 +84,12 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(csrfProtection);
+
+// ⚠️ IMPORTANTE: O webhook do Stripe DEVE ser registrado ANTES do express.json() global.
+// A rota /api/stripe/webhook usa express.raw() internamente para preservar o corpo
+// original da requisição, necessário para validação criptográfica da assinatura do Stripe.
+app.use('/api/stripe', stripeRoutes);
+
 app.use(express.json({ limit: '1mb' }));
 
 // Rotas da API

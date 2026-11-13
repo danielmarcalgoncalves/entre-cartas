@@ -7,7 +7,7 @@ import { api } from "@/services/api";
 import AuthModal from "@/components/AuthModal";
 
 export default function ClubeProPage() {
-  const { user, isPro } = useAuth();
+  const { user, isPro, refreshUser } = useAuth();
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
@@ -25,12 +25,50 @@ export default function ClubeProPage() {
       setLoadingStatus(false);
       return;
     }
+    let cancelled = false;
+    setLoadingStatus(true);
     api.stripe
       .getStatus()
-      .then((data) => setStatus(data))
+      .then((data) => {
+        if (!cancelled) setStatus(data);
+      })
       .catch(() => {})
-      .finally(() => setLoadingStatus(false));
-  }, [user]);
+      .finally(() => {
+        if (!cancelled) setLoadingStatus(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.papel]);
+
+  // When returning from Stripe Checkout (?checkout=success), refresh user & subscription
+  // from the backend DB (never granting Pro from the query param alone).
+  useEffect(() => {
+    if (!checkoutSuccess || !user || isPro) return;
+    let active = true;
+    let attempts = 0;
+    const poll = async () => {
+      if (!active || attempts >= 5) return;
+      attempts += 1;
+      try {
+        const data = await api.stripe.getStatus();
+        if (!active) return;
+        setStatus(data);
+        if (data?.isPremium) {
+          await refreshUser();
+          return;
+        }
+      } catch {}
+      if (active && attempts < 5) {
+        setTimeout(poll, 1500);
+      }
+    };
+    const timer = setTimeout(poll, 400);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [checkoutSuccess, user?.id, isPro, refreshUser]);
 
   const handleAssinar = async () => {
     if (!user) {
@@ -98,12 +136,16 @@ export default function ClubeProPage() {
             textAlign: "center",
           }}
         >
-          <span className="stamp-mark olive" style={{ color: "#cfa96f", borderColor: "#cfa96f" }}>SUBSCRIPTION CONFIRMED</span>
+          <span className="stamp-mark olive" style={{ color: "#cfa96f", borderColor: "#cfa96f" }}>
+            {isPro ? "SUBSCRIPTION CONFIRMED" : "CONFIRMING PAYMENT"}
+          </span>
           <h2 className="section-title" style={{ marginTop: "12px", fontSize: "28px", color: "var(--color-birch-paper, #ece1c9)" }}>
-            Welcome to the Sender Club!
+            {isPro ? "Welcome to the Sender Club!" : "Confirming your Pro subscription..."}
           </h2>
           <p className="page-intro" style={{ margin: "8px auto 0", color: "#ece1c9" }}>
-            Your Pro sender seal has been activated. Your folders and archived letters are now unlimited.
+            {isPro
+              ? "Your Pro sender seal has been activated. Your folders and archived letters are now unlimited."
+              : "Your payment return was received. Waiting for Stripe webhook confirmation to activate your Pro benefits."}
           </p>
         </div>
       )}

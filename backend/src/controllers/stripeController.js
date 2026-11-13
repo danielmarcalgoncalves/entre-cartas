@@ -146,8 +146,8 @@ async function createCheckoutSession(req, res) {
         usuario_nome: usuario.nome
       },
       // URLs de retorno após o checkout (hospedadas pelo Stripe)
-      success_url: `${config.APP_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.APP_URL}/?checkout=cancelled`,
+      success_url: `${config.APP_URL}/clube-pro?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${config.APP_URL}/clube-pro?checkout=cancel`,
       // Configurações regionais
       locale: 'pt-BR',
       // Permite código de promoção (útil para testes)
