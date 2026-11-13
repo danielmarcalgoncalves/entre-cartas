@@ -22,6 +22,14 @@ const INTERNAL_LOG_SECRET = crypto.createHmac('sha256', JWT_SECRET).update('inte
 
 const LOG_SERVICE_URL = process.env.LOG_SERVICE_URL || 'http://log-service:3000';
 
+function getAppUrl() {
+  const configured = (process.env.APP_URL || '').trim().replace(/\/+$/, '');
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('APP_URL must be configured in production (cannot fall back to localhost).');
+  }
+  return configured || 'http://localhost:3000';
+}
+
 function sendLog(acao, req = null, detalhes = {}) {
   try {
     let usuarioId = 'anonimo';
@@ -323,7 +331,7 @@ function buildStationeryEmailLayout({ preheader, bodyHtml }) {
  * 1. Welcome Email (Brevo)
  */
 async function sendWelcomeEmail(email, nome) {
-  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const appUrl = getAppUrl();
   const deskUrl = `${appUrl}/my-desk`;
   const safeName = (nome || 'Reader').trim();
 
@@ -1170,7 +1178,7 @@ app.post('/forgot-password', rateLimit(15 * 60 * 1000, 5, 'Too many password rec
       [tokenHash, usuario.id, expiraEm]
     );
 
-    const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+    const appUrl = getAppUrl();
     const resetLink = `${appUrl}/login?mode=reset&token=${rawToken}`;
 
     sendPasswordRecoveryEmail(usuario.email, usuario.nome, resetLink)

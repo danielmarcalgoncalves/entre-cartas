@@ -2,8 +2,14 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 const { cartasIniciais } = require('./seedCartas');
 
+const isProduction = process.env.NODE_ENV === 'production';
+const dbHost = (process.env.DB_HOST || '').trim();
+if (isProduction && (!dbHost || dbHost === 'localhost' || dbHost === '127.0.0.1')) {
+  console.error('[Database] CRITICAL: DB_HOST must be set to the production database host in NODE_ENV=production.');
+}
+
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
+  host: dbHost || (isProduction ? '' : 'localhost'),
   port: parseInt(process.env.DB_PORT || '3306', 10),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',

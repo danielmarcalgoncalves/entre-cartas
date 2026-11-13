@@ -11,11 +11,16 @@ interface AdminMetricsResponse {
     free: number;
     pro: number;
     admin: number;
+    verified?: number;
+    activeLast30Days?: number;
     total: number;
   };
   subscriptions: {
     active: number;
     trialing: number;
+    pastDue?: number;
+    canceled?: number;
+    totalRecords?: number;
     totalActive: number;
   };
   mrr: {
@@ -23,6 +28,22 @@ interface AdminMetricsResponse {
     monthlyPrice: number;
     currency: string;
     isEstimate: boolean;
+    revenueTrackedInDb?: boolean;
+  };
+  application?: {
+    letters: {
+      total: number;
+      userAuthored: number;
+      curatedPublic: number;
+      inTrash: number;
+    };
+    journals: {
+      notebooks: number;
+    };
+    folders: {
+      total: number;
+    };
+    storageTracked: boolean;
   };
   generatedAt?: string;
 }
@@ -42,7 +63,14 @@ interface AdminUserSummary {
 
 interface AdminUserDetail extends AdminUserSummary {
   authProvider: string;
+  activity?: {
+    letters: number;
+    notebooks: number;
+    folders: number;
+  };
   subscription: {
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
     status: string;
     periodoInicio: string | null;
     periodoFim: string | null;
@@ -231,6 +259,7 @@ export default function AdminControlWorkspace() {
 
   const [loadingData, setLoadingData] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [logsError, setLogsError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const refreshingRef = useRef(false);
 
@@ -287,16 +316,27 @@ export default function AdminControlWorkspace() {
     refreshingRef.current = true;
     setLoadingData(true);
     setErrorMsg(null);
+    setLogsError(null);
     try {
-      const [metricsRes, logsRes] = await Promise.all([
+      const [metricsResult, logsResult] = await Promise.allSettled([
         api.admin.getMetrics(),
         api.admin.getLogs(),
       ]);
-      setMetrics(metricsRes);
-      setLogs(Array.isArray(logsRes?.logs) ? logsRes.logs.slice(0, 20) : []);
-      setLastUpdated(metricsRes?.generatedAt || new Date().toISOString());
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Unable to load administrative telemetry.");
+
+      if (metricsResult.status === "fulfilled") {
+        setMetrics(metricsResult.value);
+        setLastUpdated(metricsResult.value?.generatedAt || new Date().toISOString());
+      } else {
+        setMetrics(null);
+        setErrorMsg(metricsResult.reason?.message || "Unable to load database metrics.");
+      }
+
+      if (logsResult.status === "fulfilled") {
+        setLogs(Array.isArray(logsResult.value?.logs) ? logsResult.value.logs.slice(0, 20) : []);
+      } else {
+        setLogs([]);
+        setLogsError(logsResult.reason?.message || "Unable to load audit logs from log-service.");
+      }
     } finally {
       setLoadingData(false);
       refreshingRef.current = false;
@@ -481,17 +521,30 @@ export default function AdminControlWorkspace() {
           <div className="letter-object" style={{ padding: "22px 20px", borderColor: "rgba(207, 169, 111, 0.22)" }}>
             <span className="object-kind">Total Users</span>
             <h3 className="object-title" style={{ fontSize: "34px", marginTop: "8px", color: "#f6efe2" }}>
-              {loadingData && !metrics ? "—" : metrics?.users.total ?? 0}
+              {loadingData && !metrics ? "—" : errorMsg && !metrics ? "Unavailable" : metrics?.users.total ?? 0}
             </h3>
             <p style={{ fontSize: "13px", color: "#9c907f", margin: "6px 0 0" }}>
-              Free: {metrics?.users.free ?? 0} · Pro: {metrics?.users.pro ?? 0} · Admin: {metrics?.users.admin ?? 0}
+              {metrics
+                ? `Free: ${metrics.users.free} · Pro: ${metrics.users.pro} · Admin: ${metrics.users.admin}`
+                : errorMsg
+                ? "Database metrics unavailable"
+                : "Loading breakdown..."}
             </p>
+            {metrics && (
+              <p style={{ fontSize: "12px", color: "#8c8273", margin: "4px 0 0" }}>
+                Verified: {metrics.users.verified ?? 0} · Active (30d): {metrics.users.activeLast30Days ?? 0}
+              </p>
+            )}
           </div>
 
           <div className="letter-object" style={{ padding: "22px 20px", borderColor: "rgba(207, 169, 111, 0.22)" }}>
             <span className="object-kind">Free vs. Pro</span>
             <h3 className="object-title" style={{ fontSize: "34px", marginTop: "8px", color: "#f6efe2" }}>
-              {loadingData && !metrics ? "—" : `${metrics?.users.free ?? 0} / ${metrics?.users.pro ?? 0}`}
+              {loadingData && !metrics
+                ? "—"
+                : errorMsg && !metrics
+                ? "Unavailable"
+                : `${metrics?.users.free ?? 0} / ${metrics?.users.pro ?? 0}`}
             </h3>
             <p style={{ fontSize: "13px", color: "#9c907f", margin: "6px 0 0" }}>
               Standard accounts vs. Pro Sender Club
@@ -499,13 +552,26 @@ export default function AdminControlWorkspace() {
           </div>
 
           <div className="letter-object" style={{ padding: "22px 20px", borderColor: "rgba(207, 169, 111, 0.22)" }}>
-            <span className="object-kind">Active Subscriptions</span>
+            <span className="object-kind">Stripe Subscriptions</span>
             <h3 className="object-title" style={{ fontSize: "34px", marginTop: "8px", color: "#f6efe2" }}>
-              {loadingData && !metrics ? "—" : metrics?.subscriptions.totalActive ?? 0}
+              {loadingData && !metrics
+                ? "—"
+                : errorMsg && !metrics
+                ? "Unavailable"
+                : metrics?.subscriptions.totalActive ?? 0}
             </h3>
             <p style={{ fontSize: "13px", color: "#9c907f", margin: "6px 0 0" }}>
-              Active: {metrics?.subscriptions.active ?? 0} · Trialing: {metrics?.subscriptions.trialing ?? 0}
+              {metrics
+                ? `Active: ${metrics.subscriptions.active} · Trialing: ${metrics.subscriptions.trialing}`
+                : errorMsg
+                ? "Subscription records unavailable"
+                : "Loading subscription counts..."}
             </p>
+            {metrics && (
+              <p style={{ fontSize: "12px", color: "#8c8273", margin: "4px 0 0" }}>
+                Past due: {metrics.subscriptions.pastDue ?? 0} · Canceled: {metrics.subscriptions.canceled ?? 0} · Total rows: {metrics.subscriptions.totalRecords ?? 0}
+              </p>
+            )}
           </div>
 
           <div
@@ -535,10 +601,80 @@ export default function AdminControlWorkspace() {
               </span>
             </div>
             <h3 className="object-title" style={{ fontSize: "32px", marginTop: "8px", color: "#f7dfb3" }}>
-              {loadingData && !metrics ? "—" : formatBrl(metrics?.mrr.estimatedTestMrr ?? 0)}
+              {loadingData && !metrics
+                ? "—"
+                : errorMsg && !metrics
+                ? "Unavailable"
+                : formatBrl(metrics?.mrr.estimatedTestMrr ?? 0)}
             </h3>
             <p style={{ fontSize: "12px", color: "#b7ab98", margin: "6px 0 0" }}>
-              Test-mode estimate ({formatBrl(metrics?.mrr.monthlyPrice ?? 14.9)} × {metrics?.subscriptions.totalActive ?? 0} active/trialing). Not live Stripe revenue.
+              {metrics
+                ? `Test-mode estimate (${formatBrl(metrics.mrr.monthlyPrice)} × ${metrics.subscriptions.totalActive} active/trialing). Stripe invoice amounts are not stored in MariaDB.`
+                : "Subscription revenue data unavailable."}
+            </p>
+          </div>
+        </div>
+
+        {/* Application Metrics from MariaDB */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "18px",
+            marginTop: "18px",
+          }}
+        >
+          <div className="letter-object" style={{ padding: "20px", borderColor: "rgba(207, 169, 111, 0.22)" }}>
+            <span className="object-kind">Letters (MariaDB)</span>
+            <h3 className="object-title" style={{ fontSize: "30px", marginTop: "8px", color: "#f6efe2" }}>
+              {loadingData && !metrics
+                ? "—"
+                : errorMsg && !metrics
+                ? "Unavailable"
+                : metrics?.application?.letters.total ?? 0}
+            </h3>
+            <p style={{ fontSize: "12px", color: "#9c907f", margin: "6px 0 0" }}>
+              {metrics?.application
+                ? `User-authored: ${metrics.application.letters.userAuthored} · Curated public: ${metrics.application.letters.curatedPublic} · Trash: ${metrics.application.letters.inTrash}`
+                : "Letter records unavailable"}
+            </p>
+          </div>
+
+          <div className="letter-object" style={{ padding: "20px", borderColor: "rgba(207, 169, 111, 0.22)" }}>
+            <span className="object-kind">Journal Notebooks</span>
+            <h3 className="object-title" style={{ fontSize: "30px", marginTop: "8px", color: "#f6efe2" }}>
+              {loadingData && !metrics
+                ? "—"
+                : errorMsg && !metrics
+                ? "Unavailable"
+                : metrics?.application?.journals.notebooks ?? 0}
+            </h3>
+            <p style={{ fontSize: "12px", color: "#9c907f", margin: "6px 0 0" }}>
+              Persisted journal volumes in `cadernos`
+            </p>
+          </div>
+
+          <div className="letter-object" style={{ padding: "20px", borderColor: "rgba(207, 169, 111, 0.22)" }}>
+            <span className="object-kind">Correspondence Folders</span>
+            <h3 className="object-title" style={{ fontSize: "30px", marginTop: "8px", color: "#f6efe2" }}>
+              {loadingData && !metrics
+                ? "—"
+                : errorMsg && !metrics
+                ? "Unavailable"
+                : metrics?.application?.folders.total ?? 0}
+            </h3>
+            <p style={{ fontSize: "12px", color: "#9c907f", margin: "6px 0 0" }}>
+              Persisted folders in `pastas_cartas`
+            </p>
+          </div>
+
+          <div className="letter-object" style={{ padding: "20px", borderColor: "rgba(255, 255, 255, 0.14)" }}>
+            <span className="object-kind">Storage Usage</span>
+            <h3 className="object-title" style={{ fontSize: "24px", marginTop: "10px", color: "#c9beab" }}>
+              Not tracked
+            </h3>
+            <p style={{ fontSize: "12px", color: "#8c8273", margin: "8px 0 0" }}>
+              Byte-level MinIO object storage metrics are not recorded in MariaDB.
             </p>
           </div>
         </div>
@@ -626,6 +762,7 @@ export default function AdminControlWorkspace() {
                     <th style={{ padding: "10px 8px", color: "#cfa96f", fontWeight: 600 }}>Plan</th>
                     <th style={{ padding: "10px 8px", color: "#cfa96f", fontWeight: 600 }}>Subscription</th>
                     <th style={{ padding: "10px 8px", color: "#cfa96f", fontWeight: 600 }}>Created</th>
+                    <th style={{ padding: "10px 8px", color: "#cfa96f", fontWeight: 600 }}>Last Login</th>
                     <th style={{ padding: "10px 8px", color: "#cfa96f", fontWeight: 600, textAlign: "right" }}>
                       Inspect
                     </th>
@@ -681,6 +818,9 @@ export default function AdminControlWorkspace() {
                         </td>
                         <td style={{ padding: "11px 8px", color: "#b7ab98", whiteSpace: "nowrap" }}>
                           {formatTimestamp(u.criadoEm)}
+                        </td>
+                        <td style={{ padding: "11px 8px", color: "#b7ab98", whiteSpace: "nowrap" }}>
+                          {formatTimestamp(u.ultimoLogin)}
                         </td>
                         <td style={{ padding: "11px 8px", textAlign: "right" }}>
                           <button
@@ -842,14 +982,39 @@ export default function AdminControlWorkspace() {
                 <dt style={{ color: "#9c907f" }}>Last Login</dt>
                 <dd style={{ margin: 0, color: "#f3e9d6" }}>{formatTimestamp(selectedUser.ultimoLogin)}</dd>
 
+                <dt style={{ color: "#9c907f" }}>Activity</dt>
+                <dd style={{ margin: 0, color: "#f3e9d6" }}>
+                  {selectedUser.activity
+                    ? `${selectedUser.activity.letters} letter(s) · ${selectedUser.activity.notebooks} journal(s) · ${selectedUser.activity.folders} folder(s)`
+                    : "Not available"}
+                </dd>
+
                 <dt style={{ color: "#9c907f" }}>Subscription</dt>
                 <dd style={{ margin: 0, color: "#f3e9d6" }}>
                   {selectedUser.subscription
-                    ? `${selectedUser.subscription.status} (period end: ${formatTimestamp(
-                        selectedUser.subscription.periodoFim
-                      )})`
+                    ? `${selectedUser.subscription.status} (${formatTimestamp(
+                        selectedUser.subscription.periodoInicio
+                      )} → ${formatTimestamp(selectedUser.subscription.periodoFim)})`
                     : "No Stripe subscription"}
                 </dd>
+
+                {selectedUser.subscription?.stripeCustomerId && (
+                  <>
+                    <dt style={{ color: "#9c907f" }}>Stripe Customer</dt>
+                    <dd style={{ margin: 0, color: "#d6cdbf", fontFamily: "monospace", fontSize: "12px" }}>
+                      {selectedUser.subscription.stripeCustomerId}
+                    </dd>
+                  </>
+                )}
+
+                {selectedUser.subscription?.stripeSubscriptionId && (
+                  <>
+                    <dt style={{ color: "#9c907f" }}>Stripe Sub ID</dt>
+                    <dd style={{ margin: 0, color: "#d6cdbf", fontFamily: "monospace", fontSize: "12px" }}>
+                      {selectedUser.subscription.stripeSubscriptionId}
+                    </dd>
+                  </>
+                )}
               </dl>
             )}
           </div>
@@ -873,7 +1038,20 @@ export default function AdminControlWorkspace() {
             </span>
           </div>
 
-          {loadingData && logs.length === 0 ? (
+          {logsError ? (
+            <div
+              style={{
+                padding: "12px 16px",
+                borderRadius: "6px",
+                border: "1px solid rgba(224, 108, 88, 0.45)",
+                backgroundColor: "rgba(130, 32, 24, 0.2)",
+                color: "#ffd0c7",
+                fontSize: "13px",
+              }}
+            >
+              {logsError}
+            </div>
+          ) : loadingData && logs.length === 0 ? (
             <p className="page-intro" style={{ margin: 0 }}>
               Loading recent audit events...
             </p>

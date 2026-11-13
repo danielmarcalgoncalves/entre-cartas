@@ -19,7 +19,7 @@ const ACCESS_KEY  = process.env.MINIO_ROOT_USER    || 'minioadmin';
 const SECRET_KEY  = process.env.MINIO_ROOT_PASSWORD || 'minioadmin123';
 const BUCKET      = process.env.MINIO_BUCKET       || 'perfil-fotos';
 const JOURNAL_BUCKET = process.env.MINIO_JOURNAL_BUCKET || 'journal-media';
-const PUBLIC_URL  = process.env.MINIO_PUBLIC_URL   || 'http://localhost:9000';
+const PUBLIC_URL  = process.env.MINIO_PUBLIC_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:9000');
 
 const minioClient = new Minio.Client({
   endPoint:  ENDPOINT,

@@ -54,9 +54,21 @@ function isAllowedCorsOrigin(origin) {
   if (!origin) return true;
   try {
     const parsed = new URL(origin);
-    const allowed = new Set(['http://localhost:3000', 'http://127.0.0.1:3000']);
+    const allowed = new Set();
+    if (process.env.NODE_ENV !== 'production') {
+      allowed.add('http://localhost:3000');
+      allowed.add('http://127.0.0.1:3000');
+    }
     if (process.env.APP_URL) {
       allowed.add(new URL(process.env.APP_URL).origin);
+    }
+    if (process.env.CORS_ALLOWED_ORIGINS) {
+      for (const entry of process.env.CORS_ALLOWED_ORIGINS.split(',')) {
+        const trimmed = entry.trim();
+        if (trimmed) {
+          allowed.add(new URL(trimmed).origin);
+        }
+      }
     }
     return allowed.has(parsed.origin);
   } catch {
@@ -66,7 +78,10 @@ function isAllowedCorsOrigin(origin) {
 
 const app = express();
 const trustProxyEnv = process.env.TRUST_PROXY;
-app.set('trust proxy', trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) : false);
+app.set(
+  'trust proxy',
+  trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) : (process.env.NODE_ENV === 'production' ? 1 : false)
+);
 
 // Headers de segurança e proteção HTTP
 app.use(securityHeaders);
@@ -220,7 +235,7 @@ function startServer() {
     console.log(`💌 Entre Cartas — Arquivo Epistolar & Scrapbook`);
     console.log(`👨‍🏫 Disciplina do Professor: @siriani`);
     console.log(`🚀 Servidor rodando na porta: ${PORT}`);
-    console.log(`🌐 Acesse em: http://localhost:${PORT}`);
+    console.log(`🌐 URL configurada: ${process.env.APP_URL || `http://localhost:${PORT}`}`);
     console.log('====================================================');
     
     // Inicializa o banco e verifica tabelas

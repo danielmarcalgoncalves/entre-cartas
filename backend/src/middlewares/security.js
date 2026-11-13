@@ -176,9 +176,12 @@ function securityHeaders(req, res, next) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const devLocalSources = isProduction ? '' : ' http://localhost:*';
+  const devWsSources = isProduction ? '' : ' http://localhost:* ws://localhost:*';
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://image.tmdb.org https://lh3.googleusercontent.com http://localhost:* https://*; connect-src 'self' https://api.themoviedb.org http://localhost:* ws://localhost:*; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://image.tmdb.org https://lh3.googleusercontent.com${devLocalSources} https://*; connect-src 'self' https://api.themoviedb.org${devWsSources}; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`
   );
   res.removeHeader('X-Powered-By');
   next();

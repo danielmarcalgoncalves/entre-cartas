@@ -3,7 +3,20 @@
  * Connects the Next.js Frontend to the Express Backend endpoints
  */
 
-const API_BASE = '/api';
+function resolveApiBase(): string {
+  const configured = (process.env.NEXT_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
+  if (!configured) {
+    return '/api';
+  }
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(configured);
+  if (process.env.NODE_ENV === 'production' && isLocalhost) {
+    console.error('[API Config] Ignoring localhost NEXT_PUBLIC_API_URL in production build; using relative /api.');
+    return '/api';
+  }
+  return configured.endsWith('/api') ? configured : `${configured}/api`;
+}
+
+const API_BASE = resolveApiBase();
 export const SESSION_TOKEN_STORAGE_KEY = 'entre-cartas:auth:token';
 
 export function purgeLegacyTokenStorage(): void {

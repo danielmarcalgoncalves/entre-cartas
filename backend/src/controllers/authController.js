@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { sendLog, getAuditLogs } = require('../services/logClient');
 
-const PRIMARY_AUTH_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3000';
+const isProduction = process.env.NODE_ENV === 'production';
+const PRIMARY_AUTH_URL = (process.env.AUTH_SERVICE_URL || (isProduction ? '' : 'http://auth-service:3000')).trim();
 const FALLBACK_LOCAL_AUTH_URL = 'http://127.0.0.1:3001';
 const INTERNAL_AUTH_SECRET = process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32
   ? crypto.createHmac('sha256', process.env.JWT_SECRET.trim()).update('internal-auth-service').digest('hex')
@@ -35,14 +36,18 @@ function stripTokenFromAuthPayload(data) {
 }
 
 async function requestAuthService(config) {
+  if (!PRIMARY_AUTH_URL) {
+    throw new Error('AUTH_SERVICE_URL is not configured for production.');
+  }
   try {
     return await axios({
       ...config,
       url: `${PRIMARY_AUTH_URL}${config.path}`
     });
   } catch (err) {
-    // If running outside Docker where 'auth-service' hostname is not resolvable, try local port 3001
+    // Only fall back to local port 3001 in non-production development outside Docker
     if (
+      !isProduction &&
       !err.response &&
       PRIMARY_AUTH_URL !== FALLBACK_LOCAL_AUTH_URL &&
       (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED' || err.code === 'EAI_AGAIN')

@@ -22,9 +22,16 @@ const { sendLog } = require('../services/logClient');
 
 // Configurações centralizadas do plano (dinâmicas para cada requisição)
 function getStripeConfig() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const rawAppUrl = (process.env.APP_URL || '').trim().replace(/\/+$/, '');
+
+  if (isProduction && !rawAppUrl) {
+    throw new Error('APP_URL must be configured in production (cannot fall back to localhost).');
+  }
+
   return {
     PRICE_ID: process.env.STRIPE_PRICE_ID || null,
-    APP_URL: process.env.APP_URL || 'http://localhost:3000',
+    APP_URL: rawAppUrl || 'http://localhost:3000',
   };
 }
 
