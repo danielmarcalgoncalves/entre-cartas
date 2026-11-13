@@ -15,8 +15,10 @@ function enrichUserForClient(usuario) {
     ...usuario,
     role: usuario.papel || 'usuario',
   };
-  if (enriched.papel === 'admin' && process.env.ADMIN_PANEL_ROUTE_KEY) {
-    enriched.adminPanelPath = `/control/${process.env.ADMIN_PANEL_ROUTE_KEY.trim()}`;
+  const routeKey = (process.env.ADMIN_PANEL_ROUTE_KEY || '').trim();
+  const isValidRouteKey = routeKey.length >= 32 && /^[A-Za-z0-9_-]+$/.test(routeKey);
+  if (enriched.papel === 'admin' && isValidRouteKey) {
+    enriched.adminPanelPath = `/control/${routeKey}`;
   } else {
     delete enriched.adminPanelPath;
   }

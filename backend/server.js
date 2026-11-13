@@ -40,9 +40,10 @@ function validateAdminPanelRouteKey() {
   const raw = (process.env.ADMIN_PANEL_ROUTE_KEY || '').trim();
   const forbidden = new Set(['admin', 'control', 'panel', 'dashboard', 'root', 'workspace']);
   if (!raw || raw.length < 32 || !/^[A-Za-z0-9_-]+$/.test(raw) || forbidden.has(raw.toLowerCase())) {
-    throw new Error(
-      '[SECURITY] ADMIN_PANEL_ROUTE_KEY must be configured with a random identifier of at least 32 URL-safe characters.'
+    console.error(
+      '[SECURITY] ADMIN_PANEL_ROUTE_KEY is missing or invalid (must be >= 32 URL-safe chars). Private admin panel route is disabled.'
     );
+    return null;
   }
   return raw;
 }
@@ -147,6 +148,9 @@ if (staticPath) {
 
   // Rota privada do painel administrativo: serve o shell estático apenas para a chave exata
   app.get(['/control', '/control/*'], (req, res) => {
+    if (!ADMIN_PANEL_ROUTE_KEY) {
+      return sendNotFound(res);
+    }
     const cleanPath = req.path.replace(/\/+$/, '');
     const prefix = '/control/';
     if (!cleanPath.startsWith(prefix)) {
