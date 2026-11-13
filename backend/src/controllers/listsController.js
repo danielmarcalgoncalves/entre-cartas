@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
 
 // Helper para garantir que o usuário tenha sua Watchlist fixa criada
 async function getOrCreateWatchlist(usuarioId) {
@@ -212,11 +213,15 @@ async function toggleWatchlist(req, res) {
       const totalAtual = countRows[0].total;
 
       if (totalAtual >= 10) {
-        return res.status(403).json({
-          error: 'Limite de 10 filmes na Watchlist atingido para o plano Comum. Faça upgrade para o Premium para salvar filmes ilimitados!',
-          limite: 10,
-          papelAtual: papelUsuario
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            resource: 'watchlist items',
+            current: totalAtual,
+            limit: 10,
+            isPremium: false,
+            proLimitText: 'unlimited watchlist items',
+          })
+        );
       }
     }
 
@@ -258,11 +263,16 @@ async function createList(req, res) {
     const totalCriadas = countRows[0].total;
 
     if (totalCriadas >= limiteListas) {
-      return res.status(403).json({
-        error: `Você atingiu o limite de ${limiteListas} listas personalizadas para o seu plano (${papelUsuario === 'usuario' ? 'Comum' : 'Premium'}). Faça upgrade para criar mais listas!`,
-        limite: limiteListas,
-        papelAtual: papelUsuario
-      });
+      const isPro = papelUsuario === 'premium' || papelUsuario === 'admin';
+      return res.status(403).json(
+        buildPlanLimitError({
+          resource: 'custom lists',
+          current: totalCriadas,
+          limit: limiteListas,
+          isPremium: isPro,
+          proLimitText: 'up to 10 custom lists',
+        })
+      );
     }
 
     const [result] = await pool.query(
@@ -457,10 +467,15 @@ async function updateList(req, res) {
     if (Array.isArray(filmes)) {
       const limiteFilmes = lista.is_watchlist ? 10 : (papelUsuario === 'usuario' ? 10 : 9999);
       if (papelUsuario === 'usuario' && filmes.length > limiteFilmes) {
-        return res.status(403).json({
-          error: `Limite de ${limiteFilmes} filmes atingido para o plano Comum. Faça upgrade para o Premium para salvar mais filmes!`,
-          limite: limiteFilmes
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            resource: lista.is_watchlist ? 'watchlist items' : 'list items',
+            current: filmes.length,
+            limit: limiteFilmes,
+            isPremium: false,
+            proLimitText: 'unlimited saved items',
+          })
+        );
       }
 
       // Substitui os itens de forma sincronizada

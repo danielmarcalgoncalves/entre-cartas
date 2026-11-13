@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
@@ -33,7 +34,34 @@ try {
     next();
   };
 }
-const { securityHeaders, csrfProtection } = require('./src/middlewares/security');
+const { securityHeaders, noStoreHeaders, csrfProtection } = require('./src/middlewares/security');
+
+function validateAdminPanelRouteKey() {
+  const raw = (process.env.ADMIN_PANEL_ROUTE_KEY || '').trim();
+  const forbidden = new Set(['admin', 'control', 'panel', 'dashboard', 'root', 'workspace']);
+  if (!raw || raw.length < 32 || !/^[A-Za-z0-9_-]+$/.test(raw) || forbidden.has(raw.toLowerCase())) {
+    throw new Error(
+      '[SECURITY] ADMIN_PANEL_ROUTE_KEY must be configured with a random identifier of at least 32 URL-safe characters.'
+    );
+  }
+  return raw;
+}
+
+const ADMIN_PANEL_ROUTE_KEY = validateAdminPanelRouteKey();
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    const allowed = new Set(['http://localhost:3000', 'http://127.0.0.1:3000']);
+    if (process.env.APP_URL) {
+      allowed.add(new URL(process.env.APP_URL).origin);
+    }
+    return allowed.has(parsed.origin);
+  } catch {
+    return false;
+  }
+}
 
 const app = express();
 const trustProxyEnv = process.env.TRUST_PROXY;
@@ -47,9 +75,14 @@ app.use(securityHeaders);
 // original da requisição, necessário para validação criptográfica da assinatura do Stripe.
 app.use('/api/stripe', stripeRoutes);
 
-// Configuração de CORS (permitindo envio de cookies/credentials) e Parsers
+// Configuração de CORS (permitindo envio de cookies/credentials apenas para origens confiáveis) e Parsers
 app.use(cors({
-  origin: true,
+  origin(origin, callback) {
+    if (isAllowedCorsOrigin(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true
 }));
 app.use(cookieParser());
@@ -66,10 +99,14 @@ app.use('/api/lists', listsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/journal', journalRoutes);
 
-// Rota direta de administração para Logs de Auditoria (Atividade 5 - RBAC Admin)
+// Rotas diretas de administração (RBAC Admin + no-store cache)
 const authController = require('./src/controllers/authController');
+const adminController = require('./src/controllers/adminController');
 const { authMiddleware, requireAdmin } = require('./src/middlewares/auth');
-app.get('/api/admin/logs', authMiddleware, requireAdmin, authController.getAuditLogs);
+app.get('/api/admin/logs', authMiddleware, requireAdmin, noStoreHeaders, authController.getAuditLogs);
+app.get('/api/admin/metrics', authMiddleware, requireAdmin, noStoreHeaders, adminController.getMetrics);
+app.get('/api/admin/users', authMiddleware, requireAdmin, noStoreHeaders, adminController.listUsers);
+app.get('/api/admin/users/:id', authMiddleware, requireAdmin, noStoreHeaders, adminController.getUserDetail);
 
 // Health check para monitoramento e Portainer
 app.get('/api/health', (req, res) => {
@@ -96,6 +133,46 @@ if (fs.existsSync(path.join(publicPath, 'index.html'))) {
 }
 
 if (staticPath) {
+  const notFoundHtml = path.join(staticPath, '404.html');
+  const sendNotFound = (res) => {
+    res.status(404);
+    if (fs.existsSync(notFoundHtml)) {
+      return res.sendFile(notFoundHtml);
+    }
+    return res.send('Not Found');
+  };
+
+  // Bloqueia explicitamente a antiga rota pública /admin (sem redirecionamento nem divulgação)
+  app.get(['/admin', '/admin/*'], (req, res) => sendNotFound(res));
+
+  // Rota privada do painel administrativo: serve o shell estático apenas para a chave exata
+  app.get(['/control', '/control/*'], (req, res) => {
+    const cleanPath = req.path.replace(/\/+$/, '');
+    const prefix = '/control/';
+    if (!cleanPath.startsWith(prefix)) {
+      return sendNotFound(res);
+    }
+    const candidateKey = cleanPath.slice(prefix.length);
+    if (!candidateKey || candidateKey.includes('/')) {
+      return sendNotFound(res);
+    }
+    const expectedBuf = Buffer.from(ADMIN_PANEL_ROUTE_KEY, 'utf8');
+    const candidateBuf = Buffer.from(candidateKey, 'utf8');
+    if (expectedBuf.length !== candidateBuf.length || !crypto.timingSafeEqual(expectedBuf, candidateBuf)) {
+      return sendNotFound(res);
+    }
+    const controlShellHtml = path.join(staticPath, 'control', 'panel.html');
+    if (!fs.existsSync(controlShellHtml)) {
+      return sendNotFound(res);
+    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    return res.sendFile(controlShellHtml);
+  });
+
   app.use(express.static(staticPath, { redirect: false, extensions: ['html'] }));
   app.get('*', (req, res) => {
     // Se for rota da API, retorna 404 JSON

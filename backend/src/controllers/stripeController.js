@@ -269,13 +269,24 @@ async function handleWebhook(req, res) {
         break;
       }
 
-      // Falha no pagamento — NÃO revoga acesso imediatamente (Stripe tentará novamente)
-      // O cancelamento definitivo vem via customer.subscription.deleted
+      // Falha no pagamento — verifica vínculo subscription + customer, marca como past_due e registra log
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
         console.warn(`[Webhook] Falha de pagamento para assinatura ${invoice.subscription}.`);
         if (invoice.subscription) {
-          await _atualizarStatusSubscription(invoice.subscription, 'past_due');
+          const updatedUsuarioId = await _atualizarStatusSubscription(
+            invoice.subscription,
+            invoice.customer || null,
+            'past_due'
+          );
+          if (updatedUsuarioId) {
+            sendLog('STRIPE_PAGAMENTO_FALHOU', null, {
+              usuario_id: updatedUsuarioId,
+              subscription_id: invoice.subscription,
+              customer_id: invoice.customer || null,
+              invoice_id: invoice.id,
+            });
+          }
         }
         break;
       }
@@ -311,6 +322,77 @@ async function handleWebhook(req, res) {
 }
 
 /**
+ * POST /api/stripe/portal
+ * Cria uma sessão no Stripe Billing Portal para o usuário autenticado.
+ * Nunca aceita customerId ou usuarioId do frontend.
+ */
+async function createPortalSession(req, res) {
+  try {
+    const stripe = getStripe();
+    const config = getStripeConfig();
+    const usuarioId = req.usuarioId;
+
+    // Valida destino de retorno estritamente contra a origem configurada da aplicação
+    let safeReturnUrl = `${config.APP_URL}/clube-pro`;
+    const requestedReturnPath = req.body?.returnPath || req.body?.return_url;
+    if (typeof requestedReturnPath === 'string' && requestedReturnPath.trim()) {
+      try {
+        const baseOrigin = new URL(config.APP_URL).origin;
+        const resolved = new URL(requestedReturnPath, baseOrigin);
+        if (resolved.origin !== baseOrigin) {
+          return res.status(400).json({
+            error: 'INVALID_RETURN_URL',
+            message: 'Return URL must belong to the application origin.',
+          });
+        }
+        safeReturnUrl = resolved.toString();
+      } catch {
+        return res.status(400).json({
+          error: 'INVALID_RETURN_URL',
+          message: 'Invalid return URL provided.',
+        });
+      }
+    }
+
+    // Busca customerId exclusivamente do registro persistido para o usuário autenticado
+    const [rows] = await pool.query(
+      `SELECT stripe_customer_id
+       FROM stripe_subscriptions
+       WHERE usuario_id = ? AND stripe_customer_id IS NOT NULL
+       ORDER BY atualizado_em DESC, criado_em DESC
+       LIMIT 1`,
+      [usuarioId]
+    );
+
+    const customerId = rows[0]?.stripe_customer_id || null;
+    if (!customerId) {
+      return res.status(404).json({
+        error: 'NO_STRIPE_CUSTOMER',
+        message: 'No Stripe billing account was found for your profile. Subscribe to Pro Sender Club first.',
+      });
+    }
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: safeReturnUrl,
+    });
+
+    sendLog('STRIPE_PORTAL_ABERTO', req, {
+      usuario_id: usuarioId,
+      customer_id: customerId,
+    });
+
+    return res.json({ url: portalSession.url });
+  } catch (error) {
+    console.error('[stripeController] createPortalSession error:', error.message);
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ error: 'Unable to open Stripe Billing Portal: ' + error.message });
+    }
+    return res.status(500).json({ error: 'Unable to create Stripe Billing Portal session.' });
+  }
+}
+
+/**
  * GET /api/stripe/status
  * Retorna o estado atual da assinatura do usuário autenticado.
  */
@@ -336,10 +418,20 @@ async function getSubscriptionStatus(req, res) {
     );
 
     const subscription = subRows[0] || null;
+    const subStatus = subscription?.status || null;
+    const requiresAttention = subStatus === 'past_due' || subStatus === 'unpaid';
+    const billingWarning =
+      subStatus === 'past_due'
+        ? 'Your latest subscription payment failed. Please update your payment method to keep your Pro benefits.'
+        : subStatus === 'unpaid'
+        ? 'Your subscription is currently unpaid. Please update your payment method to restore Pro benefits.'
+        : null;
 
     return res.json({
       isPremium,
       papel: usuario.papel,
+      requiresAttention,
+      billingWarning,
       subscription: subscription ? {
         id: subscription.stripe_subscription_id,
         status: subscription.status,
@@ -471,14 +563,34 @@ async function _persistirPremium(usuarioId, customerId, subscriptionId, status, 
 }
 
 /**
- * Atualiza o status da assinatura sem alterar o papel do usuário
- * (usado para estados intermediários como past_due).
+ * Atualiza o status da assinatura verificando vínculo com subscription e customer
+ * (usado para estados intermediários como past_due em invoice.payment_failed).
  */
-async function _atualizarStatusSubscription(subscriptionId, status) {
-  await pool.query(
-    'UPDATE stripe_subscriptions SET status = ?, atualizado_em = NOW() WHERE stripe_subscription_id = ?',
-    [status, subscriptionId]
+async function _atualizarStatusSubscription(subscriptionId, customerId, status) {
+  const [rows] = await pool.query(
+    `SELECT usuario_id, stripe_customer_id
+     FROM stripe_subscriptions
+     WHERE stripe_subscription_id = ?
+     LIMIT 1`,
+    [subscriptionId]
   );
+
+  if (rows.length === 0) {
+    console.warn('[Webhook] invoice.payment_failed: assinatura não encontrada (ou já substituída):', subscriptionId);
+    return null;
+  }
+
+  const row = rows[0];
+  if (customerId && row.stripe_customer_id && row.stripe_customer_id !== customerId) {
+    console.warn('[Webhook] invoice.payment_failed: customer_id divergente ignorado:', customerId, subscriptionId);
+    return null;
+  }
+
+  await pool.query(
+    'UPDATE stripe_subscriptions SET status = ?, atualizado_em = NOW() WHERE stripe_subscription_id = ? AND usuario_id = ?',
+    [status, subscriptionId, row.usuario_id]
+  );
+  return row.usuario_id;
 }
 
 /**
@@ -518,7 +630,7 @@ async function _sincronizarSubscription(subscription) {
     if (currentUser.length > 0 && currentUser[0].papel !== 'admin') {
       await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['premium', usuarioId]);
     }
-  } else if (status === 'canceled' || status === 'unpaid') {
+  } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
     await _rebaixarParaUsuarioComum(usuarioId, subscriptionId, status);
   }
 }
@@ -584,6 +696,7 @@ async function _rebaixarParaUsuarioComum(usuarioId, subscriptionId, motivo) {
 
 module.exports = {
   createCheckoutSession,
+  createPortalSession,
   handleWebhook,
   getSubscriptionStatus
 };

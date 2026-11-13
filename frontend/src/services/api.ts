@@ -6,49 +6,7 @@
 const API_BASE = '/api';
 export const SESSION_TOKEN_STORAGE_KEY = 'entre-cartas:auth:token';
 
-let inMemoryToken: string | null = null;
-
-export function syncInMemoryTokenFromStorage(): string | null {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved =
-        window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
-        window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
-      inMemoryToken = saved || null;
-      return inMemoryToken;
-    } catch {}
-  }
-  return inMemoryToken;
-}
-
-export function getToken(): string | null {
-  if (typeof window !== 'undefined') {
-    return syncInMemoryTokenFromStorage();
-  }
-  return inMemoryToken;
-}
-
-export function setSession(token: string | null, persist = true) {
-  inMemoryToken = token;
-  if (typeof window !== 'undefined') {
-    try {
-      if (token) {
-        if (persist) {
-          window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
-        } else {
-          window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
-          window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-        }
-      } else {
-        window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-        window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-      }
-    } catch {}
-  }
-}
-
-export function clearSession() {
-  inMemoryToken = null;
+export function purgeLegacyTokenStorage(): void {
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
@@ -57,16 +15,29 @@ export function clearSession() {
   }
 }
 
+export function syncInMemoryTokenFromStorage(): string | null {
+  purgeLegacyTokenStorage();
+  return null;
+}
+
+export function getToken(): string | null {
+  return null;
+}
+
+export function setSession(_token: string | null, _persist = true) {
+  purgeLegacyTokenStorage();
+}
+
+export function clearSession() {
+  purgeLegacyTokenStorage();
+}
+
 async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+  purgeLegacyTokenStorage();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
@@ -83,12 +54,17 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}):
         window.dispatchEvent(new Event('entre-cartas:unauthorized'));
       }
     }
-    const errorMsg = data.error || data.message || `Request failed (${response.status})`;
+    const errorMsg = data.message || data.error || `Request failed (${response.status})`;
     const err: any = new Error(errorMsg);
     err.status = response.status;
+    err.code = data.error;
+    err.details = data.details;
+    err.upgrade = data.upgrade;
     err.requireVerification = data.requireVerification;
     err.email = data.email;
-    err.isLimitReached = Boolean(data.isLimitReached || data.limite);
+    err.isLimitReached = Boolean(
+      data.error === 'PLAN_LIMIT_REACHED' || data.isLimitReached || data.limite
+    );
     err.limite = data.limite;
     err.upgradeToPremium = data.upgradeToPremium;
     throw err;
@@ -255,7 +231,7 @@ export const api = {
       }),
     getStatus: () => apiRequest('/stripe/status'),
     createPortalSession: () =>
-      apiRequest('/stripe/customer-portal', {
+      apiRequest('/stripe/portal', {
         method: 'POST',
       }),
   },
@@ -268,10 +244,8 @@ export const api = {
         body: JSON.stringify(dados),
       }),
     uploadAvatar: async (formData: FormData) => {
-      const token = getToken();
       const res = await fetch('/api/profile/avatar', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
         credentials: 'include',
       });
@@ -282,6 +256,19 @@ export const api = {
   },
 
   admin: {
-    getLogs: () => apiRequest('/admin/logs'),
+    getLogs: () => apiRequest('/admin/logs', { cache: 'no-store' }),
+    getMetrics: () => apiRequest('/admin/metrics', { cache: 'no-store' }),
+    getUsers: (params?: { page?: number; limit?: number; q?: string; cursor?: number | null; direction?: 'next' | 'prev' }) => {
+      const sp = new URLSearchParams();
+      if (params?.cursor) sp.set('cursor', String(params.cursor));
+      if (params?.direction) sp.set('direction', params.direction);
+      if (params?.page && !params?.cursor) sp.set('page', String(params.page));
+      if (params?.limit) sp.set('limit', String(Math.min(params.limit, 20)));
+      if (params?.q && params.q.trim()) sp.set('q', params.q.trim());
+      const qs = sp.toString();
+      return apiRequest(`/admin/users${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+    },
+    getUserDetail: (id: number) =>
+      apiRequest(`/admin/users/${encodeURIComponent(String(id))}`, { cache: 'no-store' }),
   },
 };

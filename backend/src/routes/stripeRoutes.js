@@ -33,7 +33,14 @@ router.post(
  * Cria uma Checkout Session para o usuário autenticado.
  * Requer autenticação JWT.
  */
-router.post('/checkout', authMiddleware, stripeController.createCheckoutSession);
+router.post('/checkout', express.json(), authMiddleware, stripeController.createCheckoutSession);
+
+/**
+ * POST /api/stripe/portal
+ * Cria uma sessão no Stripe Billing Portal para o usuário autenticado.
+ * Requer autenticação JWT.
+ */
+router.post('/portal', express.json(), authMiddleware, stripeController.createPortalSession);
 
 /**
  * GET /api/stripe/status

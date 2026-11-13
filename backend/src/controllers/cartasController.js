@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
 
 const PUBLIC_ARCHIVE_CONDITION = `c.is_public = TRUE AND c.status_curadoria = 'aprovada' AND (c.status_carta IS NULL OR c.status_carta = 'completed') AND (c.na_lixeira IS NULL OR c.na_lixeira = FALSE)`;
 const ACCESSIBLE_LETTER_CONDITION = `((${PUBLIC_ARCHIVE_CONDITION}) OR (? IS NOT NULL AND c.usuario_id = ? AND (c.na_lixeira IS NULL OR c.na_lixeira = FALSE)))`;
@@ -241,14 +242,15 @@ async function criarCarta(req, res) {
             totalEscritas: quota.totalEscritas,
             limiteCartas: quota.limiteCartas
           });
-          return res.status(403).json({
-            error: quota.isPremium
-              ? `You have reached the limit of ${quota.limiteCartas} archived letters on the Premium Plan.`
-              : `You have reached the limit of ${quota.limiteCartas} letters on the Standard Plan. Join Pro Club to write up to 30 letters!`,
-            isLimitReached: true,
-            limite: quota.limiteCartas,
-            upgradeToPremium: !quota.isPremium
-          });
+          return res.status(403).json(
+            buildPlanLimitError({
+              resource: 'letters',
+              current: quota.totalEscritas,
+              limit: quota.limiteCartas,
+              isPremium: quota.isPremium,
+              proLimitText: 'up to 30 written & archived letters',
+            })
+          );
         }
       }
 
@@ -365,12 +367,15 @@ async function carimbarCarta(req, res) {
           limite
         });
 
-        return res.status(403).json({
-          error: `Your memory box has reached the limit of ${limite} saved letters. Join Pro Sender Club to collect unlimited memories!`,
-          isLimitReached: true,
-          limite,
-          upgradeToPremium: true
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            resource: 'saved letters',
+            current: totalGuardadas,
+            limit: limite,
+            isPremium: false,
+            proLimitText: 'unlimited saved letters in your memory box',
+          })
+        );
       }
     }
 
@@ -634,14 +639,15 @@ async function atualizarMinhaCarta(req, res) {
       const quota = await enforceActiveLetterQuota(connection, usuarioId, papelUsuario);
       if (!quota.allowed) {
         await connection.rollback();
-        return res.status(403).json({
-          error: quota.isPremium
-            ? `You have reached the limit of ${quota.limiteCartas} archived letters on the Premium Plan.`
-            : `You have reached the limit of ${quota.limiteCartas} letters on the Standard Plan. Join Pro Club to restore more letters!`,
-          isLimitReached: true,
-          limite: quota.limiteCartas,
-          upgradeToPremium: !quota.isPremium
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            resource: 'letters',
+            current: quota.totalEscritas,
+            limit: quota.limiteCartas,
+            isPremium: quota.isPremium,
+            proLimitText: 'up to 30 written & archived letters',
+          })
+        );
       }
     }
 
@@ -726,14 +732,15 @@ async function atualizarLixeiraCarta(req, res) {
       const quota = await enforceActiveLetterQuota(connection, usuarioId, papelUsuario);
       if (!quota.allowed) {
         await connection.rollback();
-        return res.status(403).json({
-          error: quota.isPremium
-            ? `You have reached the limit of ${quota.limiteCartas} archived letters on the Premium Plan.`
-            : `You have reached the limit of ${quota.limiteCartas} letters on the Standard Plan. Join Pro Club to restore more letters!`,
-          isLimitReached: true,
-          limite: quota.limiteCartas,
-          upgradeToPremium: !quota.isPremium
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            resource: 'letters',
+            current: quota.totalEscritas,
+            limit: quota.limiteCartas,
+            isPremium: quota.isPremium,
+            proLimitText: 'up to 30 written & archived letters',
+          })
+        );
       }
     }
 

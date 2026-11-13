@@ -9,6 +9,8 @@ import AuthModal from "@/components/AuthModal";
 export default function ClubeProPage() {
   const { user, isPro } = useAuth();
   const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [loadingPortal, setLoadingPortal] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [status, setStatus] = useState<any>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
@@ -52,15 +54,28 @@ export default function ClubeProPage() {
   };
 
   const handleGerenciarAssinatura = async () => {
+    if (loadingPortal) return;
+    setPortalError(null);
+    setLoadingPortal(true);
     try {
       const data = await api.stripe.createPortalSession();
       if (data && data.url) {
         window.location.href = data.url;
+      } else {
+        setPortalError("Unable to open the Stripe Billing Portal. Please try again.");
       }
     } catch (err: any) {
-      alert(err.message || "Error opening subscriber portal.");
+      setPortalError(err.message || "Error opening subscriber portal.");
+    } finally {
+      setLoadingPortal(false);
     }
   };
+
+  const subStatus: string | null = status?.subscription?.status || null;
+  const isPastDue = subStatus === "past_due";
+  const isUnpaid = subStatus === "unpaid";
+  const isCanceled = subStatus === "canceled";
+  const isTrialing = subStatus === "trialing";
 
   return (
     <div className="page-shell">
@@ -110,6 +125,60 @@ export default function ClubeProPage() {
         </div>
       )}
 
+      {!loadingStatus && (isPastDue || isUnpaid) && (
+        <div
+          className="paper-panel"
+          role="alert"
+          style={{
+            marginBottom: "28px",
+            backgroundColor: "rgba(145, 55, 38, 0.38)",
+            border: "1px solid rgba(235, 130, 105, 0.65)",
+            textAlign: "center",
+          }}
+        >
+          <span className="stamp-mark" style={{ color: "#ffd2c7", borderColor: "#e07a64" }}>
+            {isPastDue ? "PAYMENT PAST DUE" : "SUBSCRIPTION UNPAID"}
+          </span>
+          <h2 className="section-title" style={{ marginTop: "12px", fontSize: "24px", color: "#ffece6" }}>
+            Action required on your Pro subscription
+          </h2>
+          <p className="page-intro" style={{ margin: "8px auto 18px", color: "#ffd8ce" }}>
+            {status?.billingWarning ||
+              "Your latest subscription payment failed. Please update your payment method to keep your Pro benefits."}
+          </p>
+          <button
+            type="button"
+            onClick={handleGerenciarAssinatura}
+            disabled={loadingPortal}
+            className="primary-cta"
+          >
+            {loadingPortal ? "Opening Billing Portal..." : "Update Payment Method on Stripe ↗"}
+          </button>
+          {portalError && (
+            <p style={{ marginTop: "12px", color: "#ffd2c7", fontSize: "13px" }}>{portalError}</p>
+          )}
+        </div>
+      )}
+
+      {!loadingStatus && !isPro && isCanceled && (
+        <div
+          className="paper-panel"
+          style={{
+            marginBottom: "28px",
+            backgroundColor: "rgba(62, 48, 36, 0.42)",
+            border: "1px dashed rgba(207, 169, 111, 0.45)",
+            textAlign: "center",
+          }}
+        >
+          <span className="stamp-mark" style={{ color: "#e6c999", borderColor: "#cfa96f" }}>
+            SUBSCRIPTION CANCELED
+          </span>
+          <p className="page-intro" style={{ margin: "10px auto 0", color: "#ece1c9" }}>
+            Your previous Pro subscription has ended. Your journals and letters remain safely preserved on the Standard Plan, and you may re-subscribe anytime below.
+          </p>
+        </div>
+      )}
+
       {isPro ? (
         <div
           className="letter-paper"
@@ -123,16 +192,32 @@ export default function ClubeProPage() {
           <span className="wax-seal" style={{ margin: "0 auto 16px" }}>
             ★
           </span>
-          <span className="eyebrow">You are an honored member</span>
+          <span className="eyebrow">
+            {isTrialing
+              ? "Pro Trial Active · Honored Member"
+              : isPastDue
+              ? "Billing Attention Required"
+              : "You are an honored member"}
+          </span>
           <h2 className="display-title" style={{ fontSize: "36px", margin: "10px 0" }}>
             Your memory box knows no bounds
           </h2>
           <p className="page-intro" style={{ margin: "0 auto 24px" }}>
             Thank you for supporting the preservation of this epistolary archive free of advertisements and algorithmic noise.
           </p>
-          <button type="button" onClick={handleGerenciarAssinatura} className="primary-cta">
-            Manage my subscription on Stripe ↗
+          <button
+            type="button"
+            onClick={handleGerenciarAssinatura}
+            disabled={loadingPortal}
+            className="primary-cta"
+          >
+            {loadingPortal ? "Opening Billing Portal..." : "Manage my subscription on Stripe ↗"}
           </button>
+          {portalError && (
+            <p style={{ marginTop: "12px", color: "#8b2626", fontSize: "13px", fontWeight: 600 }}>
+              {portalError}
+            </p>
+          )}
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "28px", marginBottom: "48px" }}>

@@ -9,6 +9,7 @@
 
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
 const {
   uploadJournalMedia,
   getJournalMediaStream,
@@ -187,13 +188,15 @@ async function upsertNotebook(req, res) {
         const total = countRows[0] ? countRows[0].total : 0;
         if (total >= limit) {
           await conn.rollback();
-          return res.status(403).json({
-            error: isPro
-              ? `You have reached the limit of ${limit} journals on the Premium Plan.`
-              : `You have reached the limit of ${limit} journals on the Standard Plan. Join Pro Club for up to 10 journals!`,
-            isLimitReached: true,
-            limite: limit,
-          });
+          return res.status(403).json(
+            buildPlanLimitError({
+              resource: 'journals',
+              current: total,
+              limit,
+              isPremium: isPro,
+              proLimitText: 'up to 10 journals',
+            })
+          );
         }
 
         await conn.query(
@@ -345,13 +348,15 @@ async function upsertFolder(req, res) {
         const total = countRows[0] ? countRows[0].total : 0;
         if (total >= limit) {
           await conn.rollback();
-          return res.status(403).json({
-            error: isPro
-              ? `You have reached the limit of ${limit} folders on the Premium Plan.`
-              : `You have reached the limit of ${limit} folders on the Standard Plan. Join Pro Club for up to 10 folders!`,
-            isLimitReached: true,
-            limite: limit,
-          });
+          return res.status(403).json(
+            buildPlanLimitError({
+              resource: 'folders',
+              current: total,
+              limit,
+              isPremium: isPro,
+              proLimitText: 'up to 10 correspondence folders',
+            })
+          );
         }
 
         await conn.query(

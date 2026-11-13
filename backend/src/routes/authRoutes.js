@@ -7,7 +7,8 @@ const {
   loginLimiter,
   verifyCodeLimiter,
   forgotPasswordLimiter,
-  validateRegistrationInput
+  validateRegistrationInput,
+  noStoreHeaders
 } = require('../middlewares/security');
 
 // Email/Password & OTP Authentication
@@ -31,9 +32,9 @@ router.get('/google', authController.googleAuthRedirect);
 router.get('/google/callback', authController.googleAuthCallback);
 
 // RBAC Admin Routes
-router.get('/users', authMiddleware, requireAdmin, authController.listUsers);
-router.patch('/users/:id/role', authMiddleware, requireAdmin, authController.updateUserRole);
-router.delete('/users/:id', authMiddleware, requireAdmin, authController.deleteUser);
-router.get('/logs', authMiddleware, requireAdmin, authController.getAuditLogs);
+router.get('/users', authMiddleware, requireAdmin, noStoreHeaders, authController.listUsers);
+router.patch('/users/:id/role', authMiddleware, requireAdmin, noStoreHeaders, authController.updateUserRole);
+router.delete('/users/:id', authMiddleware, requireAdmin, noStoreHeaders, authController.deleteUser);
+router.get('/logs', authMiddleware, requireAdmin, noStoreHeaders, authController.getAuditLogs);
 
 module.exports = router;

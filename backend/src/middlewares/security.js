@@ -173,12 +173,22 @@ function securityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://image.tmdb.org https://lh3.googleusercontent.com http://localhost:* https://*; connect-src 'self' https://api.themoviedb.org http://localhost:* ws://localhost:*;"
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://image.tmdb.org https://lh3.googleusercontent.com http://localhost:* https://*; connect-src 'self' https://api.themoviedb.org http://localhost:* ws://localhost:*; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
   );
   res.removeHeader('X-Powered-By');
+  next();
+}
+
+function noStoreHeaders(req, res, next) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 }
 
@@ -190,8 +200,14 @@ function csrfProtection(req, res, next) {
     return next();
   }
 
+  // Stripe webhook is authenticated via Stripe-Signature HMAC, not browser cookies
+  if (req.originalUrl && req.originalUrl.startsWith('/api/stripe/webhook')) {
+    return next();
+  }
+
   if (req.cookies && req.cookies.access_token) {
     const origin = req.headers['origin'];
+    const referer = req.headers['referer'];
     const host = req.headers['host'];
 
     if (origin) {
@@ -204,6 +220,18 @@ function csrfProtection(req, res, next) {
       } catch {
         return res.status(403).json({ error: 'Request blocked by security policy (Invalid origin).' });
       }
+    } else if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        if (refererUrl.host !== host) {
+          console.warn(`[CSRF BLOCK] Suspicious referer blocked: ${referer} vs Host ${host}`);
+          return res.status(403).json({ error: 'Request blocked by security policy (CSRF validation).' });
+        }
+      } catch {
+        return res.status(403).json({ error: 'Request blocked by security policy (Invalid referer).' });
+      }
+    } else {
+      return res.status(403).json({ error: 'Request blocked by security policy (Missing origin header).' });
     }
   }
 
@@ -220,5 +248,6 @@ module.exports = {
   sanitizeComment,
   validateRegistrationInput,
   securityHeaders,
+  noStoreHeaders,
   csrfProtection
 };

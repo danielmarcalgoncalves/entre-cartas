@@ -148,11 +148,14 @@ function requireRole(...papeisPermitidos) {
 }
 
 function requireAdmin(req, res, next) {
-  const role = req.usuarioPapel || (req.usuario && (req.usuario.papel || req.usuario.role));
-  if (role !== 'admin') {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  const role = req.usuarioPapel;
+  if (!req.usuarioId || role !== 'admin') {
     sendLog('BLOQUEIO_RBAC_ADMIN_403', req, {
       motivo: 'Unauthorized access attempt to administrative resource',
-      papelAtual: role || 'unknown'
+      usuario_id: req.usuarioId || null,
+      papelAtual: role || 'unauthenticated'
     });
     return res.status(403).json({ error: 'Access restricted to administrators only.' });
   }

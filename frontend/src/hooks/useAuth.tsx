@@ -20,6 +20,7 @@ export interface User {
   email: string;
   papel: string;
   role?: string;
+  adminPanelPath?: string;
   auth_provider?: string;
   foto_url?: string | null;
   bio?: string | null;
@@ -138,10 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Ensure clean slate before hydrating newly signed-in account
       await clearAllPrivateBrowserData();
+      clearSession();
       const res = await api.auth.login(email, senha, rememberMe);
-      if (res.token) {
-        setSession(res.token, rememberMe);
-      }
       if (res.usuario) {
         await syncUserAccountScope(res.usuario);
         setUser(res.usuario);
@@ -156,24 +155,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (nome: string, email: string, senha: string) => {
     const res = await api.auth.register(nome, email, senha);
-    if (res.token && !res.requireVerification) {
+    if (!res.requireVerification && res.usuario) {
       await clearAllPrivateBrowserData();
-      setSession(res.token, true);
-      if (res.usuario) {
-        await syncUserAccountScope(res.usuario);
-        setUser(res.usuario);
-      } else {
-        await refreshUser();
-      }
+      clearSession();
+      await syncUserAccountScope(res.usuario);
+      setUser(res.usuario);
     }
     return res;
   };
 
-  const applyTokenSession = async (token: string, persist = true) => {
+  const applyTokenSession = async (_token: string, _persist = true) => {
     setLoading(true);
     try {
       await clearAllPrivateBrowserData();
-      setSession(token, persist);
+      clearSession();
       await refreshUser();
     } finally {
       setLoading(false);

@@ -298,12 +298,8 @@ export default function AuthCard({
             "Your password has been updated. You may now sign in with your new password."
         );
       } else if (mode === "otp") {
-        const res = await api.auth.verifyEmail(trimmedEmail, codigoOtp.trim());
-        if (res && res.token) {
-          await applyTokenSession(res.token, true);
-        } else {
-          await login(trimmedEmail, senha, true);
-        }
+        await api.auth.verifyEmail(trimmedEmail, codigoOtp.trim());
+        await refreshUser();
         setSuccess("Email confirmed. Opening your desk...");
         if (onSuccess) onSuccess();
         else router.push("/my-desk");

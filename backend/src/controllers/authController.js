@@ -9,6 +9,29 @@ const INTERNAL_AUTH_SECRET = process.env.JWT_SECRET && process.env.JWT_SECRET.tr
   ? crypto.createHmac('sha256', process.env.JWT_SECRET.trim()).update('internal-auth-service').digest('hex')
   : '';
 
+function enrichUserForClient(usuario) {
+  if (!usuario || typeof usuario !== 'object') return usuario;
+  const enriched = {
+    ...usuario,
+    role: usuario.papel || 'usuario',
+  };
+  if (enriched.papel === 'admin' && process.env.ADMIN_PANEL_ROUTE_KEY) {
+    enriched.adminPanelPath = `/control/${process.env.ADMIN_PANEL_ROUTE_KEY.trim()}`;
+  } else {
+    delete enriched.adminPanelPath;
+  }
+  return enriched;
+}
+
+function stripTokenFromAuthPayload(data) {
+  if (!data || typeof data !== 'object') return data;
+  const { token: _omittedToken, ...safeData } = data;
+  if (safeData.usuario) {
+    safeData.usuario = enrichUserForClient(safeData.usuario);
+  }
+  return safeData;
+}
+
 async function requestAuthService(config) {
   try {
     return await axios({
@@ -130,12 +153,9 @@ async function register(req, res) {
 
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, true, req);
-      if (response.data.usuario) {
-        response.data.usuario.role = response.data.usuario.papel || 'usuario';
-      }
     }
 
-    return res.status(response.status).json(response.data);
+    return res.status(response.status).json(stripTokenFromAuthPayload(response.data));
   } catch (error) {
     if (error.response) {
       return res.status(error.response.status).json(error.response.data);
@@ -155,7 +175,6 @@ async function login(req, res) {
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, Boolean(req.body?.rememberMe), req);
       if (response.data.usuario) {
-        response.data.usuario.role = response.data.usuario.papel || 'usuario';
         if (!response.data.usuario.foto_url) {
           try {
             const [rows] = await pool.query('SELECT foto_url, bio FROM usuarios WHERE id = ?', [response.data.usuario.id]);
@@ -171,7 +190,7 @@ async function login(req, res) {
         email: req.body?.email
       });
     }
-    return res.status(response.status).json(response.data);
+    return res.status(response.status).json(stripTokenFromAuthPayload(response.data));
   } catch (error) {
     if (error.response) {
       sendLog('LOGIN_FALHA', req, {
@@ -235,6 +254,9 @@ async function logout(req, res) {
 
 async function me(req, res) {
   try {
+    if (req.usuario) {
+      return res.json({ usuario: enrichUserForClient(req.usuario) });
+    }
     const token = getBearerToken(req);
     const response = await requestAuthService({
       method: 'GET',
@@ -244,17 +266,14 @@ async function me(req, res) {
       }
     });
     if (response.data && response.data.usuario) {
-      response.data.usuario.role = response.data.usuario.papel || 'usuario';
-      response.data.usuario.foto_url = response.data.usuario.foto_url || req.usuario?.foto_url || null;
-      response.data.usuario.bio = response.data.usuario.bio || req.usuario?.bio || null;
+      response.data.usuario.foto_url = response.data.usuario.foto_url || null;
+      response.data.usuario.bio = response.data.usuario.bio || null;
+      response.data.usuario = enrichUserForClient(response.data.usuario);
     }
     return res.status(response.status).json(response.data);
   } catch (error) {
     if (error.response) {
       return res.status(error.response.status).json(error.response.data);
-    }
-    if (req.usuario) {
-      return res.json({ usuario: req.usuario });
     }
     return res.status(500).json({ error: 'Unable to verify session with the authentication service.' });
   }
@@ -450,22 +469,8 @@ async function googleAuthCallback(req, res) {
 }
 
 async function listUsers(req, res) {
-  try {
-    const token = getBearerToken(req);
-    const response = await requestAuthService({
-      method: 'GET',
-      path: '/users',
-      headers: {
-        Authorization: token ? `Bearer ${token}` : req.headers.authorization
-      }
-    });
-    return res.status(response.status).json(response.data);
-  } catch (error) {
-    if (error.response) {
-      return res.status(error.response.status).json(error.response.data);
-    }
-    return res.status(500).json({ error: 'Internal error contacting authentication service.' });
-  }
+  const adminController = require('./adminController');
+  return adminController.listUsers(req, res);
 }
 
 async function updateUserRole(req, res) {
@@ -497,11 +502,8 @@ async function verifyCode(req, res) {
     });
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, true, req);
-      if (response.data.usuario) {
-        response.data.usuario.role = response.data.usuario.papel || 'usuario';
-      }
     }
-    return res.status(response.status).json(response.data);
+    return res.status(response.status).json(stripTokenFromAuthPayload(response.data));
   } catch (error) {
     if (error.response) {
       return res.status(error.response.status).json(error.response.data);
@@ -549,10 +551,11 @@ async function getAuditLogsController(req, res) {
   try {
     const { limit, acao, usuario_id } = req.query;
     const logs = await getAuditLogs({ limit, acao, usuario_id });
+    sendLog('ADMIN_LOGS_VIEWED', req, { usuario_id: req.usuarioId });
     return res.json(logs);
   } catch (error) {
     console.error('[getAuditLogsController Error]:', error.message);
-    return res.status(500).json({ error: error.message || 'Error querying audit logs.' });
+    return res.status(500).json({ error: 'Error querying audit logs.' });
   }
 }
 

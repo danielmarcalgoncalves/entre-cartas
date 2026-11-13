@@ -9,7 +9,9 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'filmes_db',
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '25', 10) || 25,
+  maxIdle: 10,
+  idleTimeout: 60000,
   queueLimit: 0,
   connectTimeout: 5000,
   enableKeepAlive: true,
@@ -95,6 +97,17 @@ async function initDb(retries = 15, delay = 2000) {
 
     try {
       await connection.query(`ALTER TABLE usuarios ADD COLUMN token_version INT NOT NULL DEFAULT 1;`);
+    } catch (e) {}
+
+    // Índices escaláveis para métricas administrativas e deduplicação de webhooks
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD INDEX idx_usuarios_papel (papel);`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE stripe_subscriptions ADD INDEX idx_stripe_status (status);`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE stripe_webhook_events DROP INDEX idx_event_id;`);
     } catch (e) {}
 
     // 3. Códigos de verificação OTP
