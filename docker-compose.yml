@@ -15,7 +15,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-root_password}
       - DB_NAME=${DB_NAME:-filmes_db}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be configured}
-      - ADMIN_PANEL_ROUTE_KEY=${ADMIN_PANEL_ROUTE_KEY:?ADMIN_PANEL_ROUTE_KEY must be configured}
+      - ADMIN_PANEL_ROUTE_KEY=${ADMIN_PANEL_ROUTE_KEY:-}
       - AUTH_SERVICE_URL=http://auth-service:3000
       - LOG_SERVICE_URL=http://log-service:3000
       # Google OAuth 2.0
