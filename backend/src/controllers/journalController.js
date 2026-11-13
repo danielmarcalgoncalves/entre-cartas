@@ -9,6 +9,98 @@
 
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const {
+  uploadJournalMedia,
+  getJournalMediaStream,
+  deleteJournalMedia,
+} = require('../services/minioClient');
+
+const MAX_CONCURRENT_JOURNAL_UPLOADS = 4;
+let activeJournalUploads = 0;
+
+function hasValidImageMagicBytes(buffer, mimetype) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return false;
+  if (mimetype === 'image/jpeg') {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimetype === 'image/png') {
+    return (
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47 &&
+      buffer[4] === 0x0d &&
+      buffer[5] === 0x0a &&
+      buffer[6] === 0x1a &&
+      buffer[7] === 0x0a
+    );
+  }
+  if (mimetype === 'image/webp') {
+    return (
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    );
+  }
+  return false;
+}
+
+function extractAttachmentObjectKeys(paginas, usuarioId) {
+  const keys = new Set();
+  const prefix = `journal/${Number(usuarioId)}/`;
+  if (!Array.isArray(paginas)) return keys;
+  for (const page of paginas) {
+    if (!page || !Array.isArray(page.attachments)) continue;
+    for (const att of page.attachments) {
+      if (att && typeof att.objectKey === 'string' && att.objectKey.startsWith(prefix)) {
+        keys.add(att.objectKey);
+      }
+    }
+  }
+  return keys;
+}
+
+function containsDisallowedBase64Media(paginas) {
+  if (!Array.isArray(paginas)) return false;
+  for (const page of paginas) {
+    if (!page || !Array.isArray(page.attachments)) continue;
+    for (const att of page.attachments) {
+      if (!att) continue;
+      if (typeof att.url === 'string' && att.url.trim().toLowerCase().startsWith('data:')) {
+        return true;
+      }
+      if (typeof att.objectKey === 'string' && att.objectKey.trim().toLowerCase().startsWith('data:')) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+async function cleanupUnusedJournalMedia(usuarioId, candidateKeys) {
+  if (!candidateKeys || candidateKeys.size === 0) return;
+  try {
+    const [rows] = await pool.query(
+      'SELECT paginas_json FROM cadernos WHERE usuario_id = ?',
+      [usuarioId]
+    );
+    const stillReferenced = new Set();
+    for (const row of rows) {
+      try {
+        const parsed = JSON.parse(row.paginas_json || '[]');
+        for (const k of extractAttachmentObjectKeys(parsed, usuarioId)) {
+          stillReferenced.add(k);
+        }
+      } catch {}
+    }
+    for (const key of candidateKeys) {
+      if (!stillReferenced.has(key)) {
+        await deleteJournalMedia(key);
+      }
+    }
+  } catch (err) {
+    console.warn('[journalController] Media cleanup deferred:', err.message);
+  }
+}
 
 // =========================================================================
 // 1. LIST USER NOTEBOOKS (GET /api/journal/notebooks)
@@ -68,7 +160,11 @@ async function upsertNotebook(req, res) {
     }
 
     const safePages = Array.isArray(paginas) ? paginas : [];
+    if (containsDisallowedBase64Media(safePages)) {
+      return res.status(400).json({ error: 'Embedded Base64 image data is not permitted in journal pages.' });
+    }
     const pagesJson = JSON.stringify(safePages);
+    let removedKeys = new Set();
 
     const conn = await pool.getConnection();
     try {
@@ -77,7 +173,7 @@ async function upsertNotebook(req, res) {
       const papelEfetivo = (userRows[0] && userRows[0].papel) || papelUsuario;
 
       const [existing] = await conn.query(
-        'SELECT id FROM cadernos WHERE usuario_id = ? AND client_id = ? FOR UPDATE',
+        'SELECT id, paginas_json FROM cadernos WHERE usuario_id = ? AND client_id = ? FOR UPDATE',
         [usuarioId, clientId]
       );
 
@@ -106,6 +202,16 @@ async function upsertNotebook(req, res) {
           [clientId, usuarioId, String(nome).trim().slice(0, 120), String(corCapa).slice(0, 30), pagesJson]
         );
       } else {
+        let prevPages = [];
+        try {
+          prevPages = JSON.parse(existing[0].paginas_json || '[]');
+        } catch {}
+        const prevKeys = extractAttachmentObjectKeys(prevPages, usuarioId);
+        const nextKeys = extractAttachmentObjectKeys(safePages, usuarioId);
+        for (const k of prevKeys) {
+          if (!nextKeys.has(k)) removedKeys.add(k);
+        }
+
         await conn.query(
           `UPDATE cadernos
            SET nome = ?, cor_capa = ?, paginas_json = ?
@@ -115,6 +221,9 @@ async function upsertNotebook(req, res) {
       }
 
       await conn.commit();
+      if (removedKeys.size > 0) {
+        await cleanupUnusedJournalMedia(usuarioId, removedKeys);
+      }
       return res.json({ message: 'Journal saved.', id: clientId });
     } catch (txErr) {
       await conn.rollback();
@@ -136,6 +245,11 @@ async function deleteNotebook(req, res) {
     const usuarioId = req.usuarioId;
     const clientId = String(req.params.clientId || '').trim();
 
+    const [rows] = await pool.query(
+      'SELECT paginas_json FROM cadernos WHERE usuario_id = ? AND client_id = ? LIMIT 1',
+      [usuarioId, clientId]
+    );
+
     const [result] = await pool.query(
       'DELETE FROM cadernos WHERE usuario_id = ? AND client_id = ?',
       [usuarioId, clientId]
@@ -143,6 +257,16 @@ async function deleteNotebook(req, res) {
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Journal not found for this account.' });
+    }
+
+    if (rows[0]?.paginas_json) {
+      try {
+        const parsed = JSON.parse(rows[0].paginas_json || '[]');
+        const candidateKeys = extractAttachmentObjectKeys(parsed, usuarioId);
+        if (candidateKeys.size > 0) {
+          await cleanupUnusedJournalMedia(usuarioId, candidateKeys);
+        }
+      } catch {}
     }
 
     sendLog('CADERNO_EXCLUIDO', req, { usuario_id: usuarioId, client_id: clientId });
@@ -283,10 +407,116 @@ async function deleteFolder(req, res) {
   }
 }
 
+// =========================================================================
+// 7. UPLOAD JOURNAL PHOTOGRAPH (POST /api/journal/notebooks/:clientId/media)
+// =========================================================================
+async function uploadJournalPhoto(req, res) {
+  if (activeJournalUploads >= MAX_CONCURRENT_JOURNAL_UPLOADS) {
+    return res.status(503).json({ error: 'Too many concurrent image uploads. Please try again in a moment.' });
+  }
+  activeJournalUploads += 1;
+  try {
+    const usuarioId = req.usuarioId;
+    const clientId = String(req.params.clientId || '').trim().slice(0, 120);
+    if (!clientId) {
+      return res.status(400).json({ error: 'Journal identifier is required.' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded. Please select an image using the "photo" field.' });
+    }
+
+    const { buffer, mimetype, size } = req.file;
+    if (size > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image file too large. Maximum size allowed is 5 MB.' });
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(mimetype) || !hasValidImageMagicBytes(buffer, mimetype)) {
+      return res.status(400).json({ error: 'Invalid image format. Please upload JPEG, PNG, or WebP.' });
+    }
+
+    // Verify ownership if notebook exists in DB (or ensure clientId isn't owned by another account)
+    const [nbRows] = await pool.query(
+      'SELECT usuario_id FROM cadernos WHERE client_id = ? AND usuario_id = ? LIMIT 1',
+      [clientId, usuarioId]
+    );
+    // Note: uk_usuario_caderno is (usuario_id, client_id); if not yet saved in DB, upload is strictly scoped under journal/<usuarioId>/<clientId>/
+
+    const { objectKey, url } = await uploadJournalMedia(buffer, mimetype, usuarioId, clientId);
+
+    sendLog('JOURNAL_MEDIA_UPLOADED', req, {
+      usuario_id: usuarioId,
+      notebook_id: clientId,
+      objectKey,
+      size,
+      mimetype
+    });
+
+    return res.status(201).json({
+      objectKey,
+      url,
+      mimeType: mimetype,
+      size
+    });
+  } catch (err) {
+    console.error('[journalController] uploadJournalPhoto error:', err.message);
+    return res.status(500).json({ error: 'Failed to upload journal photograph.' });
+  } finally {
+    activeJournalUploads = Math.max(0, activeJournalUploads - 1);
+  }
+}
+
+// =========================================================================
+// 8. STREAM PRIVATE JOURNAL PHOTOGRAPH (GET /api/journal/media/:usuarioId/:notebookId/:filename)
+// =========================================================================
+async function getJournalMedia(req, res) {
+  try {
+    const reqUserId = Number(req.usuarioId);
+    const paramUserId = Number(req.params.usuarioId);
+    const notebookId = String(req.params.notebookId || '');
+    const filename = String(req.params.filename || '');
+
+    if (!reqUserId || reqUserId !== paramUserId) {
+      return res.status(403).json({ error: 'You do not have permission to access this journal photograph.' });
+    }
+
+    if (
+      !notebookId || !filename ||
+      notebookId.includes('..') || notebookId.includes('/') || notebookId.includes('\\') ||
+      filename.includes('..') || filename.includes('/') || filename.includes('\\')
+    ) {
+      return res.status(400).json({ error: 'Invalid media path.' });
+    }
+
+    const objectKey = `journal/${paramUserId}/${notebookId}/${filename}`;
+    const stream = await getJournalMediaStream(objectKey);
+
+    if (filename.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (filename.endsWith('.webp')) {
+      res.setHeader('Content-Type', 'image/webp');
+    } else {
+      res.setHeader('Content-Type', 'image/jpeg');
+    }
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    stream.on('error', () => {
+      if (!res.headersSent) res.status(404).json({ error: 'Journal photograph not found.' });
+    });
+    stream.pipe(res);
+  } catch (err) {
+    return res.status(404).json({ error: 'Journal photograph not found.' });
+  }
+}
+
 module.exports = {
   listNotebooks,
   upsertNotebook,
   deleteNotebook,
+  uploadJournalPhoto,
+  getJournalMedia,
   listFolders,
   upsertFolder,
   deleteFolder,

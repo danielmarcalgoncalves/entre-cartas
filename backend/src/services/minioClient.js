@@ -12,11 +12,13 @@
 
 const Minio = require('minio');
 
+const crypto    = require('crypto');
 const ENDPOINT    = process.env.MINIO_ENDPOINT     || 'minio';
 const PORT        = parseInt(process.env.MINIO_PORT || '9000', 10);
 const ACCESS_KEY  = process.env.MINIO_ROOT_USER    || 'minioadmin';
 const SECRET_KEY  = process.env.MINIO_ROOT_PASSWORD || 'minioadmin123';
 const BUCKET      = process.env.MINIO_BUCKET       || 'perfil-fotos';
+const JOURNAL_BUCKET = process.env.MINIO_JOURNAL_BUCKET || 'journal-media';
 const PUBLIC_URL  = process.env.MINIO_PUBLIC_URL   || 'http://localhost:9000';
 
 const minioClient = new Minio.Client({
@@ -81,4 +83,63 @@ async function deleteFile(objectName) {
   }
 }
 
-module.exports = { minioClient, ensureBucket, uploadFile, getFileStream, deleteFile, BUCKET, PUBLIC_URL };
+async function ensureJournalBucket() {
+  try {
+    const exists = await minioClient.bucketExists(JOURNAL_BUCKET);
+    if (!exists) {
+      await minioClient.makeBucket(JOURNAL_BUCKET, 'us-east-1');
+      console.log('[MinIO] Private journal bucket "' + JOURNAL_BUCKET + '" created.');
+    }
+  } catch (err) {
+    console.error('[MinIO] Error verifying/creating journal bucket:', err.message);
+  }
+}
+
+function getSafeExtForMime(mimetype) {
+  if (mimetype === 'image/jpeg') return 'jpg';
+  if (mimetype === 'image/png') return 'png';
+  if (mimetype === 'image/webp') return 'webp';
+  return 'bin';
+}
+
+async function uploadJournalMedia(buffer, mimetype, usuarioId, notebookClientId) {
+  const safeNb = String(notebookClientId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  const ext = getSafeExtForMime(mimetype);
+  const uniqueId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  const fileName = `${Date.now()}-${uniqueId}.${ext}`;
+  const objectKey = `journal/${Number(usuarioId)}/${safeNb}/${fileName}`;
+  await minioClient.putObject(JOURNAL_BUCKET, objectKey, buffer, buffer.length, {
+    'Content-Type': mimetype
+  });
+  return {
+    objectKey,
+    url: `/api/journal/media/${Number(usuarioId)}/${safeNb}/${fileName}`
+  };
+}
+
+async function getJournalMediaStream(objectKey) {
+  return await minioClient.getObject(JOURNAL_BUCKET, objectKey);
+}
+
+async function deleteJournalMedia(objectKey) {
+  try {
+    await minioClient.removeObject(JOURNAL_BUCKET, objectKey);
+  } catch (err) {
+    console.warn('[MinIO] Failed to remove journal media object:', objectKey, err.message);
+  }
+}
+
+module.exports = {
+  minioClient,
+  ensureBucket,
+  ensureJournalBucket,
+  uploadFile,
+  getFileStream,
+  deleteFile,
+  uploadJournalMedia,
+  getJournalMediaStream,
+  deleteJournalMedia,
+  BUCKET,
+  JOURNAL_BUCKET,
+  PUBLIC_URL
+};

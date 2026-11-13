@@ -165,6 +165,36 @@ export const api = {
       apiRequest(`/journal/notebooks/${encodeURIComponent(clientId)}`, {
         method: 'DELETE',
       }),
+    uploadMedia: async (
+      clientId: string,
+      file: File
+    ): Promise<{ objectKey: string; url: string; mimeType: string; size: number }> => {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(
+        `${API_BASE}/journal/notebooks/${encodeURIComponent(clientId)}/media`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: formData,
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) {
+          clearSession();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('entre-cartas:unauthorized'));
+          }
+        }
+        throw new Error(data.error || `Upload failed (${res.status})`);
+      }
+      return data;
+    },
     listFolders: () => apiRequest('/journal/folders'),
     upsertFolder: (clientId: string, dados: { nome: string; cor?: string }) =>
       apiRequest(`/journal/folders/${encodeURIComponent(clientId)}`, {

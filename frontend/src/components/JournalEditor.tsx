@@ -12,6 +12,18 @@ import { api } from "@/services/api";
 import GuestSavePromptModal, { type GuestPromptVariant } from "@/components/GuestSavePromptModal";
 import { registerJournalNavigationGuard } from "@/lib/journal-navigation-guard";
 import {
+  type JournalAttachment,
+  type JournalSticker,
+} from "@/lib/journal-storage";
+import {
+  ScrapbookLayer,
+  type SelectedScrapbookItem,
+} from "@/components/journal/ScrapbookLayer";
+import { ScrapbookInspectorPanel } from "@/components/journal/ScrapbookInspectorPanel";
+import { StickerCatalogDrawer } from "@/components/journal/StickerCatalogDrawer";
+import { PhotoUploadModal } from "@/components/journal/PhotoUploadModal";
+import { type StickerDefinition } from "@/lib/scrapbook-stickers";
+import {
   JOURNAL_MAX_CHARS_PER_PAGE,
   JOURNAL_MAX_LINES_PER_PAGE,
   JOURNAL_PAGE_HEIGHT,
@@ -159,6 +171,27 @@ function getPageQualifyingContentSignature(page: NotebookPage): string {
     titulo: (page.titulo || "").trim(),
     conteudo: normalizeJournalContentForStorage(page.conteudo || ""),
     polaroid: (page as any).polaroid_url || "",
+    attachments: (page.attachments || []).map((a) => ({
+      id: a.id,
+      objectKey: a.objectKey,
+      x: a.x,
+      y: a.y,
+      width: a.width,
+      height: a.height,
+      rotation: a.rotation,
+      zIndex: a.zIndex,
+      style: a.style,
+      caption: a.caption || "",
+    })),
+    stickers: (page.stickers || []).map((s) => ({
+      id: s.id,
+      stickerId: s.stickerId,
+      x: s.x,
+      y: s.y,
+      scale: s.scale,
+      rotation: s.rotation,
+      zIndex: s.zIndex,
+    })),
   });
 }
 
@@ -172,6 +205,8 @@ function getPageFullPersistenceSignature(page: NotebookPage): string {
     fonte: page.fonte || "",
     polaroid: (page as any).polaroid_url || "",
     polaroidLegenda: (page as any).polaroid_legenda || "",
+    attachments: page.attachments || [],
+    stickers: page.stickers || [],
   });
 }
 
@@ -207,6 +242,22 @@ export default function JournalEditor() {
   const [guestPromptVariant, setGuestPromptVariant] = useState<GuestPromptVariant>("save");
   const [sheetScale, setSheetScale] = useState(1);
 
+  // Scrapbook studio state
+  const [stickerDrawerOpen, setStickerDrawerOpen] = useState(false);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [guestPhotoNoticeOpen, setGuestPhotoNoticeOpen] = useState(false);
+  const [selectedScrapbookItem, setSelectedScrapbookItem] = useState<SelectedScrapbookItem>(null);
+  const [scrapbookUndoStack, setScrapbookUndoStack] = useState<
+    Array<{ attachments: JournalAttachment[]; stickers: JournalSticker[] }>
+  >([]);
+  const [scrapbookRedoStack, setScrapbookRedoStack] = useState<
+    Array<{ attachments: JournalAttachment[]; stickers: JournalSticker[] }>
+  >([]);
+  const lastCommittedScrapbookRef = useRef<{
+    attachments: JournalAttachment[];
+    stickers: JournalSticker[];
+  } | null>(null);
+
   const openGuestPrompt = (variant: GuestPromptVariant) => {
     setGuestPromptVariant(variant);
     setGuestPromptOpen(true);
@@ -226,7 +277,7 @@ export default function JournalEditor() {
 
     updateSheetScale();
     window.addEventListener("resize", updateSheetScale);
-    return () => window.removeEventListener("resize", updateSheetScale);
+  return () => window.removeEventListener("resize", updateSheetScale);
   }, []);
 
   // Focus Mode
@@ -356,7 +407,7 @@ export default function JournalEditor() {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Exit Focus Mode on Escape
@@ -367,7 +418,7 @@ export default function JournalEditor() {
       }
     }
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
   }, [modoFoco]);
 
   // Initialize notebooks from in-memory guest store (for guests) or LocalStorage (for authenticated users)
@@ -516,7 +567,7 @@ export default function JournalEditor() {
       setCadernoFavoritado(false);
     };
     window.addEventListener(SESSION_CLEARED_EVENT, resetEditorMemory);
-    return () => {
+  return () => {
       window.removeEventListener(SESSION_CLEARED_EVENT, resetEditorMemory);
     };
   }, []);
@@ -527,7 +578,7 @@ export default function JournalEditor() {
     if (isGuestMode) return;
     window.addEventListener(JOURNAL_UPDATED_EVENT, carregarCadernos);
     window.addEventListener("storage", carregarCadernos);
-    return () => {
+  return () => {
       window.removeEventListener(JOURNAL_UPDATED_EVENT, carregarCadernos);
       window.removeEventListener("storage", carregarCadernos);
     };
@@ -607,7 +658,7 @@ export default function JournalEditor() {
     const s = latestStateRef.current;
     if (s.isGuestMode || !s.user?.id) return false;
     if (!s.activeNotebook) {
-      return (
+  return (
         hasMeaningfulJournalText(s.cadernoConteudo) ||
         hasMeaningfulJournalText(s.cadernoTitulo)
       );
@@ -919,7 +970,7 @@ export default function JournalEditor() {
 
     document.addEventListener("click", handleDocumentLinkClick, true);
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
+  return () => {
       unregister();
       document.removeEventListener("click", handleDocumentLinkClick, true);
       window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -992,7 +1043,7 @@ export default function JournalEditor() {
     };
 
     window.addEventListener("entre-cartas:abrir-edicao-caderno", handleEditRequest);
-    return () => {
+  return () => {
       window.removeEventListener("entre-cartas:abrir-edicao-caderno", handleEditRequest);
     };
   }, [notebooks, hasPendingSaveWork, flushBackendSave, openNavFailureModal]);
@@ -1040,14 +1091,17 @@ export default function JournalEditor() {
     setEditRevision((r) => r + 1);
   };
 
-  // Pagination rule: allow advancing up to 3 blank pages beyond the last written page
+  // Pagination rule: allow advancing up to 3 blank pages beyond the last written/decorated page
   const ultimoIndiceEscrito = (() => {
     let ultimo = -1;
     cadernoPaginas.forEach((pag, idx) => {
       const isCurrent = idx === currentPageIndex;
       const texto = isCurrent ? cadernoConteudo : pag.conteudo || "";
       const titulo = isCurrent ? cadernoTitulo : pag.titulo || "";
-      if (hasMeaningfulJournalText(texto) || hasMeaningfulJournalText(titulo)) {
+      const hasMedia =
+        (pag.attachments && pag.attachments.length > 0) ||
+        (pag.stickers && pag.stickers.length > 0);
+      if (hasMeaningfulJournalText(texto) || hasMeaningfulJournalText(titulo) || hasMedia) {
         if (idx > ultimo) ultimo = idx;
       }
     });
@@ -1060,8 +1114,266 @@ export default function JournalEditor() {
   const maxAllowedIndex = (ultimoIndiceEscrito >= 0 ? ultimoIndiceEscrito : 0) + 3;
   const podeAvancarPagina = currentPageIndex < maxAllowedIndex;
 
+  const resetScrapbookSelectionAndHistory = () => {
+    setSelectedScrapbookItem(null);
+    setScrapbookUndoStack([]);
+    setScrapbookRedoStack([]);
+    lastCommittedScrapbookRef.current = null;
+  };
+
+  const currentPageObj = cadernoPaginas[currentPageIndex];
+  const currentPageAttachments = currentPageObj?.attachments ?? [];
+  const currentPageStickers = currentPageObj?.stickers ?? [];
+
+  const getNextScrapbookZIndex = (
+    attachmentsList: JournalAttachment[] = currentPageAttachments,
+    stickersList: JournalSticker[] = currentPageStickers
+  ) => {
+    const maxAttachmentZ = attachmentsList.reduce((max, item) => Math.max(max, item.zIndex || 1), 0);
+    const maxStickerZ = stickersList.reduce((max, item) => Math.max(max, item.zIndex || 1), 0);
+    return Math.max(1, maxAttachmentZ, maxStickerZ) + 1;
+  };
+
+  const applyCurrentPageScrapbook = (
+    nextAttachments: JournalAttachment[],
+    nextStickers: JournalSticker[],
+    options?: { commit?: boolean; recordUndo?: boolean }
+  ) => {
+    const commit = options?.commit !== false;
+    const recordUndo = options?.recordUndo !== false;
+    const cur = latestStateRef.current;
+    const nextPages = [...cur.cadernoPaginas];
+    const existing = nextPages[cur.currentPageIndex] || createBlankPage();
+
+    if (commit && recordUndo) {
+      const baseline = lastCommittedScrapbookRef.current ?? {
+        attachments: existing.attachments ?? [],
+        stickers: existing.stickers ?? [],
+      };
+      setScrapbookUndoStack((prev) => [...prev.slice(-24), baseline]);
+      setScrapbookRedoStack([]);
+      lastCommittedScrapbookRef.current = null;
+    } else if (!commit && !lastCommittedScrapbookRef.current) {
+      lastCommittedScrapbookRef.current = {
+        attachments: existing.attachments ?? [],
+        stickers: existing.stickers ?? [],
+      };
+    }
+
+    nextPages[cur.currentPageIndex] = {
+      ...existing,
+      titulo: cur.cadernoTitulo,
+      conteudo: cur.cadernoConteudo,
+      favoritado: cur.cadernoFavoritado,
+      atualizadoEm: new Date().toISOString(),
+      tipoPapel: cur.sheetBgId,
+      corTinta: cur.inkColorId,
+      fonte: cur.fontFamilyId,
+      attachments: nextAttachments,
+      stickers: nextStickers,
+    };
+
+    latestStateRef.current.cadernoPaginas = nextPages;
+    setCadernoPaginas(nextPages);
+
+    if (commit) {
+      if (cur.activeNotebook) {
+        syncLocalNotebooksStorage(cur.activeNotebook.id, nextPages, true);
+      }
+      editRevisionRef.current += 1;
+      setEditRevision((r) => r + 1);
+    }
+  };
+
+  const handleChangePageAttachments = (nextAttachments: JournalAttachment[], commit = true) => {
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    applyCurrentPageScrapbook(nextAttachments, curPage?.stickers ?? [], { commit });
+  };
+
+  const handleChangePageStickers = (nextStickers: JournalSticker[], commit = true) => {
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    applyCurrentPageScrapbook(curPage?.attachments ?? [], nextStickers, { commit });
+  };
+
+  const handleInsertSticker = (def: StickerDefinition) => {
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    const existingAttachments = curPage?.attachments ?? [];
+    const existingStickers = curPage?.stickers ?? [];
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? `stk_${crypto.randomUUID()}`
+        : `stk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const offset = (existingStickers.length % 5) * 18;
+    const newSticker: JournalSticker = {
+      id,
+      stickerId: def.id,
+      x: 210 + offset,
+      y: 190 + offset,
+      scale: 1,
+      rotation: (existingStickers.length % 3 - 1) * 4,
+      zIndex: getNextScrapbookZIndex(existingAttachments, existingStickers),
+    };
+    applyCurrentPageScrapbook(existingAttachments, [...existingStickers, newSticker], {
+      commit: true,
+    });
+    setSelectedScrapbookItem({ kind: "sticker", id });
+    setStickerDrawerOpen(false);
+    playPaperSound();
+  };
+
+  const handleInsertAttachment = (attachment: JournalAttachment) => {
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    const existingAttachments = curPage?.attachments ?? [];
+    const existingStickers = curPage?.stickers ?? [];
+    const offset = (existingAttachments.length % 4) * 20;
+    const placed: JournalAttachment = {
+      ...attachment,
+      x: Math.min(340, 120 + offset),
+      y: Math.min(520, 140 + offset),
+      zIndex: getNextScrapbookZIndex(existingAttachments, existingStickers),
+    };
+    applyCurrentPageScrapbook([...existingAttachments, placed], existingStickers, {
+      commit: true,
+    });
+    setSelectedScrapbookItem({ kind: "attachment", id: placed.id });
+    setPhotoModalOpen(false);
+    playPaperSound();
+  };
+
+  const handleUndoScrapbook = () => {
+    if (scrapbookUndoStack.length === 0) return;
+    const previous = scrapbookUndoStack[scrapbookUndoStack.length - 1];
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    setScrapbookRedoStack((prev) => [
+      ...prev.slice(-24),
+      {
+        attachments: curPage?.attachments ?? [],
+        stickers: curPage?.stickers ?? [],
+      },
+    ]);
+    setScrapbookUndoStack((prev) => prev.slice(0, -1));
+    applyCurrentPageScrapbook(previous.attachments, previous.stickers, {
+      commit: true,
+      recordUndo: false,
+    });
+    setSelectedScrapbookItem(null);
+  };
+
+  const handleRedoScrapbook = () => {
+    if (scrapbookRedoStack.length === 0) return;
+    const next = scrapbookRedoStack[scrapbookRedoStack.length - 1];
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    setScrapbookUndoStack((prev) => [
+      ...prev.slice(-24),
+      {
+        attachments: curPage?.attachments ?? [],
+        stickers: curPage?.stickers ?? [],
+      },
+    ]);
+    setScrapbookRedoStack((prev) => prev.slice(0, -1));
+    applyCurrentPageScrapbook(next.attachments, next.stickers, {
+      commit: true,
+      recordUndo: false,
+    });
+    setSelectedScrapbookItem(null);
+  };
+
+  const handleShiftSelectedZIndex = (direction: "forward" | "backward") => {
+    if (!selectedScrapbookItem) return;
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    const attachmentsList = curPage?.attachments ?? [];
+    const stickersList = curPage?.stickers ?? [];
+    const allZ = [...attachmentsList.map((a) => a.zIndex), ...stickersList.map((s) => s.zIndex)];
+    const maxZ = allZ.length > 0 ? Math.max(...allZ) : 1;
+    const minZ = allZ.length > 0 ? Math.min(...allZ) : 1;
+
+    if (selectedScrapbookItem.kind === "attachment") {
+      const next = attachmentsList.map((item) =>
+        item.id === selectedScrapbookItem.id
+          ? { ...item, zIndex: direction === "forward" ? maxZ + 1 : Math.max(1, minZ - 1) }
+          : item
+      );
+      applyCurrentPageScrapbook(next, stickersList, { commit: true });
+    } else {
+      const next = stickersList.map((item) =>
+        item.id === selectedScrapbookItem.id
+          ? { ...item, zIndex: direction === "forward" ? maxZ + 1 : Math.max(1, minZ - 1) }
+          : item
+      );
+      applyCurrentPageScrapbook(attachmentsList, next, { commit: true });
+    }
+  };
+
+  const handleUpdateSelectedAttachment = (
+    patch: Partial<
+      Pick<JournalAttachment, "style" | "caption" | "width" | "height" | "rotation">
+    >
+  ) => {
+    if (!selectedScrapbookItem || selectedScrapbookItem.kind !== "attachment") return;
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    const attachmentsList = curPage?.attachments ?? [];
+    const stickersList = curPage?.stickers ?? [];
+    const next = attachmentsList.map((item) =>
+      item.id === selectedScrapbookItem.id ? { ...item, ...patch } : item
+    );
+    applyCurrentPageScrapbook(next, stickersList, { commit: true });
+  };
+
+  const handleUpdateSelectedSticker = (
+    patch: Partial<Pick<JournalSticker, "scale" | "rotation">>
+  ) => {
+    if (!selectedScrapbookItem || selectedScrapbookItem.kind !== "sticker") return;
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    const attachmentsList = curPage?.attachments ?? [];
+    const stickersList = curPage?.stickers ?? [];
+    const next = stickersList.map((item) =>
+      item.id === selectedScrapbookItem.id ? { ...item, ...patch } : item
+    );
+    applyCurrentPageScrapbook(attachmentsList, next, { commit: true });
+  };
+
+  const handleDeleteSelectedScrapbookItem = () => {
+    if (!selectedScrapbookItem) return;
+    const curPage = latestStateRef.current.cadernoPaginas[latestStateRef.current.currentPageIndex];
+    const attachmentsList = curPage?.attachments ?? [];
+    const stickersList = curPage?.stickers ?? [];
+    if (selectedScrapbookItem.kind === "attachment") {
+      applyCurrentPageScrapbook(
+        attachmentsList.filter((item) => item.id !== selectedScrapbookItem.id),
+        stickersList,
+        { commit: true }
+      );
+    } else {
+      applyCurrentPageScrapbook(
+        attachmentsList,
+        stickersList.filter((item) => item.id !== selectedScrapbookItem.id),
+        { commit: true }
+      );
+    }
+    setSelectedScrapbookItem(null);
+  };
+
+  const selectedAttachmentObj =
+    selectedScrapbookItem?.kind === "attachment"
+      ? currentPageAttachments.find((a) => a.id === selectedScrapbookItem.id) ?? null
+      : null;
+  const selectedStickerObj =
+    selectedScrapbookItem?.kind === "sticker"
+      ? currentPageStickers.find((s) => s.id === selectedScrapbookItem.id) ?? null
+      : null;
+
+  const handleOpenPhotoUpload = () => {
+    if (isGuestMode) {
+      setGuestPhotoNoticeOpen(true);
+      return;
+    }
+    setStickerDrawerOpen(false);
+    setPhotoModalOpen(true);
+  };
+
   const navegarAnterior = () => {
     if (currentPageIndex <= 0) return;
+    resetScrapbookSelectionAndHistory();
 
     const paginasAtuais = [...cadernoPaginas];
     if (paginasAtuais[currentPageIndex]) {
@@ -1097,6 +1409,7 @@ export default function JournalEditor() {
 
   const navegarProximo = () => {
     if (!podeAvancarPagina) return;
+    resetScrapbookSelectionAndHistory();
 
     const paginasAtuais = [...cadernoPaginas];
     if (paginasAtuais[currentPageIndex]) {
@@ -1295,6 +1608,51 @@ export default function JournalEditor() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // TAB indentation inside the active journal editor (4 spaces, preserves selections)
+    if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const INDENT = "    ";
+      const start = textarea.selectionStart ?? cadernoConteudo.length;
+      const end = textarea.selectionEnd ?? cadernoConteudo.length;
+      const normalized = normalizeJournalLineEndings(cadernoConteudo);
+
+      let nextText: string;
+      let nextSelectionStart: number;
+      let nextSelectionEnd: number;
+
+      if (start === end) {
+        nextText = normalized.slice(0, start) + INDENT + normalized.slice(end);
+        nextSelectionStart = start + INDENT.length;
+        nextSelectionEnd = nextSelectionStart;
+      } else {
+        const lineStart = normalized.lastIndexOf("\n", start - 1) + 1;
+        const selectedBlock = normalized.slice(lineStart, end);
+        const linesInBlock = selectedBlock.split("\n");
+        const indentedBlock = linesInBlock.map((line) => INDENT + line).join("\n");
+        nextText = normalized.slice(0, lineStart) + indentedBlock + normalized.slice(end);
+        nextSelectionStart = start + INDENT.length;
+        nextSelectionEnd = end + INDENT.length * linesInBlock.length;
+      }
+
+      const overflow = splitJournalPageOverflow(nextText);
+      if (overflow.exceeded) {
+        return;
+      }
+
+      setCadernoConteudo(nextText);
+      atualizarRascunhoCaderno(nextText);
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(nextSelectionStart, nextSelectionEnd);
+        }
+      });
+      return;
+    }
+
     const isDeleteKey = e.key === "Backspace" || e.key === "Delete";
     const isNavKey = [
       "ArrowLeft",
@@ -2012,146 +2370,103 @@ export default function JournalEditor() {
       )}
 
       <div className="writing-desk-container">
-        {/* Left Column: Active Leather Journal Volume & Save Action */}
+        {/* Left Column: Creative Tools & Element Studio */}
         <div className="desk-left-col">
-          <div className="caderno-left-stack">
-            {activeNotebook ? (
-              (() => {
-                const theme = getNotebookTheme(activeNotebook.corCapa);
-                const dates = getNotebookDates(activeNotebook);
-                return (
-                  <div
-                    className={`leather-notebook-card leather-notebook-color--${theme.id}`}
-                    style={{
-                      background: theme.cardGradient,
-                      borderLeftColor: theme.shelfSpine2,
-                    }}
-                    onClick={() => {
-                      if (isGuestMode) {
-                        playPaperSound();
-                        openGuestPrompt("notebook-open");
-                        return;
-                      }
-                      setCadernoPromptNotice(null);
-                      setNotebookDrawerOpen(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        if (isGuestMode) {
-                          playPaperSound();
-                          openGuestPrompt("notebook-open");
-                          return;
-                        }
-                        setCadernoPromptNotice(null);
-                        setNotebookDrawerOpen(true);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    title={
-                      isGuestMode
-                        ? "Sign in or create an account to open saved journals"
-                        : "Click to switch, rename, or create a journal"
-                    }
-                  >
-                    <div
-                      className="leather-notebook-ribbon"
-                      aria-hidden="true"
-                      style={{ backgroundColor: theme.ribbonColor }}
-                    />
-                    <span className="leather-notebook-tag">ACTIVE JOURNAL</span>
-                    <span className="leather-notebook-title">
-                      {activeNotebook.nome}
-                    </span>
-                    <span className="leather-notebook-author">
-                      {dates.updated}
-                    </span>
-                  </div>
-                );
-              })()
-            ) : (
-              <div
-                className="leather-notebook-card is-empty-state"
-                onClick={() => {
-                  if (isGuestMode) {
-                    playPaperSound();
-                    openGuestPrompt("notebook-manage");
-                    return;
-                  }
-                  setCadernoPromptNotice(null);
-                  setNotebookDrawerOpen(true);
-                }}
-                role="button"
-                tabIndex={0}
+          {/* Creative Tools Section (directly above Element Studio) */}
+          <section
+            className="scrapbook-creative-panel"
+            role="toolbar"
+            aria-label="Scrapbook creative tools"
+          >
+            <div className="scrapbook-creative-header">
+              <span className="scrapbook-inspector-eyebrow">CREATIVE TOOLS</span>
+              <span className="scrapbook-creative-count">
+                {currentPageAttachments.length} photo
+                {currentPageAttachments.length === 1 ? "" : "s"} · {currentPageStickers.length}{" "}
+                sticker{currentPageStickers.length === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="scrapbook-creative-primary-grid">
+              <button
+                type="button"
+                className={`scrapbook-creative-btn is-primary ${isGuestMode ? "is-guest-locked" : ""}`}
+                onClick={handleOpenPhotoUpload}
                 title={
                   isGuestMode
-                    ? "Sign in or create an account to create personal journals"
-                    : "Click to create your first journal"
+                    ? "Sign in to upload personal photos to your journal"
+                    : "Upload a photograph to this page"
                 }
               >
-                <div className="leather-notebook-ribbon" aria-hidden="true" />
-                <span className="leather-notebook-tag">NEW VOLUME</span>
-                <span className="leather-notebook-title">+ CREATE JOURNAL</span>
-                <span className="leather-notebook-author">CLICK TO BEGIN</span>
-              </div>
-            )}
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                <span>Add Photo</span>
+                {isGuestMode && <span className="scrapbook-creative-badge">Account</span>}
+              </button>
 
-            <button
-              type="button"
-              className="focus-mode-trigger-btn"
-              onClick={() => {
-                setModoFoco(true);
-                playPaperSound();
-              }}
-              title="Activate Focus Mode (immersive writing canvas)"
-              aria-label="Activate Focus Mode"
-            >
-              <EyeIcon className="focus-mode-eye-icon" />
-              <span>FOCUS MODE</span>
-            </button>
-          </div>
-
-          <div className="desk-left-bottom">
-            <button
-              type="button"
-              className="sober-save-btn"
-              onClick={salvarPagina}
-              disabled={salvando}
-              title="Save current page in your active journal"
-            >
-              <SaveIcon className="save-btn-icon" />
-              <span>{salvando ? "SAVING..." : "SAVE JOURNAL PAGE"}</span>
-            </button>
-
-            {!isGuestMode && autosaveStatus !== "idle" && (
-              <div
-                className={`journal-autosave-status is-${autosaveStatus}`}
-                role={autosaveStatus === "error" ? "alert" : "status"}
-                aria-live="polite"
+              <button
+                type="button"
+                className="scrapbook-creative-btn"
+                onClick={() => {
+                  setPhotoModalOpen(false);
+                  setStickerDrawerOpen(true);
+                  playPaperSound();
+                }}
+                title="Open vintage sticker & pressed botanical catalog"
               >
-                {autosaveStatus === "saving" && (
-                  <>
-                    <span className="journal-autosave-dot" aria-hidden="true" />
-                    <span>Saving...</span>
-                  </>
-                )}
-                {autosaveStatus === "saved" && <span>✓ Saved</span>}
-                {autosaveStatus === "error" && (
-                  <>
-                    <span>Unable to save —</span>
-                    <button
-                      type="button"
-                      className="journal-autosave-retry-btn"
-                      onClick={() => void flushBackendSave()}
-                    >
-                      Retry
-                    </button>
-                  </>
-                )}
+                <span aria-hidden="true">✦</span>
+                <span>Stickers</span>
+              </button>
+            </div>
+
+            <div className="scrapbook-creative-history-row">
+              <button
+                type="button"
+                className="scrapbook-creative-history-btn"
+                onClick={handleUndoScrapbook}
+                disabled={scrapbookUndoStack.length === 0}
+                title="Undo last scrapbook change"
+              >
+                ↶ Undo
+              </button>
+              <button
+                type="button"
+                className="scrapbook-creative-history-btn"
+                onClick={handleRedoScrapbook}
+                disabled={scrapbookRedoStack.length === 0}
+                title="Redo scrapbook change"
+              >
+                ↷ Redo
+              </button>
+            </div>
+
+            {isGuestMode && (
+              <div className="scrapbook-creative-guest-note">
+                Guest preview (not saved)
               </div>
             )}
-          </div>
+          </section>
+
+          <ScrapbookInspectorPanel
+            selectedAttachment={selectedAttachmentObj}
+            selectedSticker={selectedStickerObj}
+            onUpdateAttachment={handleUpdateSelectedAttachment}
+            onUpdateSticker={handleUpdateSelectedSticker}
+            onShiftZIndex={handleShiftSelectedZIndex}
+            onDelete={handleDeleteSelectedScrapbookItem}
+          />
         </div>
 
         {/* Center Column: Dedicated Ruled Notebook Sheet */}
@@ -2235,6 +2550,11 @@ export default function JournalEditor() {
                     color: inkColor,
                     fontFamily: getFontFamilyById(fontFamilyId),
                   }}
+                  onPointerDown={() => {
+                    if (selectedScrapbookItem) {
+                      setSelectedScrapbookItem(null);
+                    }
+                  }}
                   initial={{ opacity: 0.9, scale: 0.99 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.22 }}
@@ -2301,6 +2621,16 @@ export default function JournalEditor() {
                       </motion.button>
                     </div>
                   </div>
+                  <ScrapbookLayer
+                    attachments={currentPageAttachments}
+                    stickers={currentPageStickers}
+                    readonly={false}
+                    sheetScale={sheetScale}
+                    selectedItem={selectedScrapbookItem}
+                    onSelectItem={setSelectedScrapbookItem}
+                    onChangeAttachments={handleChangePageAttachments}
+                    onChangeStickers={handleChangePageStickers}
+                  />
                 </motion.div>
               </div>
             </div>
@@ -2333,8 +2663,93 @@ export default function JournalEditor() {
           </div>
         </div>
 
-        {/* Right Column: Paper & Ink Menu, Pull Inspiration, Pinned Theme, Shelf Link */}
+        {/* Right Column: Active Leather Journal Volume, Paper & Ink Menu, Inspiration, Focus Mode & Save */}
         <div className="desk-right-col">
+          <div className="desk-right-top">
+            <div className="desk-right-notebook-wrap">
+              {activeNotebook ? (
+                (() => {
+                  const theme = getNotebookTheme(activeNotebook.corCapa);
+                  const dates = getNotebookDates(activeNotebook);
+                  return (
+                    <div
+                      className={`leather-notebook-card leather-notebook-color--${theme.id}`}
+                    style={{
+                      background: theme.cardGradient,
+                      borderLeftColor: theme.shelfSpine2,
+                    }}
+                    onClick={() => {
+                      if (isGuestMode) {
+                        playPaperSound();
+                        openGuestPrompt("notebook-open");
+                        return;
+                      }
+                      setCadernoPromptNotice(null);
+                      setNotebookDrawerOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        if (isGuestMode) {
+                          playPaperSound();
+                          openGuestPrompt("notebook-open");
+                          return;
+                        }
+                        setCadernoPromptNotice(null);
+                        setNotebookDrawerOpen(true);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title={
+                      isGuestMode
+                        ? "Sign in or create an account to open saved journals"
+                        : "Click to switch, rename, or create a journal"
+                    }
+                  >
+                    <div
+                      className="leather-notebook-ribbon"
+                      aria-hidden="true"
+                      style={{ backgroundColor: theme.ribbonColor }}
+                    />
+                    <span className="leather-notebook-tag">ACTIVE JOURNAL</span>
+                    <span className="leather-notebook-title">
+                      {activeNotebook.nome}
+                    </span>
+                    <span className="leather-notebook-author">
+                      {dates.updated}
+                    </span>
+                  </div>
+                );
+              })()
+            ) : (
+              <div
+                className="leather-notebook-card is-empty-state"
+                onClick={() => {
+                  if (isGuestMode) {
+                    playPaperSound();
+                    openGuestPrompt("notebook-manage");
+                    return;
+                  }
+                  setCadernoPromptNotice(null);
+                  setNotebookDrawerOpen(true);
+                }}
+                role="button"
+                tabIndex={0}
+                title={
+                  isGuestMode
+                    ? "Sign in or create an account to create personal journals"
+                    : "Click to create your first journal"
+                }
+              >
+                <div className="leather-notebook-ribbon" aria-hidden="true" />
+                <span className="leather-notebook-tag">NEW VOLUME</span>
+                <span className="leather-notebook-title">+ CREATE JOURNAL</span>
+                <span className="leather-notebook-author">CLICK TO BEGIN</span>
+              </div>
+            )}
+          </div>
+
           <div className="desk-right-tools">
             {!modoFoco && renderCustomizationMenu(false)}
 
@@ -2381,6 +2796,65 @@ export default function JournalEditor() {
                 <p className="pinned-theme-phrase">“{temaSalvo}”</p>
               </div>
             )}
+          </div>
+          </div>
+
+          {/* Bottom-Right Primary Actions: Focus Mode & Save Journal Page */}
+          <div className="desk-right-bottom-actions">
+            <button
+              type="button"
+              className="focus-mode-trigger-btn"
+              onClick={() => {
+                setModoFoco(true);
+                playPaperSound();
+              }}
+              title="Activate Focus Mode (immersive writing canvas)"
+              aria-label="Activate Focus Mode"
+            >
+              <EyeIcon className="focus-mode-eye-icon" />
+              <span>FOCUS MODE</span>
+            </button>
+
+            <div className="desk-left-save-block">
+              <button
+                type="button"
+                className="sober-save-btn"
+                onClick={salvarPagina}
+                disabled={salvando}
+                title="Save current page in your active journal"
+              >
+                <SaveIcon className="save-btn-icon" />
+                <span>{salvando ? "SAVING..." : "SAVE JOURNAL PAGE"}</span>
+              </button>
+
+              {!isGuestMode && autosaveStatus !== "idle" && (
+                <div
+                  className={`journal-autosave-status is-${autosaveStatus}`}
+                  role={autosaveStatus === "error" ? "alert" : "status"}
+                  aria-live="polite"
+                >
+                  {autosaveStatus === "saving" && (
+                    <>
+                      <span className="journal-autosave-dot" aria-hidden="true" />
+                      <span>Saving...</span>
+                    </>
+                  )}
+                  {autosaveStatus === "saved" && <span>✓ Saved</span>}
+                  {autosaveStatus === "error" && (
+                    <>
+                      <span>Unable to save —</span>
+                      <button
+                        type="button"
+                        className="journal-autosave-retry-btn"
+                        onClick={() => void flushBackendSave()}
+                      >
+                        Retry
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -2463,7 +2937,7 @@ export default function JournalEditor() {
                     const totalPags = filterWrittenPages(nb.paginas).length;
                     const isRenaming = renamingNotebookId === nb.id;
 
-                    return (
+  return (
                       <div
                         key={nb.id}
                         className={`notebook-item-card ${
@@ -2622,7 +3096,7 @@ export default function JournalEditor() {
                 <div className="notebook-color-picker-grid">
                   {NOTEBOOK_COLOR_OPTIONS.map((opt) => {
                     const isSelected = newNotebookCover === opt.id;
-                    return (
+  return (
                       <button
                         key={opt.id}
                         type="button"
@@ -2819,6 +3293,118 @@ export default function JournalEditor() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Sticker Catalog Drawer */}
+      <StickerCatalogDrawer
+        open={stickerDrawerOpen}
+        isGuestMode={isGuestMode}
+        onClose={() => setStickerDrawerOpen(false)}
+        onSelectSticker={handleInsertSticker}
+      />
+
+      {/* Photo Upload Modal (Authenticated Users) */}
+      <PhotoUploadModal
+        open={photoModalOpen}
+        notebookId={activeNotebookId}
+        nextZIndex={getNextScrapbookZIndex()}
+        onClose={() => setPhotoModalOpen(false)}
+        onInsertAttachment={handleInsertAttachment}
+      />
+
+      {/* Guest Photo Upload Restriction Modal */}
+      <AnimatePresence>
+        {guestPhotoNoticeOpen && (
+          <motion.div
+            className="drawer-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setGuestPhotoNoticeOpen(false)}
+            style={{ zIndex: 1300 }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="guest-photo-notice-title"
+              initial={{ opacity: 0, y: 12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.97 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: "430px",
+                margin: "auto",
+                background: "#1f1812",
+                border: "1px solid rgba(207, 169, 111, 0.42)",
+                borderRadius: "12px",
+                padding: "24px",
+                color: "#f5e7d2",
+                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.55)",
+              }}
+            >
+              <h3
+                id="guest-photo-notice-title"
+                style={{
+                  margin: "0 0 8px",
+                  fontFamily: "var(--font-serif, Georgia, serif)",
+                  fontSize: "20px",
+                  color: "#f5d7a3",
+                }}
+              >
+                Account Required for Photo Uploads
+              </h3>
+              <p
+                style={{
+                  margin: "0 0 16px",
+                  fontSize: "13px",
+                  lineHeight: 1.55,
+                  color: "rgba(245, 231, 210, 0.85)",
+                }}
+              >
+                In guest mode, you can freely write and decorate pages with predefined vintage
+                stickers in temporary memory. Sign in or create a free account to upload personal
+                photographs and save your scrapbook journal permanently.
+              </p>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => setGuestPhotoNoticeOpen(false)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(207, 169, 111, 0.3)",
+                    background: "transparent",
+                    color: "#e6d7c3",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                  }}
+                >
+                  Continue as Guest
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuestPhotoNoticeOpen(false);
+                    openGuestPrompt("save");
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(207, 169, 111, 0.6)",
+                    background: "linear-gradient(180deg, #c99b5b, #9c7238)",
+                    color: "#1b120b",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontSize: "13px",
+                  }}
+                >
+                  Sign In / Create Account
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

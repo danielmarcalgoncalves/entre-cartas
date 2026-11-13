@@ -53,6 +53,32 @@ export type JournalEntry = {
   tema_carta?: string;
 };
 
+export type JournalAttachmentStyle = "polaroid" | "washi" | "vintage" | "plain";
+
+export interface JournalAttachment {
+  id: string;
+  objectKey: string;
+  url: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  rotation: number;
+  zIndex: number;
+  style: JournalAttachmentStyle;
+  caption?: string;
+}
+
+export interface JournalSticker {
+  id: string;
+  stickerId: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  zIndex: number;
+}
+
 export interface NotebookPage {
   id: string;
   titulo: string;
@@ -64,6 +90,8 @@ export interface NotebookPage {
   tipoPapel?: string;
   corTinta?: string;
   fonte?: string;
+  attachments?: JournalAttachment[];
+  stickers?: JournalSticker[];
 }
 
 export interface Notebook {
@@ -385,10 +413,26 @@ export function dispatchJournalUpdated(source?: string) {
 }
 
 export function normalizeNotebookPageForStorage(page: NotebookPage): NotebookPage {
+  const safeAttachments = Array.isArray(page.attachments)
+    ? page.attachments.filter(
+        (a) =>
+          a &&
+          typeof a.objectKey === "string" &&
+          a.objectKey.length > 0 &&
+          !a.objectKey.startsWith("data:") &&
+          (!a.url || !a.url.startsWith("data:"))
+      )
+    : undefined;
+  const safeStickers = Array.isArray(page.stickers)
+    ? page.stickers.filter((s) => s && typeof s.stickerId === "string" && s.stickerId.length > 0)
+    : undefined;
+
   return {
     ...page,
     titulo: (page.titulo || "").trim(),
     conteudo: normalizeJournalContentForStorage(page.conteudo || ""),
+    ...(safeAttachments && safeAttachments.length > 0 ? { attachments: safeAttachments } : { attachments: undefined }),
+    ...(safeStickers && safeStickers.length > 0 ? { stickers: safeStickers } : { stickers: undefined }),
   };
 }
 

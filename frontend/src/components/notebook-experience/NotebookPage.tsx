@@ -17,6 +17,7 @@ import {
   hasMeaningfulJournalText,
   isJournalPageMeaningful,
 } from "@/lib/journal-page-layout";
+import { ScrapbookLayer } from "@/components/journal/ScrapbookLayer";
 
 import React, { type ReactNode } from "react";
 
@@ -557,11 +558,15 @@ export function JournalUserPage({
 
   const hasContent = hasMeaningfulJournalText(cleanContent);
   const hasTitle = hasMeaningfulJournalText(page.titulo);
+  const hasScrapbookItems =
+    (Array.isArray(page.attachments) && page.attachments.length > 0) ||
+    (Array.isArray(page.stickers) && page.stickers.length > 0);
 
   return (
     <div
       className="nb-user-entry-page"
       style={{
+        position: "relative",
         width: `${JOURNAL_PAGE_LAYOUT.width}px`,
         height: `${JOURNAL_PAGE_LAYOUT.height}px`,
         padding: `${JOURNAL_PAGE_LAYOUT.paddingTop}px ${JOURNAL_PAGE_LAYOUT.paddingRight}px ${JOURNAL_PAGE_LAYOUT.paddingBottom}px ${JOURNAL_PAGE_LAYOUT.paddingLeft}px`,
@@ -612,11 +617,11 @@ export function JournalUserPage({
 
           {hasContent ? (
             cleanContent
-          ) : (
+          ) : !hasScrapbookItems ? (
             <em className="nb-user-entry-empty">
               This page contains no written text yet.
             </em>
-          )}
+          ) : null}
         </div>
 
         {/* Bottom 38px footer matching .caderno-bottom-corner height */}
@@ -625,6 +630,14 @@ export function JournalUserPage({
           <span className="nb-user-page-folio">P. {pageNumber}</span>
         </div>
       </div>
+
+      {/* Synchronized Scrapbook Layer on exact 580x820 coordinate system */}
+      <ScrapbookLayer
+        attachments={page.attachments}
+        stickers={page.stickers}
+        readonly
+        sheetScale={1}
+      />
     </div>
   );
 }

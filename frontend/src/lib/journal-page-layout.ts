@@ -59,13 +59,17 @@ export function isJournalPageMeaningful(
     titulo?: string | null;
     conteudo?: string | null;
     polaroid_url?: string | null;
+    attachments?: unknown[] | null;
+    stickers?: unknown[] | null;
   } | null
 ): boolean {
   if (!page) return false;
   return (
     hasMeaningfulJournalText(page.titulo) ||
     hasMeaningfulJournalText(page.conteudo) ||
-    Boolean(page.polaroid_url)
+    Boolean(page.polaroid_url) ||
+    (Array.isArray(page.attachments) && page.attachments.length > 0) ||
+    (Array.isArray(page.stickers) && page.stickers.length > 0)
   );
 }
 

@@ -144,8 +144,9 @@ function startServer() {
     initDb().catch(err => console.error('[Database] Inicializacao pendente:', err.message));
 
     // Garante que o bucket do MinIO existe (cria se necessario)
-    const { ensureBucket } = require('./src/services/minioClient');
+    const { ensureBucket, ensureJournalBucket } = require('./src/services/minioClient');
     ensureBucket().catch(err => console.warn('[MinIO] Bucket nao verificado:', err.message));
+    ensureJournalBucket().catch(err => console.warn('[MinIO] Journal bucket not verified:', err.message));
   });
 }
 
