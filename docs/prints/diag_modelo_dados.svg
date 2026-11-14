@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 620" width="1100" height="620" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="fk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#6b4c2b"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="620" fill="#fcfaf5" rx="10" stroke="#d6cbb9" stroke-width="1.5"/>
+
+  <text x="550" y="30" text-anchor="middle" font-size="16.5" font-weight="bold" fill="#2c2219">
+    Modelo de Dados Relacional do Domínio (MariaDB 10.11 — Entre Cartas SaaS)
+  </text>
+  <text x="550" y="48" text-anchor="middle" font-size="11.5" fill="#6e5d4b">
+    Entidades de Identidade/RBAC, Faturamento Stripe (Assinaturas e Idempotência) e Domínio Epistolar (Cadernos, Cartas e Pastas)
+  </text>
+
+  <!-- Central Entity: USUARIOS -->
+  <rect x="405" y="70" width="290" height="225" rx="7" fill="#ffffff" stroke="#b96f1f" stroke-width="2.2"/>
+  <rect x="405" y="70" width="290" height="28" rx="7" fill="#b96f1f"/>
+  <text x="550" y="89" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#ffffff">usuarios (Entidade Central)</text>
+  <text x="418" y="112" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#8a4f0f">PK id INT AUTO_INCREMENT</text>
+  <text x="418" y="129" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   nome VARCHAR(100) NOT NULL</text>
+  <text x="418" y="146" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">UK email VARCHAR(150) UNIQUE</text>
+  <text x="418" y="163" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   senha_hash VARCHAR(255)</text>
+  <text x="418" y="180" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#15803d">   papel VARCHAR(50) ('usuario'|'premium'|'admin')</text>
+  <text x="418" y="197" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   auth_provider VARCHAR(30) ('local'|'google')</text>
+  <text x="418" y="214" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   email_verificado BOOLEAN</text>
+  <text x="418" y="231" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   foto_url VARCHAR(500) (MinIO key)</text>
+  <text x="418" y="248" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   bio TEXT / onboarding_concluido TINYINT</text>
+  <text x="418" y="265" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   token_version INT DEFAULT 1</text>
+  <text x="418" y="282" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   criado_em / atualizado_em TIMESTAMP</text>
+
+  <!-- Left Top: STRIPE_SUBSCRIPTIONS -->
+  <rect x="25" y="70" width="310" height="190" rx="7" fill="#ffffff" stroke="#4f46e5" stroke-width="2"/>
+  <rect x="25" y="70" width="310" height="28" rx="7" fill="#4f46e5"/>
+  <text x="180" y="89" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#ffffff">stripe_subscriptions</text>
+  <text x="38" y="112" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#3730a3">PK id INT AUTO_INCREMENT</text>
+  <text x="38" y="129" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#8a4f0f">FK usuario_id INT UNIQUE → usuarios(id)</text>
+  <text x="38" y="146" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   stripe_customer_id VARCHAR(255)</text>
+  <text x="38" y="163" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   stripe_subscription_id VARCHAR(255)</text>
+  <text x="38" y="180" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#15803d">   status VARCHAR(50) ('active'|'past_due'|...)</text>
+  <text x="38" y="197" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   periodo_inicio TIMESTAMP NULL</text>
+  <text x="38" y="214" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   periodo_fim TIMESTAMP NULL</text>
+  <text x="38" y="231" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   criado_em / atualizado_em TIMESTAMP</text>
+
+  <!-- Left Middle: STRIPE_WEBHOOK_EVENTS -->
+  <rect x="25" y="280" width="310" height="115" rx="7" fill="#ffffff" stroke="#4f46e5" stroke-width="1.6"/>
+  <rect x="25" y="280" width="310" height="26" rx="7" fill="#6366f1"/>
+  <text x="180" y="298" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">stripe_webhook_events (Idempotência)</text>
+  <text x="38" y="320" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#3730a3">PK id INT AUTO_INCREMENT</text>
+  <text x="38" y="338" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#b91c1c">UK stripe_event_id VARCHAR(255) UNIQUE</text>
+  <text x="38" y="356" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   tipo VARCHAR(100) NOT NULL</text>
+  <text x="38" y="374" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   processado_em TIMESTAMP</text>
+
+  <!-- Left Bottom: AUTH AUX TABLES -->
+  <rect x="25" y="415" width="310" height="180" rx="7" fill="#ffffff" stroke="#3b7a57" stroke-width="1.6"/>
+  <rect x="25" y="415" width="310" height="26" rx="7" fill="#3b7a57"/>
+  <text x="180" y="433" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">Tabelas Auxiliares de Autenticação</text>
+  <text x="38" y="455" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#166534">reset_tokens:</text>
+  <text x="38" y="471" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  PK token | FK usuario_id → usuarios(id)</text>
+  <text x="38" y="493" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#166534">codigos_verificacao (OTP Brevo):</text>
+  <text x="38" y="509" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  PK id | email | codigo (6 dígitos) | expira_em</text>
+  <text x="38" y="531" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#166534">revoked_tokens (Blacklist Logout):</text>
+  <text x="38" y="547" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  PK token_hash VARCHAR(64) | usuario_id | expira_em</text>
+
+  <!-- Right Top: CADERNOS_USUARIO -->
+  <rect x="765" y="70" width="310" height="165" rx="7" fill="#ffffff" stroke="#1d4ed8" stroke-width="2"/>
+  <rect x="765" y="70" width="310" height="28" rx="7" fill="#1d4ed8"/>
+  <text x="920" y="89" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#ffffff">cadernos_usuario (Journals 3 / 10)</text>
+  <text x="778" y="112" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#1d4ed8">PK id INT AUTO_INCREMENT</text>
+  <text x="778" y="129" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#8a4f0f">FK usuario_id INT NOT NULL → usuarios(id)</text>
+  <text x="778" y="146" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">UK client_id VARCHAR(100) (uk_usuario_caderno)</text>
+  <text x="778" y="163" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   nome VARCHAR(255) NOT NULL</text>
+  <text x="778" y="180" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   cor_capa VARCHAR(50) DEFAULT 'marrom'</text>
+  <text x="778" y="197" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   paginas_json LONGTEXT (páginas + scrapbook)</text>
+  <text x="778" y="214" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   criado_em / atualizado_em TIMESTAMP</text>
+
+  <!-- Right Middle: PASTAS_USUARIO -->
+  <rect x="765" y="255" width="310" height="145" rx="7" fill="#ffffff" stroke="#1d4ed8" stroke-width="2"/>
+  <rect x="765" y="255" width="310" height="28" rx="7" fill="#1d4ed8"/>
+  <text x="920" y="274" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#ffffff">pastas_usuario (Folders 3 / 10)</text>
+  <text x="778" y="297" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#1d4ed8">PK id INT AUTO_INCREMENT</text>
+  <text x="778" y="314" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#8a4f0f">FK usuario_id INT NOT NULL → usuarios(id)</text>
+  <text x="778" y="331" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">UK client_id VARCHAR(100) (uk_usuario_pasta)</text>
+  <text x="778" y="348" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   nome VARCHAR(120) NOT NULL</text>
+  <text x="778" y="365" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   cor VARCHAR(50) DEFAULT 'marrom'</text>
+  <text x="778" y="382" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   criado_em / atualizado_em TIMESTAMP</text>
+
+  <!-- Bottom Center: CARTAS -->
+  <rect x="405" y="335" width="290" height="260" rx="7" fill="#ffffff" stroke="#1d4ed8" stroke-width="2.2"/>
+  <rect x="405" y="335" width="290" height="28" rx="7" fill="#1d4ed8"/>
+  <text x="550" y="354" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#ffffff">cartas (Letters 10 Free / 30 Pro)</text>
+  <text x="418" y="377" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#1d4ed8">PK id INT AUTO_INCREMENT</text>
+  <text x="418" y="394" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#8a4f0f">FK usuario_id INT NULL → usuarios(id)</text>
+  <text x="418" y="411" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   client_id VARCHAR(100) NULL</text>
+  <text x="418" y="428" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   titulo VARCHAR(255) / conteudo MEDIUMTEXT</text>
+  <text x="418" y="445" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   remetente_anonimo / destinatario_anonimo</text>
+  <text x="418" y="462" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   categoria / tema_carta / tipo_papel / fonte</text>
+  <text x="418" y="479" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   pasta_client_id / pasta_nome</text>
+  <text x="418" y="496" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   status_carta ('draft'|'completed')</text>
+  <text x="418" y="513" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   favoritado BOOLEAN / na_lixeira BOOLEAN</text>
+  <text x="418" y="530" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   is_public BOOLEAN (acervo vs. privada)</text>
+  <text x="418" y="547" font-size="10.5" font-family="Consolas, monospace" fill="#2c2219">   lixeira_em / criado_em / atualizado_em</text>
+
+  <!-- Right Bottom: CARTAS_SALVAS & NOTAS_PESSOAIS -->
+  <rect x="765" y="420" width="310" height="175" rx="7" fill="#ffffff" stroke="#7c3aed" stroke-width="1.8"/>
+  <rect x="765" y="420" width="310" height="28" rx="7" fill="#7c3aed"/>
+  <text x="920" y="439" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff">cartas_salvas &amp; notas_pessoais</text>
+  <text x="778" y="462" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#6d28d9">cartas_salvas (Carimbos no Acervo):</text>
+  <text x="778" y="478" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  PK id | FK usuario_id → usuarios(id)</text>
+  <text x="778" y="494" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  FK carta_id → cartas(id) | tipo_carimbo</text>
+  <text x="778" y="518" font-size="10.5" font-family="Consolas, monospace" font-weight="bold" fill="#6d28d9">notas_pessoais (Notas Marginais):</text>
+  <text x="778" y="534" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  PK id | FK usuario_id → usuarios(id)</text>
+  <text x="778" y="550" font-size="10" font-family="Consolas, monospace" fill="#2c2219">  FK carta_id → cartas(id) | conteudo TEXT</text>
+
+  <!-- Relationship Lines -->
+  <!-- stripe_subscriptions -> usuarios (1:1) -->
+  <line x1="335" y1="130" x2="403" y2="130" stroke="#6b4c2b" stroke-width="2" marker-end="url(#fk)"/>
+  <text x="369" y="122" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#6b4c2b">1 : 1</text>
+
+  <!-- reset_tokens -> usuarios (N:1) -->
+  <line x1="335" y1="455" x2="403" y2="255" stroke="#6b4c2b" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#fk)"/>
+
+  <!-- cadernos_usuario -> usuarios (N:1) -->
+  <line x1="765" y1="130" x2="697" y2="130" stroke="#6b4c2b" stroke-width="2" marker-end="url(#fk)"/>
+  <text x="731" y="122" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#6b4c2b">N : 1</text>
+
+  <!-- pastas_usuario -> usuarios (N:1) -->
+  <line x1="765" y1="310" x2="697" y2="210" stroke="#6b4c2b" stroke-width="2" marker-end="url(#fk)"/>
+  <text x="735" y="250" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#6b4c2b">N : 1</text>
+
+  <!-- cartas -> usuarios (N:1) -->
+  <line x1="550" y1="335" x2="550" y2="297" stroke="#6b4c2b" stroke-width="2" marker-end="url(#fk)"/>
+  <text x="568" y="320" font-size="9.5" font-weight="bold" fill="#6b4c2b">N : 1</text>
+
+  <!-- cartas_salvas -> usuarios & cartas -->
+  <line x1="765" y1="475" x2="697" y2="265" stroke="#6b4c2b" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#fk)"/>
+  <line x1="765" y1="505" x2="697" y2="485" stroke="#6b4c2b" stroke-width="2" marker-end="url(#fk)"/>
+  <text x="731" y="512" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#6b4c2b">N : 1</text>
+</svg>

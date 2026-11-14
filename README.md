@@ -2,6 +2,8 @@
 
 > 🎓 **Projeto Acadêmico:** Desenvolvido por **Daniel Marçal Gonçalves** para a disciplina de **Introdução à Computação em Nuvem (ISW055)** lecionada pelo professor **[@siriani](https://github.com/siriani)** ([github.com/siriani](https://github.com/siriani)) — Fatec Pompeia.
 >
+> 📄 **Relatório Consolidado P2 (2º Bimestre — PDF):** [docs/P2_ISW055_Daniel_Marcal.pdf](./docs/P2_ISW055_Daniel_Marcal.pdf) | **Código-fonte Typst:** [docs/P2_ISW055_Daniel_Marcal.typ](./docs/P2_ISW055_Daniel_Marcal.typ)
+>
 > 📌 **Evolução Arquitetural (Fork):** Este repositório é o fork evolutivo do sistema anterior ([filmecc](https://github.com/danielmarcalgoncalves/filmecc)), reaproveitando integralmente os microsserviços conteinerizados em Docker, banco relacional MariaDB, object storage MinIO, mensageria com Redis Streams, autenticação RBAC e pagamentos recorrentes via Stripe.
 
 ---
