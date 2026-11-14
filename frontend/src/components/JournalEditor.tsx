@@ -22,6 +22,8 @@ import {
 import { ScrapbookInspectorPanel } from "@/components/journal/ScrapbookInspectorPanel";
 import { StickerCatalogDrawer } from "@/components/journal/StickerCatalogDrawer";
 import { PhotoUploadModal } from "@/components/journal/PhotoUploadModal";
+import PaperInkModal from "@/components/journal/PaperInkModal";
+import "./journal/journal-sidebar.css";
 import { type StickerDefinition } from "@/lib/scrapbook-stickers";
 import {
   JOURNAL_MAX_CHARS_PER_PAGE,
@@ -2395,122 +2397,20 @@ export default function JournalEditor() {
   };
 
   const renderCustomizationMenu = (isInFocus = false) => (
-    <div
-      className={`vintage-menu-wrapper ${isInFocus ? "is-focus-mode" : ""}`}
-      ref={menuRef}
-    >
+    <div className={`vintage-menu-wrapper ${isInFocus ? "is-focus-mode" : ""}`}>
       <button
         type="button"
-        className={`vintage-menu-btn ${isInFocus ? "is-focus-mode" : ""}`}
-        onClick={() => setCustomMenuOpen(!customMenuOpen)}
+        className={isInFocus ? "focus-paper-ink-btn" : "vintage-menu-btn"}
+        onClick={() => {
+          playPaperSound();
+          setCustomMenuOpen(true);
+        }}
+        aria-haspopup="dialog"
         aria-expanded={customMenuOpen}
         title="Customize paper, ink, and calligraphy"
       >
-        <span>Paper & Ink</span>
-        <span className="menu-caret">▾</span>
+        <span>Paper &amp; Ink</span>
       </button>
-
-      <AnimatePresence>
-        {customMenuOpen && (
-          <motion.div
-            className={`floating-customization-menu ${
-              isInFocus ? "is-focus-mode" : ""
-            }`}
-            initial={{ opacity: 0, y: -8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ duration: 0.16 }}
-          >
-            {/* 1. Paper Background */}
-            <div className="menu-group">
-              <span className="menu-group-title">Sheet Paper</span>
-              <div className="paper-swatches">
-                {PAPER_OPTIONS.map((paper) => (
-                  <button
-                    key={paper.id}
-                    type="button"
-                    className={`paper-swatch ${
-                      sheetBgId === paper.id ? "active" : ""
-                    }`}
-                    style={{ backgroundColor: paper.color }}
-                    onClick={() => {
-                      setSheetBgId(paper.id);
-                      setSheetBgColor(paper.color);
-                      atualizarRascunhoCaderno(undefined, undefined, undefined, {
-                        tipoPapel: paper.id,
-                      });
-                    }}
-                    title={paper.name}
-                  >
-                    {sheetBgId === paper.id ? "✓" : ""}
-                  </button>
-                ))}
-              </div>
-              <small className="swatch-name">
-                {PAPER_OPTIONS.find((p) => p.id === sheetBgId)?.name}
-              </small>
-            </div>
-
-            {/* 2. Ink Color */}
-            <div className="menu-group">
-              <span className="menu-group-title">Ink Color</span>
-              <div className="ink-swatches">
-                {INK_OPTIONS.map((ink) => (
-                  <button
-                    key={ink.id}
-                    type="button"
-                    className={`ink-swatch ${
-                      inkColorId === ink.id ? "active" : ""
-                    }`}
-                    style={{ backgroundColor: ink.color }}
-                    onClick={() => {
-                      setInkColorId(ink.id);
-                      setInkColor(ink.color);
-                      atualizarRascunhoCaderno(undefined, undefined, undefined, {
-                        corTinta: ink.id,
-                      });
-                    }}
-                    title={ink.name}
-                  >
-                    {inkColorId === ink.id ? "✓" : ""}
-                  </button>
-                ))}
-              </div>
-              <small className="swatch-name">
-                {INK_OPTIONS.find((i) => i.id === inkColorId)?.name}
-              </small>
-            </div>
-
-            {/* 3. Typography & Calligraphy */}
-            <div className="menu-group">
-              <span className="menu-group-title">Script & Typography</span>
-              <div className="font-options-list">
-                {FONT_OPTIONS.map((font) => (
-                  <button
-                    key={font.id}
-                    type="button"
-                    className={`font-choice-btn ${
-                      fontFamilyId === font.id ? "active" : ""
-                    }`}
-                    style={{ fontFamily: font.styleFamily }}
-                    onClick={() => {
-                      setFontFamilyId(font.id);
-                      atualizarRascunhoCaderno(undefined, undefined, undefined, {
-                        fonte: font.id,
-                      });
-                    }}
-                  >
-                    <span>{font.name}</span>
-                    {fontFamilyId === font.id && (
-                      <span className="font-check">✓</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 
@@ -2875,144 +2775,245 @@ export default function JournalEditor() {
           </div>
         </div>
 
-        {/* Right Column: Active Leather Journal Volume, Paper & Ink Menu, Inspiration, Focus Mode & Save */}
-        <div className="desk-right-col">
-          <div className="desk-right-top">
-            <div className="desk-right-notebook-wrap">
+        {/* Right Column: Reorganized Journal Identity, Writing Tools & Session Actions */}
+        <aside className="desk-right-col journal-right-rail" aria-label="Journal controls">
+          <div className="journal-rail-stack">
+            {/* Group 1: Journal Identity */}
+            <div className="journal-rail-group">
+              <span className="journal-rail-group-label">Current Volume</span>
               {activeNotebook ? (
                 (() => {
                   const theme = getNotebookTheme(activeNotebook.corCapa);
                   const dates = getNotebookDates(activeNotebook);
+                  const handleOpenVolume = () => {
+                    if (isGuestMode) {
+                      playPaperSound();
+                      openGuestPrompt("notebook-open");
+                      return;
+                    }
+                    setCadernoPromptNotice(null);
+                    setNotebookDrawerOpen(true);
+                  };
                   return (
                     <div
-                      className={`leather-notebook-card leather-notebook-color--${theme.id}`}
-                    style={{
-                      background: theme.cardGradient,
-                      borderLeftColor: theme.shelfSpine2,
-                    }}
-                    onClick={() => {
+                      className={`journal-volume-card leather-notebook-color--${theme.id}`}
+                      style={
+                        {
+                          background: theme.cardGradient,
+                          "--volume-spine": theme.shelfSpine2,
+                        } as React.CSSProperties
+                      }
+                      onClick={handleOpenVolume}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleOpenVolume();
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title={
+                        isGuestMode
+                          ? "Sign in or create an account to open saved journals"
+                          : "Click to switch, rename, or create a journal"
+                      }
+                    >
+                      <div
+                        className="journal-volume-ribbon"
+                        aria-hidden="true"
+                        style={{ backgroundColor: theme.ribbonColor }}
+                      />
+                      <span className="journal-volume-kicker">ACTIVE JOURNAL</span>
+                      <span className="journal-volume-title">{activeNotebook.nome}</span>
+                      <div className="journal-volume-meta">
+                        <span>{dates.updated}</span>
+                        <span className="journal-volume-switch-cue">Switch ▾</span>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div
+                  className="journal-volume-card is-empty-state"
+                  onClick={() => {
+                    if (isGuestMode) {
+                      playPaperSound();
+                      openGuestPrompt("notebook-manage");
+                      return;
+                    }
+                    setCadernoPromptNotice(null);
+                    setNotebookDrawerOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
                       if (isGuestMode) {
                         playPaperSound();
-                        openGuestPrompt("notebook-open");
+                        openGuestPrompt("notebook-manage");
                         return;
                       }
                       setCadernoPromptNotice(null);
                       setNotebookDrawerOpen(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        if (isGuestMode) {
-                          playPaperSound();
-                          openGuestPrompt("notebook-open");
-                          return;
-                        }
-                        setCadernoPromptNotice(null);
-                        setNotebookDrawerOpen(true);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    title={
-                      isGuestMode
-                        ? "Sign in or create an account to open saved journals"
-                        : "Click to switch, rename, or create a journal"
                     }
-                  >
-                    <div
-                      className="leather-notebook-ribbon"
-                      aria-hidden="true"
-                      style={{ backgroundColor: theme.ribbonColor }}
-                    />
-                    <span className="leather-notebook-tag">ACTIVE JOURNAL</span>
-                    <span className="leather-notebook-title">
-                      {activeNotebook.nome}
-                    </span>
-                    <span className="leather-notebook-author">
-                      {dates.updated}
-                    </span>
-                  </div>
-                );
-              })()
-            ) : (
-              <div
-                className="leather-notebook-card is-empty-state"
-                onClick={() => {
-                  if (isGuestMode) {
-                    playPaperSound();
-                    openGuestPrompt("notebook-manage");
-                    return;
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  title={
+                    isGuestMode
+                      ? "Sign in or create an account to create personal journals"
+                      : "Click to create your first journal"
                   }
-                  setCadernoPromptNotice(null);
-                  setNotebookDrawerOpen(true);
-                }}
-                role="button"
-                tabIndex={0}
-                title={
-                  isGuestMode
-                    ? "Sign in or create an account to create personal journals"
-                    : "Click to create your first journal"
-                }
-              >
-                <div className="leather-notebook-ribbon" aria-hidden="true" />
-                <span className="leather-notebook-tag">NEW VOLUME</span>
-                <span className="leather-notebook-title">+ CREATE JOURNAL</span>
-                <span className="leather-notebook-author">CLICK TO BEGIN</span>
-              </div>
-            )}
-          </div>
-
-          <div className="desk-right-tools">
-            {!modoFoco && renderCustomizationMenu(false)}
-
-            <button
-              type="button"
-              className="inspire-trigger-btn"
-              onClick={sortearInspiracao}
-              title="Pull an inspiring writing prompt from the archive"
-            >
-              <span>Pull Inspiration</span>
-            </button>
-
-            <Link
-              href="/my-shelf?section=journals"
-              className="inspire-trigger-btn"
-              style={{ textDecoration: "none", justifyContent: "center" }}
-              title="Browse all your saved journals on My Shelf"
-            >
-              <span>My Shelf Archive ↗</span>
-            </Link>
-
-            {temaSalvo && (
-              <div className="pinned-theme-box">
-                <div className="pinned-theme-top">
-                  <span className="pinned-theme-label">TODAY&apos;S THEME</span>
-                  <button
-                    type="button"
-                    className="pinned-theme-clear"
-                    onClick={() => {
-                      setTemaSalvo("");
-                      if (isGuestMode) {
-                        setGuestPinnedTheme("");
-                      } else {
-                        try {
-                          window.localStorage.removeItem(PINNED_THEME_STORAGE_KEY);
-                        } catch {}
-                      }
-                    }}
-                    title="Remove theme"
-                  >
-                    ✕
-                  </button>
+                >
+                  <div className="journal-volume-ribbon" aria-hidden="true" />
+                  <span className="journal-volume-kicker">NEW VOLUME</span>
+                  <span className="journal-volume-title">+ Create Journal</span>
+                  <div className="journal-volume-meta">
+                    <span>No active volume</span>
+                    <span className="journal-volume-switch-cue">Begin →</span>
+                  </div>
                 </div>
-                <p className="pinned-theme-phrase">“{temaSalvo}”</p>
+              )}
+            </div>
+
+            {/* Group 2: Writing Tools */}
+            <div className="journal-rail-group">
+              <span className="journal-rail-group-label">Writing Tools</span>
+
+              {!modoFoco && (
+                <button
+                  type="button"
+                  className="journal-paper-ink-trigger"
+                  onClick={() => {
+                    playPaperSound();
+                    setCustomMenuOpen(true);
+                  }}
+                  aria-haspopup="dialog"
+                  aria-expanded={customMenuOpen}
+                  title="Customize sheet paper, ink color, and typography"
+                >
+                  <span className="journal-paper-ink-left">
+                    <span className="journal-paper-ink-swatches" aria-hidden="true">
+                      <span
+                        className="journal-mini-paper-chip"
+                        style={{ backgroundColor: sheetBgColor }}
+                      />
+                      <span
+                        className="journal-mini-ink-dot"
+                        style={{ backgroundColor: inkColor }}
+                      />
+                    </span>
+                    <span className="journal-paper-ink-copy">
+                      <span className="journal-paper-ink-title">Paper &amp; Ink</span>
+                      <span className="journal-paper-ink-summary">
+                        {PAPER_OPTIONS.find((p) => p.id === sheetBgId)?.name || "Ivory"} ·{" "}
+                        {FONT_OPTIONS.find((f) => f.id === fontFamilyId)?.name || "EB Garamond"}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="journal-paper-ink-chevron" aria-hidden="true">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </span>
+                </button>
+              )}
+
+              <div className="journal-tools-pair">
+                <button
+                  type="button"
+                  className="journal-secondary-tool-btn"
+                  onClick={sortearInspiracao}
+                  title="Pull an inspiring writing prompt from the archive"
+                >
+                  <span className="journal-secondary-tool-icon" aria-hidden="true">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 3v3" />
+                      <path d="M12 18v3" />
+                      <path d="m4.9 4.9 2.1 2.1" />
+                      <path d="m17 17 2.1 2.1" />
+                      <path d="M3 12h3" />
+                      <path d="M18 12h3" />
+                      <path d="m4.9 19.1 2.1-2.1" />
+                      <path d="m17 7 2.1-2.1" />
+                    </svg>
+                  </span>
+                  <span>Pull Inspiration</span>
+                </button>
+
+                <Link
+                  href="/my-shelf?section=journals"
+                  className="journal-secondary-tool-btn"
+                  title="Browse all your saved journals on My Shelf"
+                >
+                  <span className="journal-secondary-tool-icon" aria-hidden="true">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19v20H6.5a2.5 2.5 0 0 1 0-5H19" />
+                    </svg>
+                  </span>
+                  <span>My Shelf ↗</span>
+                </Link>
               </div>
-            )}
-          </div>
+
+              {temaSalvo && (
+                <div className="pinned-theme-box">
+                  <div className="pinned-theme-top">
+                    <span className="pinned-theme-label">TODAY&apos;S THEME</span>
+                    <button
+                      type="button"
+                      className="pinned-theme-clear"
+                      onClick={() => {
+                        setTemaSalvo("");
+                        if (isGuestMode) {
+                          setGuestPinnedTheme("");
+                        } else {
+                          try {
+                            window.localStorage.removeItem(PINNED_THEME_STORAGE_KEY);
+                          } catch {}
+                        }
+                      }}
+                      title="Remove theme"
+                      aria-label="Remove pinned theme"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="pinned-theme-phrase">“{temaSalvo}”</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Bottom-Right Primary Actions: Focus Mode & Save Journal Page */}
-          <div className="desk-right-bottom-actions">
+          {/* Group 3: Writing Actions */}
+          <div className="journal-rail-actions">
+            <span className="journal-rail-group-label">Writing Actions</span>
+
             <button
               type="button"
               className="focus-mode-trigger-btn"
@@ -3068,8 +3069,39 @@ export default function JournalEditor() {
               )}
             </div>
           </div>
-        </div>
+        </aside>
       </div>
+
+      {/* Paper & Ink Customization Modal */}
+      <PaperInkModal
+        isOpen={customMenuOpen}
+        onClose={() => setCustomMenuOpen(false)}
+        sheetBgId={sheetBgId}
+        sheetBgColor={sheetBgColor}
+        inkColorId={inkColorId}
+        inkColor={inkColor}
+        fontFamilyId={fontFamilyId}
+        onSelectPaper={(paperId, color) => {
+          setSheetBgId(paperId);
+          setSheetBgColor(color);
+          atualizarRascunhoCaderno(undefined, undefined, undefined, {
+            tipoPapel: paperId,
+          });
+        }}
+        onSelectInk={(inkId, color) => {
+          setInkColorId(inkId);
+          setInkColor(color);
+          atualizarRascunhoCaderno(undefined, undefined, undefined, {
+            corTinta: inkId,
+          });
+        }}
+        onSelectFont={(fontId) => {
+          setFontFamilyId(fontId);
+          atualizarRascunhoCaderno(undefined, undefined, undefined, {
+            fonte: fontId,
+          });
+        }}
+      />
 
       {/* Journal Volumes Drawer */}
       <AnimatePresence>

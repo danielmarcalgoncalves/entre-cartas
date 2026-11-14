@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { BookVolumeIcon, EyeOpenIcon, QuillIcon } from "@/components/my-shelf/ShelfIcons";
 import {
   ACTIVE_NOTEBOOK_ID_KEY,
   ACTIVE_NOTEBOOK_PAGE_KEY,
@@ -22,16 +23,24 @@ import { hasMeaningfulJournalText } from "@/lib/journal-page-layout";
 
 interface MyJournalCollectionProps {
   notebooks: Notebook[];
+  totalCount?: number;
   limiteCadernos: number;
+  searchQuery?: string;
+  onClearSearch?: () => void;
   onRefresh: () => void;
 }
 
 export default function MyJournalCollection({
   notebooks,
+  totalCount,
   limiteCadernos,
+  searchQuery = "",
+  onClearSearch,
   onRefresh,
 }: MyJournalCollectionProps) {
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
+  const effectiveTotal = typeof totalCount === "number" ? totalCount : notebooks.length;
 
   // Dark Reading Room State
   const [readingNotebook, setReadingNotebook] = useState<Notebook | null>(null);
@@ -123,6 +132,25 @@ export default function MyJournalCollection({
     }
   };
 
+  // Keyboard navigation in Dark Reading Room
+  useEffect(() => {
+    if (!readingNotebook) return;
+    const totalPages = Math.max(readingNotebook.paginas.length, 1);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setReadingNotebook(null);
+      } else if (e.key === "ArrowLeft" && readingPageIndex > 0) {
+        playPaperSound();
+        setReadingPageIndex((p) => Math.max(0, p - 1));
+      } else if (e.key === "ArrowRight" && readingPageIndex < totalPages - 1) {
+        playPaperSound();
+        setReadingPageIndex((p) => Math.min(totalPages - 1, p + 1));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [readingNotebook, readingPageIndex]);
+
   const paginasLeitura =
     readingNotebook && readingNotebook.paginas.length > 0
       ? readingNotebook.paginas
@@ -138,157 +166,189 @@ export default function MyJournalCollection({
         ];
 
   const paginaAtual = paginasLeitura[readingPageIndex] || paginasLeitura[0];
+  const hasSearch = searchQuery.trim().length > 0;
 
   return (
     <section
-      className="my-journal-collection-section"
+      className="cabinet-section"
       id="my-journal"
       aria-labelledby="my-journal-heading"
     >
-      <div className="shelf-header">
-        <div>
-          <span className="section-kicker">HARDBOUND VOLUMES · PERSONAL NOTEBOOKS</span>
-          <h2 id="my-journal-heading">My Journal</h2>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-          <span
-            style={{
-              fontSize: "12px",
-              fontFamily: "var(--serif, serif)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            {notebooks.length} of {limiteCadernos} journals created
+      <div className="cabinet-section-header">
+        <div className="cabinet-section-title-wrap">
+          <span className="cabinet-section-emblem" aria-hidden="true">
+            <BookVolumeIcon size={17} />
           </span>
-          <Link href="/journal?create=1" className="stamp-button">
+          <h2 id="my-journal-heading" className="cabinet-section-title">
+            My Journal
+          </h2>
+        </div>
+
+        <div className="cabinet-section-meta">
+          <span className="cabinet-count-note">
+            {hasSearch
+              ? `${notebooks.length} matching of ${effectiveTotal} volumes`
+              : `${effectiveTotal} of ${limiteCadernos} volumes`}
+          </span>
+          <Link href="/journal?create=1" className="cabinet-inline-btn">
             + Create a Journal
           </Link>
         </div>
       </div>
 
       {notebooks.length === 0 ? (
-        <div className="empty-journal-box">
-          <div className="mini-leather-emblem" style={{ margin: "0 auto 14px" }} aria-hidden="true">
-            <span className="mini-leather-emblem__ribbon" />
-            <span className="mini-leather-emblem__glyph">✎</span>
-          </div>
-          <h3>Your story begins here.</h3>
-          <p style={{ marginBottom: "18px" }}>
-            Create a journal and give your thoughts a place to live.
-          </p>
-          <Link href="/journal?create=1" className="sober-save-btn" style={{ width: "auto" }}>
-            Create a Journal
-          </Link>
-        </div>
-      ) : (
-        <div className="shelf-tomes-grid">
-          {notebooks.map((nb) => {
-            const totalPaginas = filterWrittenPages(nb.paginas).length;
-            const dates = getNotebookDates(nb);
-            const theme = getNotebookTheme(nb.corCapa);
-
-            return (
-              <motion.article
-                key={nb.id}
-                className={`tome-book-item tome-book-color--${theme.id}`}
-                style={{ backgroundColor: theme.shelfBg }}
-                onClick={() => {
-                  playPaperSound();
-                  router.push(`/notebook?id=${encodeURIComponent(nb.id)}`);
-                }}
-                whileHover={{ y: -6 }}
-                transition={{ duration: 0.2 }}
+        hasSearch ? (
+          <div className="empty-journal-box">
+            <h3>No journal volumes match “{searchQuery.trim()}”.</h3>
+            <p style={{ marginBottom: "18px" }}>
+              Try another keyword or clear your search to see all bound volumes.
+            </p>
+            {onClearSearch && (
+              <button
+                type="button"
+                className="cabinet-secondary-btn"
+                onClick={onClearSearch}
               >
-                <div className="tome-book-spine-line" aria-hidden="true" />
-                <div
-                  className="tome-book-ribbon"
-                  aria-hidden="true"
-                  style={{ backgroundColor: theme.ribbonColor }}
-                />
+                Clear Search
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="empty-journal-box">
+            <div className="mini-leather-emblem" style={{ margin: "0 auto 14px" }} aria-hidden="true">
+              <span className="mini-leather-emblem__ribbon" />
+              <span className="mini-leather-emblem__glyph">
+                <QuillIcon size={16} />
+              </span>
+            </div>
+            <h3>Your story begins here.</h3>
+            <p style={{ marginBottom: "18px" }}>
+              Create a leather-bound journal and give your thoughts a place to live.
+            </p>
+            <Link href="/journal?create=1" className="cabinet-primary-btn">
+              Create a Journal
+            </Link>
+          </div>
+        )
+      ) : (
+        <div className="journal-shelf-bay">
+          <div className="cabinet-tomes-grid">
+            {notebooks.map((nb, idx) => {
+              const totalPaginas = filterWrittenPages(nb.paginas).length;
+              const dates = getNotebookDates(nb);
+              const theme = getNotebookTheme(nb.corCapa);
 
-                <div className="tome-book-top">
+              return (
+                <motion.article
+                  key={nb.id}
+                  className={`tome-book-item cabinet-tome-card tome-book-color--${theme.id}`}
+                  style={{ backgroundColor: theme.shelfBg }}
+                  onClick={() => {
+                    playPaperSound();
+                    router.push(`/notebook?id=${encodeURIComponent(nb.id)}`);
+                  }}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.28,
+                    delay: prefersReducedMotion ? 0 : Math.min(idx * 0.04, 0.24),
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                  whileHover={prefersReducedMotion ? undefined : { y: -6 }}
+                >
+                  <div className="tome-book-spine-line" aria-hidden="true" />
                   <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      paddingRight: "28px",
-                    }}
-                  >
-                    <span className="tome-book-tag">
-                      {theme.nome.toUpperCase()} · {theme.etiqueta.toUpperCase()}
-                    </span>
-                  </div>
-                  <h3 className="tome-book-title">{nb.nome}</h3>
-                </div>
+                    className="tome-book-ribbon"
+                    aria-hidden="true"
+                    style={{ backgroundColor: theme.ribbonColor }}
+                  />
 
-                <div className="tome-book-bottom-extended">
-                  <div className="tome-book-stats">
-                    <span className="tome-book-page-count">
-                      {totalPaginas}{" "}
-                      {totalPaginas === 1 ? "page written" : "pages written"}
-                    </span>
-                    <span className="tome-book-date">
-                      Created: {dates.created}
-                    </span>
-                    <span className="tome-book-date">
-                      Modified: {dates.updated}
-                    </span>
-                  </div>
-
-                  {/* Journal Card Actions */}
-                  <div
-                    className="tome-book-actions-bar"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className="tome-action-btn tome-action-btn--primary"
-                      onClick={() => {
-                        playPaperSound();
-                        router.push(`/notebook?id=${encodeURIComponent(nb.id)}`);
+                  <div className="tome-book-top">
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        paddingRight: "28px",
                       }}
-                      title={`Open and browse realistic 3D journal "${nb.nome}"`}
                     >
-                      View Journal
-                    </button>
-                    <button
-                      type="button"
-                      className="tome-action-btn"
-                      onClick={() => abrirCadernoParaLeitura(nb)}
-                      title={`Quick read "${nb.nome}"`}
-                    >
-                      Quick Read
-                    </button>
-                    <button
-                      type="button"
-                      className="tome-action-btn"
-                      onClick={() => continuarEscrevendoCaderno(nb)}
-                      title={`Continue writing in "${nb.nome}"`}
-                    >
-                      Continue Writing ↗
-                    </button>
-                    <button
-                      type="button"
-                      className="tome-action-btn"
-                      onClick={(e) => abrirModalRenomear(nb, e)}
-                      title={`Rename "${nb.nome}"`}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      className="tome-action-btn tome-action-btn--danger"
-                      onClick={(e) => abrirModalExclusao(nb, e)}
-                      title={`Delete "${nb.nome}"`}
-                    >
-                      Delete
-                    </button>
+                      <span className="tome-book-tag">
+                        {theme.nome.toUpperCase()} · {theme.etiqueta.toUpperCase()}
+                      </span>
+                    </div>
+                    <h3 className="tome-book-title">{nb.nome}</h3>
+                    <span className="cabinet-tome-open-hint">
+                      Open 3D Volume →
+                    </span>
                   </div>
-                </div>
-              </motion.article>
-            );
-          })}
+
+                  <div className="cabinet-tome-footer">
+                    <div className="tome-book-stats">
+                      <span className="tome-book-page-count">
+                        {totalPaginas}{" "}
+                        {totalPaginas === 1 ? "page written" : "pages written"}
+                      </span>
+                      <span className="tome-book-date">
+                        Created {dates.created} · Updated {dates.updated}
+                      </span>
+                    </div>
+
+                    <div
+                      className="cabinet-tome-actions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="cabinet-tome-btn cabinet-tome-btn--primary"
+                        onClick={() => {
+                          playPaperSound();
+                          router.push(`/notebook?id=${encodeURIComponent(nb.id)}`);
+                        }}
+                        title={`Open and browse realistic 3D journal "${nb.nome}"`}
+                      >
+                        <BookVolumeIcon size={13} />
+                        <span>View Journal</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="cabinet-tome-btn"
+                        onClick={() => abrirCadernoParaLeitura(nb)}
+                        title={`Quick read "${nb.nome}"`}
+                      >
+                        <EyeOpenIcon size={13} />
+                        <span>Quick Read</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="cabinet-tome-btn"
+                        onClick={() => continuarEscrevendoCaderno(nb)}
+                        title={`Continue writing in "${nb.nome}"`}
+                      >
+                        <QuillIcon size={13} />
+                        <span>Write ↗</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="cabinet-tome-btn"
+                        onClick={(e) => abrirModalRenomear(nb, e)}
+                        title={`Rename "${nb.nome}"`}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        type="button"
+                        className="cabinet-tome-btn cabinet-tome-btn--danger"
+                        onClick={(e) => abrirModalExclusao(nb, e)}
+                        title={`Delete "${nb.nome}"`}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </motion.article>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -300,8 +360,11 @@ export default function MyJournalCollection({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
             onClick={() => setReadingNotebook(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Reading ${readingNotebook.nome}`}
           >
             <div
               className="dark-reading-topbar"
@@ -326,7 +389,7 @@ export default function MyJournalCollection({
                   }
                   title="Open this journal on the writing desk to continue writing"
                 >
-                  <span>✎ CONTINUE WRITING</span>
+                  <span>CONTINUE WRITING</span>
                 </button>
 
                 <button
@@ -351,7 +414,7 @@ export default function MyJournalCollection({
                   type="button"
                   className="dark-reading-close-btn"
                   onClick={() => setReadingNotebook(null)}
-                  title="Close reading room"
+                  title="Close reading room (Esc)"
                 >
                   ✕ Close
                 </button>
@@ -380,7 +443,7 @@ export default function MyJournalCollection({
                   backgroundColor: getPaperColorById(paginaAtual.tipoPapel),
                   color: getInkColorById(paginaAtual.corTinta),
                 }}
-                initial={{ opacity: 0.85, scale: 0.98 }}
+                initial={prefersReducedMotion ? false : { opacity: 0.85, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.2 }}
               >
@@ -457,15 +520,19 @@ export default function MyJournalCollection({
             <motion.div
               className="notebook-drawer-sheet"
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.92, opacity: 0, y: 15 }}
+              initial={prefersReducedMotion ? false : { scale: 0.94, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 15 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Rename Journal"
             >
               <button
                 type="button"
                 className="drawer-close-btn"
                 onClick={() => setRenamingNotebook(null)}
                 title="Close"
+                aria-label="Close rename modal"
               >
                 ✕
               </button>
@@ -475,8 +542,11 @@ export default function MyJournalCollection({
               </p>
 
               <form onSubmit={confirmarRenomear} className="new-notebook-form">
-                <label className="new-notebook-label">JOURNAL TITLE</label>
+                <label className="new-notebook-label" htmlFor="rename-journal-input">
+                  JOURNAL TITLE
+                </label>
                 <input
+                  id="rename-journal-input"
                   type="text"
                   className="new-notebook-input"
                   value={renameInput}
@@ -520,10 +590,13 @@ export default function MyJournalCollection({
             <motion.div
               className="delete-notebook-modal-sheet"
               onClick={(e) => e.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.94, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
               transition={{ duration: 0.2 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Permanently Delete Journal"
             >
               <div className="delete-modal-warning-header">
                 <span className="delete-modal-icon" aria-hidden="true">

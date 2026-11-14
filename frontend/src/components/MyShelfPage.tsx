@@ -1,16 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 import MyJournalCollection from "@/components/MyJournalCollection";
 import MyLettersCollection from "@/components/MyLettersCollection";
 import { GuestAccountPromptCard } from "@/components/GuestSavePromptModal";
 import {
+  BookVolumeIcon,
+  CloseIcon,
+  EnvelopeIcon,
+  QuillIcon,
+  SearchIcon,
+  SortArrowsIcon,
+} from "@/components/my-shelf/ShelfIcons";
+import {
   JOURNAL_UPDATED_EVENT,
   filterWrittenPages,
+  getNotebookTheme,
   loadLetterFolders,
   loadSavedLetters,
   loadTrashLetters,
@@ -20,14 +29,26 @@ import {
   type LetterFolder,
   type Notebook,
 } from "@/lib/journal-storage";
+import "./my-shelf/my-shelf.css";
+
+type ShelfSection = "all" | "journals" | "letters";
+type ShelfSort = "recent" | "oldest" | "title";
+
+function parseTimestamp(isoOrDate?: string): number {
+  if (!isoOrDate) return 0;
+  const parsed = Date.parse(isoOrDate);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
 
 export default function MyShelfPage({ showPageChrome = false }: { showPageChrome?: boolean } = {}) {
   const { user, loading: authLoading, isPro } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Internal navigation tab: 'all' | 'journals' | 'letters'
-  const [activeSection, setActiveSection] = useState<"all" | "journals" | "letters">("all");
+  const [activeSection, setActiveSection] = useState<ShelfSection>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<ShelfSort>("recent");
 
-  // Archive Data
   const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [lettersWritten, setLettersWritten] = useState<JournalEntry[]>([]);
   const [letterFolders, setLetterFolders] = useState<LetterFolder[]>([]);
@@ -125,6 +146,83 @@ export default function MyShelfPage({ showPageChrome = false }: { showPageChrome
     };
   }, [authLoading, user, carregarDadosEstante]);
 
+  // Press '/' to focus the archive search input
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredNotebooks = useMemo(() => {
+    const list = normalizedQuery
+      ? notebooks.filter((nb) => {
+          const theme = getNotebookTheme(nb.corCapa);
+          const matchesMeta =
+            nb.nome.toLowerCase().includes(normalizedQuery) ||
+            theme.nome.toLowerCase().includes(normalizedQuery) ||
+            theme.etiqueta.toLowerCase().includes(normalizedQuery);
+          if (matchesMeta) return true;
+          return (nb.paginas || []).some(
+            (p) =>
+              (p.titulo || "").toLowerCase().includes(normalizedQuery) ||
+              (p.conteudo || "").toLowerCase().includes(normalizedQuery)
+          );
+        })
+      : [...notebooks];
+
+    list.sort((a, b) => {
+      if (sortBy === "title") {
+        return a.nome.localeCompare(b.nome);
+      }
+      const timeA = parseTimestamp(a.atualizadoEm || a.criadoEm);
+      const timeB = parseTimestamp(b.atualizadoEm || b.criadoEm);
+      return sortBy === "oldest" ? timeA - timeB : timeB - timeA;
+    });
+
+    return list;
+  }, [notebooks, normalizedQuery, sortBy]);
+
+  const filteredLetters = useMemo(() => {
+    const folderNameById = new Map(letterFolders.map((f) => [f.id, f.nome]));
+    const list = normalizedQuery
+      ? lettersWritten.filter((letter) => {
+          const folderName =
+            letter.pasta_nome ||
+            (letter.pasta_id ? folderNameById.get(letter.pasta_id) : "") ||
+            "";
+          return (
+            (letter.titulo || "").toLowerCase().includes(normalizedQuery) ||
+            (letter.destinatario || "").toLowerCase().includes(normalizedQuery) ||
+            (letter.conteudo || "").toLowerCase().includes(normalizedQuery) ||
+            (letter.selo_carta || "").toLowerCase().includes(normalizedQuery) ||
+            folderName.toLowerCase().includes(normalizedQuery)
+          );
+        })
+      : [...lettersWritten];
+
+    list.sort((a, b) => {
+      if (sortBy === "title") {
+        return (a.titulo || "Untitled").localeCompare(b.titulo || "Untitled");
+      }
+      const timeA = parseTimestamp(a.atualizado_em || a.criado_em);
+      const timeB = parseTimestamp(b.atualizado_em || b.criado_em);
+      return sortBy === "oldest" ? timeA - timeB : timeB - timeA;
+    });
+
+    return list;
+  }, [lettersWritten, letterFolders, normalizedQuery, sortBy]);
+
   if (authLoading) {
     return (
       <div className="guest-shelf-gate-wrap">
@@ -152,168 +250,286 @@ export default function MyShelfPage({ showPageChrome = false }: { showPageChrome
 
   const isShelfCompletelyEmpty =
     notebooks.length === 0 && lettersWritten.length === 0;
+  const hasActiveSearch = normalizedQuery.length > 0;
+  const isSearchEmpty =
+    !isShelfCompletelyEmpty &&
+    hasActiveSearch &&
+    filteredNotebooks.length === 0 &&
+    filteredLetters.length === 0;
+
+  const journalPct = Math.min(100, Math.round((notebooks.length / limiteCadernos) * 100));
+  const letterPct = Math.min(100, Math.round((lettersWritten.length / limiteCartas) * 100));
+  const folderPct = Math.min(100, Math.round((letterFolders.length / limitePastas) * 100));
+
+  const tabs: { id: ShelfSection; label: string; count: number }[] = [
+    { id: "all", label: "All Archive", count: filteredNotebooks.length + filteredLetters.length },
+    { id: "journals", label: "My Journal", count: filteredNotebooks.length },
+    { id: "letters", label: "My Letters", count: filteredLetters.length },
+  ];
 
   return (
     <>
-      {showPageChrome && (
-        <section className="journal-intro" aria-labelledby="my-shelf-page-title">
-          <span className="eyebrow">PERSONAL ARCHIVE · KEPT VOLUMES &amp; CORRESPONDENCE</span>
-          <h1 id="my-shelf-page-title">
-            My <em>Shelf.</em>
-          </h1>
-          <p className="journal-intro-sub">
-            Every leather-bound journal and personal letter you have written rests here, ready to be reopened, reread, or continued whenever memory calls.
-          </p>
-        </section>
-      )}
-      <div className="personal-journal-shelf-wrap" id="my-shelf-archive">
-      {/* Top Quota & Archive Summary Bar */}
-      <div className="my-shelf-overview-bar">
-        <div className="my-shelf-internal-nav" role="tablist" aria-label="My Shelf sections">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeSection === "all"}
-            className={`my-shelf-nav-tab ${activeSection === "all" ? "is-active" : ""}`}
-            onClick={() => {
-              playPaperSound();
-              setActiveSection("all");
-            }}
-          >
-            <span>All Archive</span>
-            <small>{notebooks.length + lettersWritten.length}</small>
-          </button>
+      <div className="study-cabinet-shell" id="my-shelf-archive">
+        {/* Collector's Study Cabinet Masthead */}
+        <motion.header
+          className="cabinet-masthead"
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="cabinet-masthead-top">
+            <div className="cabinet-title-block">
+              <h1 id="my-shelf-page-title" className="cabinet-title">
+                My <em>Shelf.</em>
+              </h1>
+              <p className="cabinet-subtitle">
+                Every leather-bound journal and personal letter you have written rests here—catalogued, preserved, and ready to reopen whenever memory calls.
+              </p>
+            </div>
 
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeSection === "journals"}
-            className={`my-shelf-nav-tab ${
-              activeSection === "journals" ? "is-active" : ""
-            }`}
-            onClick={() => {
-              playPaperSound();
-              setActiveSection("journals");
-            }}
-          >
-            <span>My Journal</span>
-            <small>{notebooks.length}</small>
-          </button>
+            <div className="cabinet-quick-actions">
+              <Link href="/journal?create=1" className="cabinet-primary-btn">
+                <BookVolumeIcon size={15} />
+                <span>Create a Journal</span>
+              </Link>
+              <Link href="/letters" className="cabinet-secondary-btn">
+                <QuillIcon size={15} />
+                <span>Write a Letter</span>
+              </Link>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeSection === "letters"}
-            className={`my-shelf-nav-tab ${
-              activeSection === "letters" ? "is-active" : ""
-            }`}
-            onClick={() => {
-              playPaperSound();
-              setActiveSection("letters");
-            }}
-          >
-            <span>My Letters</span>
-            <small>{lettersWritten.length}</small>
-          </button>
+          {/* Collector's Ledger Strip */}
+          <div className="cabinet-ledger-strip" aria-label="Archive capacity and membership">
+            <div className="cabinet-ledger-meters">
+              <div className="cabinet-meter">
+                <div className="cabinet-meter-head">
+                  <span className="cabinet-meter-label">Journals</span>
+                  <span className="cabinet-meter-value">
+                    {notebooks.length}/{limiteCadernos}
+                  </span>
+                </div>
+                <div className="cabinet-meter-track" aria-hidden="true">
+                  <div
+                    className={`cabinet-meter-fill ${notebooks.length >= limiteCadernos ? "is-full" : ""}`}
+                    style={{ width: `${journalPct}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="cabinet-meter">
+                <div className="cabinet-meter-head">
+                  <span className="cabinet-meter-label">Letters</span>
+                  <span className="cabinet-meter-value">
+                    {lettersWritten.length}/{limiteCartas}
+                  </span>
+                </div>
+                <div className="cabinet-meter-track" aria-hidden="true">
+                  <div
+                    className={`cabinet-meter-fill ${lettersWritten.length >= limiteCartas ? "is-full" : ""}`}
+                    style={{ width: `${letterPct}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="cabinet-meter">
+                <div className="cabinet-meter-head">
+                  <span className="cabinet-meter-label">Folders</span>
+                  <span className="cabinet-meter-value">
+                    {letterFolders.length}/{limitePastas}
+                  </span>
+                </div>
+                <div className="cabinet-meter-track" aria-hidden="true">
+                  <div
+                    className={`cabinet-meter-fill ${letterFolders.length >= limitePastas ? "is-full" : ""}`}
+                    style={{ width: `${folderPct}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="cabinet-plan-cluster">
+              <span className={`cabinet-plan-badge ${isPro ? "is-pro" : ""}`}>
+                {isPro ? "Pro Sender" : "Standard Plan"}
+              </span>
+              {!isPro && (
+                <Link href="/clube-pro" className="cabinet-upgrade-link">
+                  Upgrade to Pro Club ↗
+                </Link>
+              )}
+            </div>
+          </div>
+        </motion.header>
+
+        {/* Cataloguing Desk Toolbar */}
+        <div className="catalog-toolbar" role="region" aria-label="Archive navigation and search">
+          <div className="catalog-tabs" role="tablist" aria-label="My Shelf sections">
+            {tabs.map((tab) => {
+              const isActive = activeSection === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`catalog-tab-btn ${isActive ? "is-active" : ""}`}
+                  onClick={() => {
+                    playPaperSound();
+                    setActiveSection(tab.id);
+                  }}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="shelfTabPill"
+                      className="catalog-tab-pill"
+                      transition={
+                        prefersReducedMotion
+                          ? { duration: 0 }
+                          : { type: "spring", stiffness: 420, damping: 34 }
+                      }
+                    />
+                  )}
+                  <span className="catalog-tab-label">{tab.label}</span>
+                  <span className="catalog-tab-count">{tab.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="catalog-controls">
+            <div className="catalog-search-box">
+              <span className="catalog-search-icon">
+                <SearchIcon size={15} />
+              </span>
+              <input
+                ref={searchInputRef}
+                type="search"
+                className="catalog-search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search journals, letters, recipients…"
+                aria-label="Search journals and letters"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className="catalog-search-clear"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
+                  title="Clear search"
+                >
+                  <CloseIcon size={12} />
+                </button>
+              ) : (
+                <span className="catalog-search-kbd" aria-hidden="true">
+                  /
+                </span>
+              )}
+            </div>
+
+            <div className="catalog-sort-wrap">
+              <span className="catalog-sort-icon">
+                <SortArrowsIcon size={14} />
+              </span>
+              <select
+                className="catalog-sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as ShelfSort)}
+                aria-label="Sort archive items"
+              >
+                <option value="recent">Recently Updated</option>
+                <option value="oldest">Oldest First</option>
+                <option value="title">Title (A–Z)</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div className="my-shelf-quota-badges">
-          <span className="my-shelf-quota-chip">
-            JOURNALS: {notebooks.length}/{limiteCadernos}
-          </span>
-          <span className="my-shelf-quota-chip">
-            LETTERS: {lettersWritten.length}/{limiteCartas}
-          </span>
-          <span className="my-shelf-quota-chip">
-            FOLDERS: {letterFolders.length}/{limitePastas}
-          </span>
-          <span
-            className="my-shelf-quota-chip"
-            style={{
-              background: isPro
-                ? "var(--color-red-sands, #ad5b30)"
-                : "rgba(81, 76, 52, 0.65)",
-              color: "#fcfbf7",
-            }}
+        {/* Overall My Shelf Empty State */}
+        {isShelfCompletelyEmpty && (
+          <motion.section
+            className="cabinet-empty-state"
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            aria-label="Empty shelf invitation"
           >
-            {isPro ? "★ PRO SENDER" : "STANDARD PLAN"}
-          </span>
-          {!isPro && (
-            <Link
-              href="/clube-pro"
-              style={{
-                fontSize: "11px",
-                color: "var(--color-pollen, #cfa96f)",
-                textDecoration: "underline",
-                fontWeight: 600,
-              }}
+            <div className="my-shelf-master-empty-state__art" aria-hidden="true">
+              <div className="mini-leather-emblem">
+                <span className="mini-leather-emblem__ribbon" />
+                <span className="mini-leather-emblem__glyph">
+                  <QuillIcon size={18} />
+                </span>
+              </div>
+              <div className="envelope envelope--sealed">
+                <div className="envelope__flap" />
+                <div className="envelope__seal">
+                  <EnvelopeIcon size={14} />
+                </div>
+              </div>
+            </div>
+
+            <h2 className="cabinet-empty-title">Your shelf is waiting for memories.</h2>
+            <p className="cabinet-empty-desc">
+              Begin a leather-bound journal or compose a personal letter—every volume and keepsake will be catalogued here.
+            </p>
+
+            <div className="my-shelf-master-empty-state__actions">
+              <Link href="/journal?create=1" className="cabinet-primary-btn">
+                Create a Journal
+              </Link>
+              <Link href="/letters" className="cabinet-secondary-btn">
+                Write a Letter
+              </Link>
+            </div>
+          </motion.section>
+        )}
+
+        {/* Search No-Match State */}
+        {isSearchEmpty && (
+          <section className="cabinet-empty-state" aria-live="polite">
+            <h2 className="cabinet-empty-title">No keepsakes match “{searchQuery.trim()}”</h2>
+            <p className="cabinet-empty-desc">
+              Try a different title, recipient, or phrase—or clear the search to browse your full study cabinet.
+            </p>
+            <button
+              type="button"
+              className="cabinet-secondary-btn"
+              onClick={() => setSearchQuery("")}
             >
-              Upgrade to Pro Club ↗
-            </Link>
-          )}
-        </div>
+              Clear Search
+            </button>
+          </section>
+        )}
+
+        {/* Section 1: MY JOURNAL */}
+        {!isSearchEmpty && (activeSection === "all" || activeSection === "journals") && (
+          <MyJournalCollection
+            notebooks={filteredNotebooks}
+            totalCount={notebooks.length}
+            limiteCadernos={limiteCadernos}
+            searchQuery={searchQuery}
+            onClearSearch={() => setSearchQuery("")}
+            onRefresh={carregarDadosEstante}
+          />
+        )}
+
+        {/* Section 2: MY LETTERS */}
+        {!isSearchEmpty && (activeSection === "all" || activeSection === "letters") && (
+          <MyLettersCollection
+            lettersWritten={filteredLetters}
+            totalLettersCount={lettersWritten.length}
+            letterFolders={letterFolders}
+            trashLetters={trashLetters}
+            limiteCartas={limiteCartas}
+            limitePastas={limitePastas}
+            searchQuery={searchQuery}
+            onClearSearch={() => setSearchQuery("")}
+            onRefresh={carregarDadosEstante}
+          />
+        )}
       </div>
 
-      {/* Overall My Shelf Empty State when both Journals and Letters are empty */}
-      {isShelfCompletelyEmpty && (
-        <motion.section
-          className="my-shelf-master-empty-state"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          aria-label="Empty shelf invitation"
-        >
-          <div className="my-shelf-master-empty-state__art" aria-hidden="true">
-            <div className="mini-leather-emblem">
-              <span className="mini-leather-emblem__ribbon" />
-              <span className="mini-leather-emblem__glyph">✎</span>
-            </div>
-            <div className="envelope envelope--sealed">
-              <div className="envelope__flap" />
-              <div className="envelope__seal">✦</div>
-            </div>
-          </div>
-
-          <span className="section-kicker">PERSONAL ARCHIVE & KEEPSAKES</span>
-          <h2 className="my-shelf-master-empty-state__title">
-            Your shelf is waiting for memories.
-          </h2>
-          <p className="my-shelf-master-empty-state__desc">
-            Your journals and letters will find their place here.
-          </p>
-
-          <div className="my-shelf-master-empty-state__actions">
-            <Link href="/journal?create=1" className="sober-save-btn" style={{ width: "auto" }}>
-              Create a Journal
-            </Link>
-            <Link href="/letters" className="stamp-button" style={{ padding: "11px 20px" }}>
-              Write a Letter
-            </Link>
-          </div>
-        </motion.section>
-      )}
-
-      {/* Section 1: MY JOURNAL */}
-      {(activeSection === "all" || activeSection === "journals") && (
-        <MyJournalCollection
-          notebooks={notebooks}
-          limiteCadernos={limiteCadernos}
-          onRefresh={carregarDadosEstante}
-        />
-      )}
-
-      {/* Section 2: MY LETTERS */}
-      {(activeSection === "all" || activeSection === "letters") && (
-        <MyLettersCollection
-          lettersWritten={lettersWritten}
-          letterFolders={letterFolders}
-          trashLetters={trashLetters}
-          limiteCartas={limiteCartas}
-          limitePastas={limitePastas}
-          onRefresh={carregarDadosEstante}
-        />
-      )}
-    </div>
       {showPageChrome && (
         <section className="closing-note" aria-label="A note for the collector">
           <span className="closing-note__ornament" aria-hidden="true">❧</span>

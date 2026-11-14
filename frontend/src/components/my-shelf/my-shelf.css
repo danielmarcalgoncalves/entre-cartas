@@ -1,0 +1,1038 @@
+/* ==========================================================================
+   MY SHELF — COLLECTOR'S STUDY CABINET
+   Preserves Between Letters' Dark Organic Editorial & Light Academy worlds.
+   ========================================================================== */
+
+.study-cabinet-shell {
+  --cabinet-wood-dark: linear-gradient(180deg, rgba(38, 28, 20, 0.94) 0%, rgba(25, 19, 14, 0.98) 100%);
+  --cabinet-wood-light: linear-gradient(180deg, rgba(250, 244, 232, 0.96) 0%, rgba(239, 229, 209, 0.98) 100%);
+  --cabinet-brass: var(--color-pollen, #cfa96f);
+  --cabinet-brass-dim: rgba(207, 169, 111, 0.24);
+  --cabinet-brass-border: rgba(207, 169, 111, 0.34);
+  --cabinet-terracotta: var(--color-red-sands, #ad5b30);
+  --cabinet-shelf-ledge: linear-gradient(180deg, #3c2b1e 0%, #261b12 65%, #18110b 100%);
+  --cabinet-shelf-ledge-light: linear-gradient(180deg, #d7c3a3 0%, #bfa681 65%, #9d835f 100%);
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 24px 80px;
+  position: relative;
+}
+
+.study-cabinet-shell ::selection {
+  background: rgba(207, 169, 111, 0.32);
+  color: var(--text-primary);
+}
+
+.study-cabinet-shell :is(button, a, input, select):focus-visible {
+  outline: 2px solid var(--cabinet-brass);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   1. CABINET MASTHEAD & COLLECTOR'S LEDGER
+   -------------------------------------------------------------------------- */
+
+.cabinet-masthead {
+  background: var(--cabinet-wood-dark);
+  border: 1px solid var(--cabinet-brass-border);
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  margin-bottom: 22px;
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(236, 225, 201, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.cabinet-masthead::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(207, 169, 111, 0.1);
+  border-radius: 11px;
+  pointer-events: none;
+}
+
+[data-theme="light"] .cabinet-masthead {
+  background: var(--cabinet-wood-light);
+  border-color: rgba(138, 131, 95, 0.35);
+  box-shadow:
+    0 14px 34px rgba(74, 70, 57, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+[data-theme="light"] .cabinet-masthead::before {
+  border-color: rgba(138, 131, 95, 0.16);
+}
+
+.cabinet-masthead-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.cabinet-title-block {
+  max-width: 620px;
+}
+
+.cabinet-title {
+  font-family: var(--display, "DM Serif Display", Georgia, serif);
+  font-size: clamp(32px, 4.2vw, 46px);
+  font-weight: 400;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.cabinet-title em {
+  font-family: var(--serif-title, "Cormorant Garamond", Georgia, serif);
+  font-style: italic;
+  color: var(--cabinet-brass);
+}
+
+[data-theme="light"] .cabinet-title em {
+  color: #8c4824;
+}
+
+.cabinet-subtitle {
+  font-family: var(--serif, "EB Garamond", Georgia, serif);
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 62ch;
+}
+
+.cabinet-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cabinet-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: var(--cabinet-terracotta);
+  color: #fcfbf7;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(173, 91, 48, 0.28);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+}
+
+.cabinet-primary-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.cabinet-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: rgba(207, 169, 111, 0.1);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  border: 1px solid var(--cabinet-brass-border);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.cabinet-secondary-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(207, 169, 111, 0.18);
+  border-color: var(--cabinet-brass);
+}
+
+[data-theme="light"] .cabinet-secondary-btn {
+  background: rgba(138, 131, 95, 0.1);
+  border-color: rgba(138, 131, 95, 0.38);
+}
+
+/* Collector's Ledger Strip */
+.cabinet-ledger-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--cabinet-brass-dim);
+  position: relative;
+  z-index: 1;
+}
+
+.cabinet-ledger-meters {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.cabinet-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 118px;
+}
+
+.cabinet-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cabinet-meter-label {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cabinet-meter-value {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.cabinet-meter-track {
+  height: 4px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(207, 169, 111, 0.14);
+  overflow: hidden;
+}
+
+[data-theme="light"] .cabinet-meter-track {
+  background: rgba(138, 131, 95, 0.2);
+}
+
+.cabinet-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cabinet-brass);
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cabinet-meter-fill.is-full {
+  background: var(--cabinet-terracotta);
+}
+
+.cabinet-plan-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cabinet-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid rgba(207, 169, 111, 0.28);
+  background: rgba(81, 76, 52, 0.42);
+  color: var(--text-primary);
+}
+
+.cabinet-plan-badge.is-pro {
+  background: var(--cabinet-terracotta);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fcfbf7;
+}
+
+[data-theme="light"] .cabinet-plan-badge:not(.is-pro) {
+  background: rgba(138, 131, 95, 0.16);
+  color: var(--text-primary);
+}
+
+.cabinet-upgrade-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cabinet-brass);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(207, 169, 111, 0.45);
+  padding-bottom: 1px;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.cabinet-upgrade-link:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+[data-theme="light"] .cabinet-upgrade-link {
+  color: #8c4824;
+  border-bottom-color: rgba(140, 72, 36, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   2. CATALOGUING DESK TOOLBAR (TABS + SEARCH + SORT)
+   -------------------------------------------------------------------------- */
+
+.catalog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 30px;
+  background: rgba(34, 26, 19, 0.78);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="light"] .catalog-toolbar {
+  background: rgba(252, 249, 242, 0.92);
+  border-color: rgba(138, 131, 95, 0.28);
+  box-shadow: 0 6px 18px rgba(74, 70, 57, 0.06);
+}
+
+.catalog-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.catalog-tab-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.catalog-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(207, 169, 111, 0.08);
+}
+
+.catalog-tab-btn.is-active {
+  color: #1c140d;
+  font-weight: 600;
+}
+
+.catalog-tab-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: var(--cabinet-brass);
+  z-index: 0;
+  box-shadow: 0 4px 12px rgba(207, 169, 111, 0.26);
+}
+
+.catalog-tab-label,
+.catalog-tab-count {
+  position: relative;
+  z-index: 1;
+}
+
+.catalog-tab-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.catalog-tab-btn:not(.is-active) .catalog-tab-count {
+  background: rgba(207, 169, 111, 0.12);
+  color: var(--text-muted);
+}
+
+.catalog-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 320px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.catalog-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+
+.catalog-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  display: inline-flex;
+}
+
+.catalog-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 64px 0 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-input, #1c150f);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 13px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.catalog-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.catalog-search-input:focus {
+  outline: none;
+  border-color: var(--cabinet-brass);
+  box-shadow: 0 0 0 3px rgba(207, 169, 111, 0.15);
+}
+
+.catalog-search-kbd {
+  position: absolute;
+  right: 10px;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 1px 6px;
+  pointer-events: none;
+}
+
+.catalog-search-clear {
+  position: absolute;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(207, 169, 111, 0.14);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.catalog-search-clear:hover {
+  background: rgba(207, 169, 111, 0.26);
+}
+
+.catalog-sort-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.catalog-sort-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+  display: inline-flex;
+}
+
+.catalog-sort-select {
+  height: 38px;
+  padding: 0 14px 0 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-input, #1c150f);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   3. SECTION HEADERS & SHELF LEDGE
+   -------------------------------------------------------------------------- */
+
+.cabinet-section {
+  margin-bottom: 48px;
+}
+
+.cabinet-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--cabinet-brass-dim);
+}
+
+.cabinet-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cabinet-section-emblem {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(207, 169, 111, 0.12);
+  border: 1px solid var(--cabinet-brass-border);
+  color: var(--cabinet-brass);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .cabinet-section-emblem {
+  color: #8c4824;
+  background: rgba(140, 72, 36, 0.08);
+}
+
+.cabinet-section-title {
+  font-family: var(--serif-title, "Cormorant Garamond", Georgia, serif);
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.15;
+}
+
+.cabinet-section-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cabinet-count-note {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.cabinet-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--cabinet-brass-border);
+  background: rgba(207, 169, 111, 0.1);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.cabinet-inline-btn:hover {
+  background: rgba(207, 169, 111, 0.2);
+  border-color: var(--cabinet-brass);
+}
+
+/* --------------------------------------------------------------------------
+   4. MY JOURNAL — PURE CSS LEATHER VOLUMES ON WOODEN SHELF LEDGE
+   -------------------------------------------------------------------------- */
+
+.journal-shelf-bay {
+  position: relative;
+  padding: 8px 6px 26px;
+}
+
+.journal-shelf-bay::after {
+  content: "";
+  display: block;
+  height: 14px;
+  margin-top: 22px;
+  border-radius: 4px 4px 10px 10px;
+  background: var(--cabinet-shelf-ledge);
+  border-top: 1px solid rgba(207, 169, 111, 0.28);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] .journal-shelf-bay::after {
+  background: var(--cabinet-shelf-ledge-light);
+  border-top-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 10px 22px rgba(74, 70, 57, 0.18);
+}
+
+.cabinet-tomes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 26px;
+}
+
+.cabinet-tome-card {
+  min-height: 368px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cabinet-tome-open-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(238, 220, 192, 0.72);
+  margin-top: 10px;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.cabinet-tome-card:hover .cabinet-tome-open-hint {
+  opacity: 1;
+  transform: translateX(3px);
+  color: #f3dfb6;
+}
+
+.cabinet-tome-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(235, 198, 134, 0.24);
+}
+
+.cabinet-tome-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cabinet-tome-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  background: rgba(14, 10, 7, 0.34);
+  color: #eedcc0;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.cabinet-tome-btn:hover {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: rgba(212, 175, 55, 0.65);
+}
+
+.cabinet-tome-btn--primary {
+  grid-column: 1 / -1;
+  background: rgba(207, 169, 111, 0.2);
+  border-color: rgba(212, 175, 55, 0.55);
+  color: #fcf3df;
+  padding: 8px 10px;
+}
+
+.cabinet-tome-btn--primary:hover {
+  background: rgba(207, 169, 111, 0.34);
+}
+
+.cabinet-tome-btn--danger {
+  color: #f0b5b5;
+  border-color: rgba(212, 106, 106, 0.32);
+}
+
+.cabinet-tome-btn--danger:hover {
+  background: rgba(180, 56, 56, 0.35);
+  border-color: rgba(212, 106, 106, 0.7);
+}
+
+/* --------------------------------------------------------------------------
+   5. MY LETTERS — STUDY CABINET STAGE & CORRESPONDENCE INDEX
+   -------------------------------------------------------------------------- */
+
+.cabinet-stage-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 268px;
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 34px;
+}
+
+.cabinet-drawer-frame {
+  background: rgba(28, 21, 15, 0.55);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: inset 0 1px 0 rgba(236, 225, 201, 0.05);
+}
+
+[data-theme="light"] .cabinet-drawer-frame {
+  background: rgba(246, 240, 226, 0.75);
+  border-color: rgba(138, 131, 95, 0.28);
+}
+
+.cabinet-discard-station {
+  background: rgba(28, 21, 15, 0.78);
+  border: 1px solid var(--cabinet-brass-border);
+  border-radius: 14px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="light"] .cabinet-discard-station {
+  background: rgba(252, 249, 242, 0.92);
+  border-color: rgba(138, 131, 95, 0.32);
+  box-shadow: 0 8px 20px rgba(74, 70, 57, 0.08);
+}
+
+.cabinet-discard-plate {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cabinet-brass);
+  padding: 4px 10px;
+  border: 1px solid var(--cabinet-brass-dim);
+  border-radius: 4px;
+}
+
+[data-theme="light"] .cabinet-discard-plate {
+  color: #8c4824;
+}
+
+/* Correspondence Index Toolbar */
+.correspondence-index-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  background: rgba(34, 26, 19, 0.65);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+[data-theme="light"] .correspondence-index-bar {
+  background: rgba(250, 245, 234, 0.88);
+  border-color: rgba(138, 131, 95, 0.25);
+}
+
+.correspondence-filter-groups {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.correspondence-pill-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.correspondence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-card);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.correspondence-pill:hover {
+  border-color: var(--cabinet-brass);
+  color: var(--text-primary);
+}
+
+.correspondence-pill.is-active {
+  background: var(--cabinet-brass);
+  border-color: var(--cabinet-brass);
+  color: #1c140d;
+  font-weight: 600;
+}
+
+.view-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-input, #1c150f);
+  gap: 2px;
+}
+
+.view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.view-mode-btn.is-active {
+  background: rgba(207, 169, 111, 0.2);
+  color: var(--text-primary);
+}
+
+/* Archival Ledger List View */
+.archival-ledger-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(30, 23, 17, 0.76);
+}
+
+[data-theme="light"] .archival-ledger-list {
+  background: #fdfaf3;
+  border-color: rgba(138, 131, 95, 0.3);
+}
+
+.archival-ledger-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1.5fr) minmax(120px, 0.8fr) 100px auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+.archival-ledger-row:last-child {
+  border-bottom: none;
+}
+
+.archival-ledger-row:hover {
+  background: rgba(207, 169, 111, 0.08);
+}
+
+.archival-ledger-seal {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.archival-ledger-main {
+  min-width: 0;
+}
+
+.archival-ledger-title {
+  font-family: var(--serif-title, Georgia, serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archival-ledger-recipient {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.archival-ledger-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archival-ledger-date {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* Empty States */
+.cabinet-empty-state {
+  text-align: center;
+  padding: 52px 28px;
+  background: radial-gradient(circle at center, rgba(46, 36, 26, 0.9), rgba(24, 18, 13, 0.96));
+  border: 1px dashed rgba(207, 169, 111, 0.4);
+  border-radius: 16px;
+  margin-bottom: 32px;
+}
+
+[data-theme="light"] .cabinet-empty-state {
+  background: radial-gradient(circle at center, #fbf5e8, #ede0c5);
+  border-color: rgba(138, 131, 95, 0.42);
+}
+
+.cabinet-empty-title {
+  font-family: var(--serif-title, "Cormorant Garamond", Georgia, serif);
+  font-size: clamp(26px, 3.5vw, 34px);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.cabinet-empty-desc {
+  font-family: var(--serif, "EB Garamond", Georgia, serif);
+  font-size: 17px;
+  color: var(--text-secondary);
+  margin: 0 auto 22px;
+  max-width: 52ch;
+}
+
+/* Custom Scrollbar inside modals */
+.postal-trash-modal-body::-webkit-scrollbar,
+.entry-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.postal-trash-modal-body::-webkit-scrollbar-thumb,
+.entry-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(207, 169, 111, 0.35);
+  border-radius: 999px;
+}
+
+/* --------------------------------------------------------------------------
+   6. RESPONSIVE & REDUCED MOTION
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 960px) {
+  .cabinet-stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .archival-ledger-row {
+    grid-template-columns: 82px minmax(0, 1fr) auto;
+  }
+
+  .archival-ledger-folder,
+  .archival-ledger-date {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .study-cabinet-shell {
+    padding: 14px 14px 64px;
+  }
+
+  .cabinet-masthead {
+    padding: 20px 18px;
+  }
+
+  .catalog-toolbar {
+    padding: 10px 12px;
+  }
+
+  .catalog-search-box {
+    max-width: none;
+  }
+
+  .cabinet-tomes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .archival-ledger-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-cabinet-shell *,
+  .study-cabinet-shell *::before,
+  .study-cabinet-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

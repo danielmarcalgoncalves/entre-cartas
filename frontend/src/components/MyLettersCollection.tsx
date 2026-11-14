@@ -1,12 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import VintageFolderDrawer from "@/components/VintageFolderDrawer";
 import PostalTrashCan from "@/components/PostalTrashCan";
-import { useTheme } from "@/hooks/useTheme";
+import {
+  EnvelopeIcon,
+  FolderIcon,
+  GridViewIcon,
+  LedgerListIcon,
+  TrashBinIcon,
+} from "@/components/my-shelf/ShelfIcons";
 import { api } from "@/services/api";
 import {
   ACTIVE_LETTER_EDIT_ID_KEY,
@@ -29,27 +35,36 @@ import {
 
 interface MyLettersCollectionProps {
   lettersWritten: JournalEntry[];
+  totalLettersCount?: number;
   letterFolders: LetterFolder[];
   trashLetters: JournalEntry[];
   limiteCartas: number;
   limitePastas: number;
+  searchQuery?: string;
+  onClearSearch?: () => void;
   onRefresh: () => void;
 }
 
 export default function MyLettersCollection({
   lettersWritten,
+  totalLettersCount,
   letterFolders,
   trashLetters,
   limiteCartas,
   limitePastas,
+  searchQuery = "",
+  onClearSearch,
   onRefresh,
 }: MyLettersCollectionProps) {
   const router = useRouter();
-  const { theme } = useTheme();
+  const prefersReducedMotion = useReducedMotion();
+  const effectiveTotalLetters =
+    typeof totalLettersCount === "number" ? totalLettersCount : lettersWritten.length;
 
-  // Filter state for Stationery Cards Grid
+  // Filter & View state for Correspondence Index
   const [filterMode, setFilterMode] = useState<"all" | "completed" | "draft">("all");
   const [selectedFolderFilter, setSelectedFolderFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"cards" | "ledger">("cards");
 
   // Opened Folder Full View
   const [inspectedFolder, setInspectedFolder] = useState<LetterFolder | null>(null);
@@ -59,6 +74,11 @@ export default function MyLettersCollection({
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   const [trashFeedback, setTrashFeedback] = useState<string | null>(null);
 
+  // In-app Permanent Delete / Empty Trash Confirmation State
+  const [confirmPermanentTarget, setConfirmPermanentTarget] = useState<
+    { type: "single"; letter: JournalEntry } | { type: "all" } | null
+  >(null);
+
   // Letter Reader Modal
   const [readingLetter, setReadingLetter] = useState<JournalEntry | null>(null);
 
@@ -67,12 +87,19 @@ export default function MyLettersCollection({
   const [renameTitleInput, setRenameTitleInput] = useState("");
   const [renameRecipientInput, setRenameRecipientInput] = useState("");
 
-  // Delete Letter Confirmation Modal
-  const [letterToDelete, setLetterToDelete] = useState<JournalEntry | null>(null);
-
   // Move Letter Modal
   const [movingLetter, setMovingLetter] = useState<JournalEntry | null>(null);
   const [targetFolderId, setTargetFolderId] = useState("");
+
+  // Escape key closes reading modal
+  useEffect(() => {
+    if (!readingLetter) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReadingLetter(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [readingLetter]);
 
   const handleContinueEditing = (carta: JournalEntry) => {
     playPaperSound();
@@ -139,15 +166,19 @@ export default function MyLettersCollection({
     onRefresh();
   };
 
-  const handlePermanentDelete = async (carta: JournalEntry) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to permanently delete "${carta.titulo || "Letter"}"? This cannot be undone.`
-      )
-    ) {
+  const executePermanentDelete = async () => {
+    if (!confirmPermanentTarget) return;
+
+    if (confirmPermanentTarget.type === "all") {
+      emptyAllPostalTrash();
+      setConfirmPermanentTarget(null);
+      setTrashFeedback("Postal discards emptied permanently.");
+      setTimeout(() => setTrashFeedback(null), 3500);
+      onRefresh();
       return;
     }
 
+    const carta = confirmPermanentTarget.letter;
     permanentlyDeleteLetterFromStorage(String(carta.id));
     const remoteId =
       carta.remote_id ||
@@ -158,23 +189,8 @@ export default function MyLettersCollection({
       } catch {}
     }
 
+    setConfirmPermanentTarget(null);
     setTrashFeedback(`"${carta.titulo || "Letter"}" permanently deleted.`);
-    setTimeout(() => setTrashFeedback(null), 3500);
-    onRefresh();
-  };
-
-  const handleEmptyAllTrash = () => {
-    if (trashLetters.length === 0) return;
-    if (
-      !window.confirm(
-        `Permanently delete all ${trashLetters.length} letters from trash? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
-    emptyAllPostalTrash();
-    setTrashFeedback("Postal discards emptied permanently.");
     setTimeout(() => setTrashFeedback(null), 3500);
     onRefresh();
   };
@@ -213,23 +229,30 @@ export default function MyLettersCollection({
     return true;
   });
 
+  const hasSearch = searchQuery.trim().length > 0;
+
   return (
-    <section className="letters-archive-section" id="my-letters" aria-labelledby="letters-section-title">
+    <section
+      className="cabinet-section"
+      id="my-letters"
+      aria-labelledby="letters-section-title"
+    >
       {/* Top Header */}
-      <div className="shelf-header">
-        <div>
-          <span className="section-kicker">CORRESPONDENCE & STATIONERY ARCHIVE</span>
-          <h2 id="letters-section-title">My Letters</h2>
+      <div className="cabinet-section-header">
+        <div className="cabinet-section-title-wrap">
+          <span className="cabinet-section-emblem" aria-hidden="true">
+            <EnvelopeIcon size={17} />
+          </span>
+          <h2 id="letters-section-title" className="cabinet-section-title">
+            My Letters
+          </h2>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          <span
-            style={{
-              fontSize: "12px",
-              fontFamily: "var(--serif, serif)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            {lettersWritten.length} of {limiteCartas} letters • {letterFolders.length} of {limitePastas} folders
+
+        <div className="cabinet-section-meta">
+          <span className="cabinet-count-note">
+            {hasSearch
+              ? `${lettersWritten.length} matching of ${effectiveTotalLetters} letters`
+              : `${effectiveTotalLetters} of ${limiteCartas} letters · ${letterFolders.length} of ${limitePastas} folders`}
           </span>
           {trashLetters.length > 0 && (
             <button
@@ -238,10 +261,11 @@ export default function MyLettersCollection({
               onClick={() => setIsTrashModalOpen(true)}
               title="Open Postal Discards"
             >
-              {trashLetters.length} discarded
+              <TrashBinIcon size={12} />
+              <span>{trashLetters.length} discarded</span>
             </button>
           )}
-          <Link href="/letters" className="stamp-button">
+          <Link href="/letters" className="cabinet-inline-btn">
             + Write a Letter
           </Link>
         </div>
@@ -251,22 +275,21 @@ export default function MyLettersCollection({
       <AnimatePresence>
         {trashFeedback && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: -10, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
             transition={{ duration: 0.2 }}
             className="postal-trash-toast"
             role="status"
           >
-            <span className="postal-trash-toast-icon">✦</span>
+            <span className="postal-trash-toast-icon" aria-hidden="true">✦</span>
             <span className="postal-trash-toast-text">{trashFeedback}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main Experience: Either Opened Folder View or Interactive Vintage Filing Drawer */}
+      {/* Main Study Cabinet: Either Opened Folder View or Interactive Vintage Filing Drawer + Discard Station */}
       {inspectedFolder ? (
-        /* PART 4 & 5: OPENED FOLDER VIEW */
         <div className="opened-folder-view">
           <div className="opened-folder-banner">
             <button
@@ -290,22 +313,20 @@ export default function MyLettersCollection({
 
             <button
               type="button"
-              className="sober-save-btn"
-              style={{ width: "auto" }}
+              className="cabinet-primary-btn"
               onClick={() => handleWriteInFolder(inspectedFolder)}
             >
               + Write Letter in this Folder
             </button>
           </div>
 
-          {/* Letters inside opened folder */}
           {lettersWritten.filter((l) => l.pasta_id === inspectedFolder.id).length === 0 ? (
-            <div className="empty-journal-box" style={{ margin: "32px 0" }}>
+            <div className="empty-journal-box" style={{ margin: "28px 0" }}>
               <p>No correspondence in &ldquo;{inspectedFolder.nome}&rdquo; yet.</p>
               <button
                 type="button"
-                className="sober-save-btn"
-                style={{ width: "auto", margin: "14px auto 0" }}
+                className="cabinet-primary-btn"
+                style={{ margin: "14px auto 0" }}
                 onClick={() => handleWriteInFolder(inspectedFolder)}
               >
                 Write First Letter Here
@@ -323,7 +344,7 @@ export default function MyLettersCollection({
                     <motion.article
                       key={carta.id}
                       className="stationery-letter-card"
-                      whileHover={{ y: -4 }}
+                      whileHover={prefersReducedMotion ? undefined : { y: -4 }}
                       transition={{ duration: 0.18 }}
                       onClick={() => setReadingLetter(carta)}
                     >
@@ -334,7 +355,9 @@ export default function MyLettersCollection({
                         {isDraft && <span className="stationery-card-draft-badge">Draft</span>}
                       </div>
 
-                      <h3 className="stationery-letter-card-title">{carta.titulo || "Untitled Letter"}</h3>
+                      <h3 className="stationery-letter-card-title">
+                        {carta.titulo || "Untitled Letter"}
+                      </h3>
 
                       {carta.destinatario && (
                         <p className="stationery-letter-card-recipient">To: {carta.destinatario}</p>
@@ -344,7 +367,10 @@ export default function MyLettersCollection({
                         {carta.conteudo ? carta.conteudo.slice(0, 110) + "…" : "Blank letter sheet."}
                       </p>
 
-                      <div className="stationery-letter-card-footer" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="stationery-letter-card-footer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <span className="stationery-letter-card-date">
                           {formatShortDate(carta.criado_em || carta.data_formatada)}
                         </span>
@@ -385,9 +411,8 @@ export default function MyLettersCollection({
           )}
         </div>
       ) : (
-        /* PART 2 & 3: VINTAGE FILING DRAWER EXPERIENCE */
-        <div className="drawer-desk-layout">
-          <div className="drawer-cabinet-col">
+        <div className="cabinet-stage-grid">
+          <div className="cabinet-drawer-frame">
             <VintageFolderDrawer
               folders={letterFolders}
               letters={lettersWritten}
@@ -402,129 +427,254 @@ export default function MyLettersCollection({
             />
           </div>
 
-          {/* Postal Trash Discard Bin */}
-          <div className="drawer-trash-col" ref={trashCanRef}>
-            <div className="postal-trash-sidebar-box">
-              <span className="sidebar-box-kicker">POSTAL DISCARDS</span>
-              <PostalTrashCan
-                isOpen={false}
-                count={trashLetters.length}
-                onClick={() => setIsTrashModalOpen(true)}
-              />
-              <span className="postal-trash-label">
-                {trashLetters.length === 0
-                  ? "Bin Empty"
-                  : `${trashLetters.length} ${trashLetters.length === 1 ? "Letter" : "Letters"} Discarded`}
-              </span>
-              <button
-                type="button"
-                className="postal-trash-open-btn"
-                onClick={() => setIsTrashModalOpen(true)}
-              >
-                Inspect Discards
-              </button>
-            </div>
+          <div className="cabinet-discard-station" ref={trashCanRef}>
+            <span className="cabinet-discard-plate">DISCARD STATION</span>
+            <PostalTrashCan
+              isOpen={false}
+              count={trashLetters.length}
+              onClick={() => setIsTrashModalOpen(true)}
+            />
+            <span className="postal-trash-label">
+              {trashLetters.length === 0
+                ? "Bin Empty"
+                : `${trashLetters.length} ${trashLetters.length === 1 ? "Letter" : "Letters"} Discarded`}
+            </span>
+            <button
+              type="button"
+              className="postal-trash-open-btn"
+              onClick={() => setIsTrashModalOpen(true)}
+            >
+              Inspect Discards
+            </button>
           </div>
         </div>
       )}
 
-      {/* Stationery Cards Grid (All Letters Overview) */}
+      {/* Correspondence Index (Stationery Cards or Archival Ledger) */}
       {!inspectedFolder && lettersWritten.length > 0 && (
         <div className="letters-overview-section">
-          <div className="stationery-collection-toolbar">
-            <div className="stationery-filter-pills" role="tablist" aria-label="Filter letters">
-              <button
-                type="button"
-                className={`stationery-filter-pill ${filterMode === "all" ? "is-active" : ""}`}
-                onClick={() => setFilterMode("all")}
-              >
-                All Letters ({lettersWritten.length})
-              </button>
-              <button
-                type="button"
-                className={`stationery-filter-pill ${filterMode === "completed" ? "is-active" : ""}`}
-                onClick={() => setFilterMode("completed")}
-              >
-                Sealed ({lettersWritten.filter((l) => l.status !== "draft").length})
-              </button>
-              <button
-                type="button"
-                className={`stationery-filter-pill ${filterMode === "draft" ? "is-active" : ""}`}
-                onClick={() => setFilterMode("draft")}
-              >
-                Drafts ({lettersWritten.filter((l) => l.status === "draft").length})
-              </button>
-            </div>
-
-            {letterFolders.length > 0 && (
-              <div className="stationery-filter-pills">
+          <div className="correspondence-index-bar">
+            <div className="correspondence-filter-groups">
+              <div className="correspondence-pill-group" role="tablist" aria-label="Filter letters by status">
                 <button
                   type="button"
-                  className={`stationery-filter-pill ${selectedFolderFilter === "all" ? "is-active" : ""}`}
-                  onClick={() => setSelectedFolderFilter("all")}
+                  role="tab"
+                  aria-selected={filterMode === "all"}
+                  className={`correspondence-pill ${filterMode === "all" ? "is-active" : ""}`}
+                  onClick={() => setFilterMode("all")}
                 >
-                  All Folders
+                  All ({lettersWritten.length})
                 </button>
-                {letterFolders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    type="button"
-                    className={`stationery-filter-pill ${selectedFolderFilter === folder.id ? "is-active" : ""}`}
-                    onClick={() => setSelectedFolderFilter(folder.id)}
-                  >
-                    {folder.nome}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={filterMode === "completed"}
+                  className={`correspondence-pill ${filterMode === "completed" ? "is-active" : ""}`}
+                  onClick={() => setFilterMode("completed")}
+                >
+                  Sealed ({lettersWritten.filter((l) => l.status !== "draft").length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={filterMode === "draft"}
+                  className={`correspondence-pill ${filterMode === "draft" ? "is-active" : ""}`}
+                  onClick={() => setFilterMode("draft")}
+                >
+                  Drafts ({lettersWritten.filter((l) => l.status === "draft").length})
+                </button>
               </div>
-            )}
+
+              {letterFolders.length > 0 && (
+                <div className="correspondence-pill-group" aria-label="Filter by folder">
+                  <button
+                    type="button"
+                    className={`correspondence-pill ${selectedFolderFilter === "all" ? "is-active" : ""}`}
+                    onClick={() => setSelectedFolderFilter("all")}
+                  >
+                    All Folders
+                  </button>
+                  {letterFolders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      type="button"
+                      className={`correspondence-pill ${
+                        selectedFolderFilter === folder.id ? "is-active" : ""
+                      }`}
+                      onClick={() => setSelectedFolderFilter(folder.id)}
+                    >
+                      <FolderIcon size={12} />
+                      <span>{folder.nome}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="view-mode-switch" role="group" aria-label="Letter layout view">
+              <button
+                type="button"
+                className={`view-mode-btn ${viewMode === "cards" ? "is-active" : ""}`}
+                onClick={() => setViewMode("cards")}
+                aria-pressed={viewMode === "cards"}
+              >
+                <GridViewIcon size={13} />
+                <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                className={`view-mode-btn ${viewMode === "ledger" ? "is-active" : ""}`}
+                onClick={() => setViewMode("ledger")}
+                aria-pressed={viewMode === "ledger"}
+              >
+                <LedgerListIcon size={13} />
+                <span>Ledger</span>
+              </button>
+            </div>
           </div>
 
-          <div className="my-letters-stationery-grid">
-            {filteredLetters.map((carta) => {
-              const seal = getSealByIdOrLabel(carta.selo_carta || carta.humor);
-              const folderName =
-                carta.pasta_nome ||
-                letterFolders.find((f) => f.id === carta.pasta_id)?.nome ||
-                letterFolders[0]?.nome ||
-                "General";
-              const isDraft = carta.status === "draft";
+          {filteredLetters.length === 0 ? (
+            <div className="empty-journal-box">
+              <p>No letters match the current status or folder filter.</p>
+              <button
+                type="button"
+                className="cabinet-secondary-btn"
+                style={{ marginTop: "12px" }}
+                onClick={() => {
+                  setFilterMode("all");
+                  setSelectedFolderFilter("all");
+                  if (onClearSearch && hasSearch) onClearSearch();
+                }}
+              >
+                Reset Letter Filters
+              </button>
+            </div>
+          ) : viewMode === "cards" ? (
+            <div className="my-letters-stationery-grid">
+              {filteredLetters.map((carta) => {
+                const seal = getSealByIdOrLabel(carta.selo_carta || carta.humor);
+                const folderName =
+                  carta.pasta_nome ||
+                  letterFolders.find((f) => f.id === carta.pasta_id)?.nome ||
+                  letterFolders[0]?.nome ||
+                  "General";
+                const isDraft = carta.status === "draft";
 
-              return (
-                <motion.article
-                  key={carta.id}
-                  className="stationery-letter-card"
-                  whileHover={{ y: -4 }}
-                  transition={{ duration: 0.18 }}
-                  onClick={() => setReadingLetter(carta)}
-                >
-                  <div className="stationery-letter-card-seal-bar">
-                    <span className="stationery-card-seal-tag" style={{ color: seal.color }}>
+                return (
+                  <motion.article
+                    key={carta.id}
+                    className="stationery-letter-card"
+                    whileHover={prefersReducedMotion ? undefined : { y: -4 }}
+                    transition={{ duration: 0.18 }}
+                    onClick={() => setReadingLetter(carta)}
+                  >
+                    <div className="stationery-letter-card-seal-bar">
+                      <span className="stationery-card-seal-tag" style={{ color: seal.color }}>
+                        {isDraft ? "DRAFT" : seal.code}
+                      </span>
+                      <span className="stationery-card-folder-badge">
+                        <FolderIcon size={11} />
+                        <span>{folderName}</span>
+                      </span>
+                      {isDraft && <span className="stationery-card-draft-badge">Draft</span>}
+                    </div>
+
+                    <h3 className="stationery-letter-card-title">
+                      {carta.titulo || "Untitled Letter"}
+                    </h3>
+
+                    {carta.destinatario && (
+                      <p className="stationery-letter-card-recipient">To: {carta.destinatario}</p>
+                    )}
+
+                    <p className="stationery-letter-card-snippet">
+                      {carta.conteudo ? carta.conteudo.slice(0, 110) + "…" : "Blank letter sheet."}
+                    </p>
+
+                    <div
+                      className="stationery-letter-card-footer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="stationery-letter-card-date">
+                        {formatShortDate(carta.criado_em || carta.data_formatada)}
+                      </span>
+                      <div className="card-actions-row">
+                        <button
+                          type="button"
+                          className="card-mini-btn"
+                          onClick={() => handleContinueEditing(carta)}
+                          title="Edit letter"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="card-mini-btn"
+                          onClick={() => {
+                            setMovingLetter(carta);
+                            setTargetFolderId(carta.pasta_id || letterFolders[0]?.id || "");
+                          }}
+                          title="Move to another folder"
+                        >
+                          Move
+                        </button>
+                        <button
+                          type="button"
+                          className="card-mini-btn danger"
+                          onClick={() => handleDiscardToTrash(carta)}
+                          title="Discard letter"
+                        >
+                          Discard
+                        </button>
+                      </div>
+                    </div>
+                  </motion.article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="archival-ledger-list" role="list">
+              {filteredLetters.map((carta) => {
+                const seal = getSealByIdOrLabel(carta.selo_carta || carta.humor);
+                const folderName =
+                  carta.pasta_nome ||
+                  letterFolders.find((f) => f.id === carta.pasta_id)?.nome ||
+                  letterFolders[0]?.nome ||
+                  "General";
+                const isDraft = carta.status === "draft";
+
+                return (
+                  <div
+                    key={carta.id}
+                    role="listitem"
+                    className="archival-ledger-row"
+                    onClick={() => setReadingLetter(carta)}
+                  >
+                    <span className="archival-ledger-seal" style={{ color: seal.color }}>
                       {isDraft ? "DRAFT" : seal.code}
                     </span>
-                    <span className="stationery-card-folder-badge">📁 {folderName}</span>
-                    {isDraft && <span className="stationery-card-draft-badge">Draft</span>}
-                  </div>
-
-                  <h3 className="stationery-letter-card-title">{carta.titulo || "Untitled Letter"}</h3>
-
-                  {carta.destinatario && (
-                    <p className="stationery-letter-card-recipient">To: {carta.destinatario}</p>
-                  )}
-
-                  <p className="stationery-letter-card-snippet">
-                    {carta.conteudo ? carta.conteudo.slice(0, 110) + "…" : "Blank letter sheet."}
-                  </p>
-
-                  <div className="stationery-letter-card-footer" onClick={(e) => e.stopPropagation()}>
-                    <span className="stationery-letter-card-date">
+                    <div className="archival-ledger-main">
+                      <h3 className="archival-ledger-title">
+                        {carta.titulo || "Untitled Letter"}
+                      </h3>
+                      {carta.destinatario && (
+                        <span className="archival-ledger-recipient">
+                          To: {carta.destinatario}
+                        </span>
+                      )}
+                    </div>
+                    <span className="archival-ledger-folder">
+                      <FolderIcon size={12} />
+                      <span>{folderName}</span>
+                    </span>
+                    <span className="archival-ledger-date">
                       {formatShortDate(carta.criado_em || carta.data_formatada)}
                     </span>
-                    <div className="card-actions-row">
+                    <div className="card-actions-row" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         className="card-mini-btn"
                         onClick={() => handleContinueEditing(carta)}
-                        title="Edit letter"
                       >
                         Edit
                       </button>
@@ -535,7 +685,6 @@ export default function MyLettersCollection({
                           setMovingLetter(carta);
                           setTargetFolderId(carta.pasta_id || letterFolders[0]?.id || "");
                         }}
-                        title="Move to another folder"
                       >
                         Move
                       </button>
@@ -543,16 +692,15 @@ export default function MyLettersCollection({
                         type="button"
                         className="card-mini-btn danger"
                         onClick={() => handleDiscardToTrash(carta)}
-                        title="Discard letter"
                       >
                         Discard
                       </button>
                     </div>
                   </div>
-                </motion.article>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -567,9 +715,12 @@ export default function MyLettersCollection({
                 color: getInkColorById(readingLetter.cor_tinta),
               }}
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.92, opacity: 0, y: 15 }}
+              initial={prefersReducedMotion ? false : { scale: 0.94, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 15 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label={readingLetter.titulo || "Letter"}
             >
               <div className="entry-modal-header">
                 <div>
@@ -592,13 +743,16 @@ export default function MyLettersCollection({
                   )}
                   <span className="entry-modal-date">
                     Created: {formatShortDate(readingLetter.criado_em || readingLetter.data_formatada)}
-                    {readingLetter.atualizado_em ? ` · Modified: ${formatShortDate(readingLetter.atualizado_em)}` : ""}
+                    {readingLetter.atualizado_em
+                      ? ` · Modified: ${formatShortDate(readingLetter.atualizado_em)}`
+                      : ""}
                   </span>
                 </div>
                 <button
                   type="button"
                   className="modal-close-btn"
                   onClick={() => setReadingLetter(null)}
+                  aria-label="Close letter"
                 >
                   ✕
                 </button>
@@ -655,7 +809,7 @@ export default function MyLettersCollection({
                     }}
                     onClick={() => handleContinueEditing(readingLetter)}
                   >
-                    ✎ Continue Editing
+                    Continue Editing
                   </button>
                   <button
                     type="button"
@@ -668,9 +822,7 @@ export default function MyLettersCollection({
                     type="button"
                     className="entry-modal-close"
                     style={{ color: "#991b1b", borderColor: "rgba(153,27,27,0.4)" }}
-                    onClick={() => {
-                      handleDiscardToTrash(readingLetter);
-                    }}
+                    onClick={() => handleDiscardToTrash(readingLetter)}
                   >
                     Discard to Trash
                   </button>
@@ -695,15 +847,19 @@ export default function MyLettersCollection({
             <motion.div
               className="notebook-drawer-sheet"
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.92, opacity: 0, y: 15 }}
+              initial={prefersReducedMotion ? false : { scale: 0.94, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 15 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Rename Letter"
             >
               <button
                 type="button"
                 className="drawer-close-btn"
                 onClick={() => setRenamingLetter(null)}
                 title="Close"
+                aria-label="Close rename modal"
               >
                 ✕
               </button>
@@ -713,8 +869,11 @@ export default function MyLettersCollection({
               </p>
 
               <form onSubmit={handleConfirmRename} className="new-notebook-form">
-                <label className="new-notebook-label">LETTER TITLE</label>
+                <label className="new-notebook-label" htmlFor="rename-letter-title">
+                  LETTER TITLE
+                </label>
                 <input
+                  id="rename-letter-title"
                   type="text"
                   className="new-notebook-input"
                   value={renameTitleInput}
@@ -724,10 +883,15 @@ export default function MyLettersCollection({
                   autoFocus
                 />
 
-                <label className="new-notebook-label" style={{ marginTop: "10px" }}>
+                <label
+                  className="new-notebook-label"
+                  htmlFor="rename-letter-recipient"
+                  style={{ marginTop: "10px" }}
+                >
                   RECIPIENT (OPTIONAL)
                 </label>
                 <input
+                  id="rename-letter-recipient"
                   type="text"
                   className="new-notebook-input"
                   value={renameRecipientInput}
@@ -768,9 +932,12 @@ export default function MyLettersCollection({
             <motion.div
               className="minimal-folder-modal"
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.94, opacity: 0 }}
+              initial={prefersReducedMotion ? false : { scale: 0.94, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.94, opacity: 0 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Move Letter to Folder"
             >
               <h3>Move Letter to Folder</h3>
               <p>Select target folder for &ldquo;{movingLetter.titulo}&rdquo;:</p>
@@ -780,10 +947,11 @@ export default function MyLettersCollection({
                   style={{ width: "100%", marginBottom: "16px" }}
                   value={targetFolderId}
                   onChange={(e) => setTargetFolderId(e.target.value)}
+                  aria-label="Target folder"
                 >
                   {letterFolders.map((f) => (
                     <option key={f.id} value={f.id}>
-                      📁 {f.nome}
+                      {f.nome}
                     </option>
                   ))}
                 </select>
@@ -812,10 +980,13 @@ export default function MyLettersCollection({
             <motion.div
               className="postal-trash-modal"
               onClick={(e) => e.stopPropagation()}
-              initial={{ scale: 0.94, opacity: 0, y: 15 }}
+              initial={prefersReducedMotion ? false : { scale: 0.94, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.94, opacity: 0, y: 15 }}
+              exit={{ scale: 0.94, opacity: 0, y: 12 }}
               transition={{ duration: 0.2 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Postal Discards"
             >
               <div className="postal-trash-modal-header">
                 <div>
@@ -831,13 +1002,14 @@ export default function MyLettersCollection({
                     Postal Discards
                   </h2>
                   <p className="postal-trash-modal-sub">
-                    Discarded letters are safely held here. You can restore them to your folders or delete them permanently.
+                    Discarded letters are safely held here. You can restore them to your folders, read them, or delete them permanently.
                   </p>
                 </div>
                 <button
                   type="button"
                   className="modal-close-btn"
                   onClick={() => setIsTrashModalOpen(false)}
+                  aria-label="Close Postal Discards"
                 >
                   ✕
                 </button>
@@ -862,7 +1034,9 @@ export default function MyLettersCollection({
                               {seal.code}
                             </span>
                             <div>
-                              <h4 className="postal-trash-item-title">{carta.titulo || "Untitled"}</h4>
+                              <h4 className="postal-trash-item-title">
+                                {carta.titulo || "Untitled"}
+                              </h4>
                               <span className="postal-trash-item-meta">
                                 {carta.destinatario ? `To: ${carta.destinatario} · ` : ""}
                                 {formatShortDate(carta.criado_em || carta.data_formatada)}
@@ -870,6 +1044,14 @@ export default function MyLettersCollection({
                             </div>
                           </div>
                           <div className="postal-trash-item-actions">
+                            <button
+                              type="button"
+                              className="postal-trash-action-btn"
+                              onClick={() => setReadingLetter(carta)}
+                              title="Read discarded letter"
+                            >
+                              Read
+                            </button>
                             <button
                               type="button"
                               className="postal-trash-action-btn restore"
@@ -881,7 +1063,9 @@ export default function MyLettersCollection({
                             <button
                               type="button"
                               className="postal-trash-action-btn permanent"
-                              onClick={() => handlePermanentDelete(carta)}
+                              onClick={() =>
+                                setConfirmPermanentTarget({ type: "single", letter: carta })
+                              }
                               title="Delete permanently"
                             >
                               Delete Permanently
@@ -899,12 +1083,88 @@ export default function MyLettersCollection({
                   <button
                     type="button"
                     className="postal-trash-empty-all-btn"
-                    onClick={handleEmptyAllTrash}
+                    onClick={() => setConfirmPermanentTarget({ type: "all" })}
                   >
                     Empty Discards ({trashLetters.length})
                   </button>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Permanent Delete Confirmation Modal */}
+      <AnimatePresence>
+        {confirmPermanentTarget && (
+          <div
+            className="delete-notebook-modal-backdrop"
+            onClick={() => setConfirmPermanentTarget(null)}
+          >
+            <motion.div
+              className="delete-notebook-modal-sheet"
+              onClick={(e) => e.stopPropagation()}
+              initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ duration: 0.2 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Confirm permanent deletion"
+            >
+              <div className="delete-modal-warning-header">
+                <span className="delete-modal-icon" aria-hidden="true">
+                  !
+                </span>
+                <h3 className="delete-modal-title">
+                  {confirmPermanentTarget.type === "all"
+                    ? "Empty Postal Discards"
+                    : "Permanently Delete Letter"}
+                </h3>
+              </div>
+
+              <div className="delete-modal-body">
+                <p className="delete-modal-notice-text">
+                  {confirmPermanentTarget.type === "all" ? (
+                    <>
+                      You are about to permanently delete all{" "}
+                      <strong>{trashLetters.length}</strong> discarded letters.
+                    </>
+                  ) : (
+                    <>
+                      You are about to permanently delete{" "}
+                      <strong>
+                        “{confirmPermanentTarget.letter.titulo || "Untitled Letter"}”
+                      </strong>
+                      .
+                    </>
+                  )}
+                </p>
+
+                <div className="delete-modal-danger-box">
+                  <strong>PERMANENT DELETION WARNING:</strong>
+                  <p>
+                    This action cannot be undone and the correspondence will be removed from your archive forever.
+                  </p>
+                </div>
+              </div>
+
+              <div className="delete-modal-actions">
+                <button
+                  type="button"
+                  className="delete-modal-cancel-btn"
+                  onClick={() => setConfirmPermanentTarget(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="delete-modal-confirm-btn"
+                  onClick={executePermanentDelete}
+                >
+                  Yes, Delete Permanently
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

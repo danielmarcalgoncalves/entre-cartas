@@ -1,0 +1,803 @@
+/* ==========================================================================
+   JOURNAL RIGHT SIDEBAR & PAPER & INK CUSTOMIZATION MODAL
+   ========================================================================== */
+
+.journal-right-rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  min-height: 680px;
+  padding-top: 38px;
+}
+
+.journal-right-rail :is(button, a):focus-visible {
+  outline: 2px solid var(--color-pollen, #cfa96f);
+  outline-offset: 2px;
+}
+
+.journal-rail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.journal-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.journal-rail-group-label {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9c8e76);
+  padding-left: 2px;
+}
+
+/* 1. Active Journal Identity Card (Compact Pure CSS Leather Binding) */
+.journal-volume-card {
+  position: relative;
+  width: 100%;
+  min-height: 118px;
+  padding: 16px 18px 16px 26px;
+  border-radius: 6px 10px 10px 6px;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  box-shadow:
+    -5px 0 0 var(--volume-spine, #140d0a),
+    -9px 0 0 rgba(10, 7, 5, 0.85),
+    0 14px 30px rgba(0, 0, 0, 0.36),
+    inset 0 0 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.journal-volume-card::before {
+  content: "";
+  position: absolute;
+  inset: 5px 5px 5px 8px;
+  border: 1px solid rgba(212, 175, 55, 0.16);
+  border-radius: 3px 6px 6px 3px;
+  pointer-events: none;
+}
+
+.journal-volume-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.44),
+    inset 0 0 22px rgba(0, 0, 0, 0.5);
+}
+
+.journal-volume-card.is-empty-state {
+  background: linear-gradient(145deg, rgba(44, 34, 25, 0.92), rgba(26, 20, 15, 0.98));
+  --volume-spine: #2b2016;
+  border-style: dashed;
+}
+
+[data-theme="light"] .journal-volume-card.is-empty-state {
+  background: linear-gradient(145deg, #f7efe0, #eadbc1);
+  --volume-spine: #9e7f56;
+  border-color: rgba(138, 131, 95, 0.45);
+}
+
+.journal-volume-ribbon {
+  position: absolute;
+  top: -2px;
+  right: 18px;
+  width: 11px;
+  height: 36px;
+  border-radius: 0 0 3px 3px;
+  background: #7a1818;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.journal-volume-kicker {
+  font-family: var(--sans);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(235, 198, 134, 0.85);
+}
+
+[data-theme="light"] .journal-volume-card.is-empty-state .journal-volume-kicker {
+  color: #7a5c38;
+}
+
+.journal-volume-title {
+  font-family: var(--serif-title, "Cormorant Garamond", Georgia, serif);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #f3e6d0;
+  padding-right: 20px;
+  word-break: break-word;
+}
+
+[data-theme="light"] .journal-volume-card.is-empty-state .journal-volume-title {
+  color: #3e3a2f;
+}
+
+.journal-volume-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: rgba(238, 220, 192, 0.7);
+  padding-top: 6px;
+  border-top: 1px solid rgba(212, 175, 55, 0.16);
+}
+
+[data-theme="light"] .journal-volume-card.is-empty-state .journal-volume-meta {
+  color: #6b6454;
+}
+
+.journal-volume-switch-cue {
+  color: rgba(235, 198, 134, 0.92);
+  font-weight: 600;
+}
+
+[data-theme="light"] .journal-volume-card.is-empty-state .journal-volume-switch-cue {
+  color: #8c4824;
+}
+
+/* 2. Writing Tools Group */
+.journal-paper-ink-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(207, 169, 111, 0.36);
+  background: linear-gradient(180deg, rgba(48, 38, 29, 0.94) 0%, rgba(34, 27, 20, 0.98) 100%);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.26);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.journal-paper-ink-trigger:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-pollen, #cfa96f);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+}
+
+[data-theme="light"] .journal-paper-ink-trigger {
+  background: linear-gradient(180deg, #fcfaf4 0%, #f3ebda 100%);
+  border-color: rgba(138, 131, 95, 0.38);
+  box-shadow: 0 6px 16px rgba(74, 70, 57, 0.08);
+}
+
+[data-theme="light"] .journal-paper-ink-trigger:hover {
+  border-color: #8c4824;
+}
+
+.journal-paper-ink-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.journal-paper-ink-swatches {
+  position: relative;
+  width: 30px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.journal-mini-paper-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+.journal-mini-ink-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #2b221a;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .journal-mini-ink-dot {
+  border-color: #fcfaf4;
+}
+
+.journal-paper-ink-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.journal-paper-ink-title {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.journal-paper-ink-summary {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.journal-paper-ink-chevron {
+  color: var(--color-pollen, #cfa96f);
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+[data-theme="light"] .journal-paper-ink-chevron {
+  color: #8c4824;
+}
+
+/* Secondary Tools Grid (Pull Inspiration + My Shelf) */
+.journal-tools-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.journal-secondary-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border-card, rgba(207, 169, 111, 0.22));
+  background: rgba(34, 27, 20, 0.72);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.journal-secondary-tool-btn:hover {
+  background: rgba(52, 41, 31, 0.88);
+  border-color: var(--color-pollen, #cfa96f);
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .journal-secondary-tool-btn {
+  background: rgba(252, 249, 242, 0.9);
+  border-color: rgba(138, 131, 95, 0.3);
+}
+
+[data-theme="light"] .journal-secondary-tool-btn:hover {
+  background: #ffffff;
+  border-color: #8c4824;
+}
+
+.journal-secondary-tool-icon {
+  color: var(--color-pollen, #cfa96f);
+  display: inline-flex;
+}
+
+[data-theme="light"] .journal-secondary-tool-icon {
+  color: #8c4824;
+}
+
+/* 3. Writing Actions Group (Focus Mode + Save Journal Page) */
+.journal-rail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid rgba(207, 169, 111, 0.2);
+}
+
+[data-theme="light"] .journal-rail-actions {
+  border-top-color: rgba(138, 131, 95, 0.26);
+}
+
+.journal-rail-actions .focus-mode-trigger-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Focus Mode Topbar Paper & Ink Trigger */
+.focus-paper-ink-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(207, 169, 111, 0.35);
+  background: rgba(34, 26, 19, 0.9);
+  color: #ece1c9;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.focus-paper-ink-btn:hover {
+  border-color: var(--color-pollen, #cfa96f);
+  background: rgba(48, 37, 27, 0.95);
+}
+
+/* ==========================================================================
+   PAPER & INK CUSTOMIZATION MODAL (STATIONERY SAMPLE BOOK)
+   ========================================================================== */
+
+.paper-ink-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: var(--bg-overlay, rgba(14, 11, 8, 0.78));
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.paper-ink-modal-sheet {
+  width: 100%;
+  max-width: 620px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #282018 0%, #1c1610 100%);
+  border: 1px solid rgba(207, 169, 111, 0.36);
+  border-radius: 16px;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(236, 225, 201, 0.08);
+  overflow: hidden;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .paper-ink-modal-sheet {
+  background: linear-gradient(180deg, #fdfaf3 0%, #f5eddc 100%);
+  border-color: rgba(138, 131, 95, 0.42);
+  box-shadow: 0 24px 56px rgba(62, 58, 47, 0.24);
+}
+
+.paper-ink-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(207, 169, 111, 0.18);
+}
+
+[data-theme="light"] .paper-ink-modal-header {
+  border-bottom-color: rgba(138, 131, 95, 0.22);
+}
+
+.paper-ink-modal-title {
+  font-family: var(--display, "DM Serif Display", Georgia, serif);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.paper-ink-modal-subtitle {
+  font-family: var(--serif, "EB Garamond", Georgia, serif);
+  font-size: 15.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.paper-ink-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(207, 169, 111, 0.28);
+  background: rgba(207, 169, 111, 0.08);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.paper-ink-close-btn:hover {
+  background: rgba(207, 169, 111, 0.2);
+  border-color: var(--color-pollen, #cfa96f);
+}
+
+/* Live Specimen Strip */
+.paper-ink-live-specimen {
+  margin: 16px 24px 0;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(110, 88, 60, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 4px 14px rgba(0, 0, 0, 0.18);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.paper-ink-specimen-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.62;
+  margin-bottom: 6px;
+}
+
+.paper-ink-specimen-line {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+/* Scrollable Modal Body */
+.paper-ink-modal-body {
+  padding: 18px 24px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.paper-ink-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.paper-ink-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(207, 169, 111, 0.35);
+  border-radius: 999px;
+}
+
+.paper-ink-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.paper-ink-section + .paper-ink-section {
+  padding-top: 18px;
+  border-top: 1px solid rgba(207, 169, 111, 0.14);
+}
+
+[data-theme="light"] .paper-ink-section + .paper-ink-section {
+  border-top-color: rgba(138, 131, 95, 0.2);
+}
+
+.paper-ink-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.paper-ink-section-title {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.paper-ink-selected-name {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 14px;
+  font-style: italic;
+  color: var(--color-pollen, #cfa96f);
+}
+
+[data-theme="light"] .paper-ink-selected-name {
+  color: #8c4824;
+}
+
+/* A. Sheet Paper Swatches */
+.paper-ink-paper-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.paper-specimen-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(207, 169, 111, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.paper-specimen-btn:hover {
+  border-color: rgba(207, 169, 111, 0.55);
+  transform: translateY(-1px);
+}
+
+.paper-specimen-btn.is-selected {
+  border-color: var(--color-pollen, #cfa96f);
+  background: rgba(207, 169, 111, 0.14);
+}
+
+[data-theme="light"] .paper-specimen-btn {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(138, 131, 95, 0.26);
+}
+
+[data-theme="light"] .paper-specimen-btn.is-selected {
+  border-color: #8c4824;
+  background: rgba(173, 91, 48, 0.08);
+}
+
+.paper-specimen-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(80, 62, 42, 0.28);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 2px 6px rgba(0, 0, 0, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.paper-specimen-label {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* B. Ink Color Circular Wells */
+.paper-ink-ink-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ink-well-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(207, 169, 111, 0.18);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.ink-well-btn:hover {
+  border-color: rgba(207, 169, 111, 0.55);
+  transform: translateY(-2px);
+}
+
+.ink-well-btn.is-selected {
+  border-color: var(--color-pollen, #cfa96f);
+  background: rgba(207, 169, 111, 0.14);
+}
+
+[data-theme="light"] .ink-well-btn {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(138, 131, 95, 0.26);
+}
+
+[data-theme="light"] .ink-well-btn.is-selected {
+  border-color: #8c4824;
+  background: rgba(173, 91, 48, 0.08);
+}
+
+.ink-well-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid rgba(236, 225, 201, 0.3);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ink-well-btn.is-selected .ink-well-circle {
+  border-color: var(--color-pollen, #cfa96f);
+  box-shadow: 0 0 0 3px rgba(207, 169, 111, 0.25), 0 4px 12px rgba(0, 0, 0, 0.35);
+  transform: scale(1.06);
+}
+
+.ink-well-label {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.25;
+}
+
+.ink-well-btn.is-selected .ink-well-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* C. Script & Typography List */
+.paper-ink-font-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.font-specimen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(207, 169, 111, 0.2);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+.font-specimen-btn:hover {
+  border-color: rgba(207, 169, 111, 0.55);
+  background: rgba(207, 169, 111, 0.07);
+}
+
+.font-specimen-btn.is-selected {
+  border-color: var(--color-pollen, #cfa96f);
+  background: rgba(207, 169, 111, 0.14);
+}
+
+[data-theme="light"] .font-specimen-btn {
+  background: rgba(255, 255, 255, 0.68);
+  border-color: rgba(138, 131, 95, 0.26);
+}
+
+[data-theme="light"] .font-specimen-btn.is-selected {
+  border-color: #8c4824;
+  background: rgba(173, 91, 48, 0.08);
+}
+
+.font-specimen-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.font-specimen-name {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.font-specimen-preview {
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-specimen-indicator {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-pollen, #cfa96f);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .font-specimen-indicator {
+  color: #8c4824;
+}
+
+/* ==========================================================================
+   RESPONSIVE & REDUCED MOTION
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .journal-right-rail {
+    min-height: auto;
+    padding-top: 0;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .paper-ink-modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .paper-ink-modal-sheet {
+    max-height: 90vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .paper-ink-modal-header {
+    padding: 18px 18px 14px;
+  }
+
+  .paper-ink-live-specimen {
+    margin: 12px 18px 0;
+  }
+
+  .paper-ink-modal-body {
+    padding: 16px 18px 24px;
+  }
+
+  .paper-ink-paper-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .paper-ink-ink-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journal-right-rail *,
+  .paper-ink-modal-sheet * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
