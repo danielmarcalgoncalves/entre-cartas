@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useId, useRef, useState } from "react";
 import {
   type JournalAttachment,
   type JournalSticker,
@@ -65,8 +65,8 @@ function getAttachmentFrameStyle(style: JournalAttachment["style"]): React.CSSPr
       return {
         backgroundColor: "transparent",
         padding: 0,
-        borderRadius: "2px",
-        boxShadow: "0 5px 14px rgba(24, 15, 8, 0.2)",
+        borderRadius: 0,
+        boxShadow: "none",
       };
   }
 }
@@ -83,6 +83,7 @@ export function ScrapbookLayer({
 }: ScrapbookLayerProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const [isInteracting, setIsInteracting] = useState(false);
+  const contourFilterId = `paper-contour-${useId().replace(/:/g, "")}`;
 
   const safeScale = sheetScale > 0 ? sheetScale : 1;
 
@@ -307,6 +308,20 @@ export function ScrapbookLayer({
       }}
       aria-label={readonly ? undefined : "Scrapbook decorations layer"}
     >
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+        <defs>
+          <filter id={contourFilterId} x="-20%" y="-20%" width="140%" height="140%">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="4" result="dilated" />
+            <feFlood floodColor="#fbf8f1" result="paperColor" />
+            <feComposite in="paperColor" in2="dilated" operator="in" result="paperBorder" />
+            <feMerge>
+              <feMergeNode in="paperBorder" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
+
       {/* Photographs */}
       {attachments.map((att) => {
         const isSelected = !readonly && selectedItem?.kind === "attachment" && selectedItem.id === att.id;
@@ -367,8 +382,8 @@ export function ScrapbookLayer({
               style={{
                 width: "100%",
                 height: att.style === "polaroid" && att.caption ? "calc(100% - 18px)" : "100%",
-                overflow: "hidden",
-                backgroundColor: "#e6dccb",
+                overflow: att.style === "plain" ? "visible" : "hidden",
+                backgroundColor: att.style === "plain" ? "transparent" : "#e6dccb",
                 position: "relative",
               }}
             >
@@ -379,9 +394,14 @@ export function ScrapbookLayer({
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
+                  objectFit: att.style === "plain" ? "contain" : "cover",
                   display: "block",
-                  filter: att.style === "vintage" ? "sepia(0.24) contrast(0.96)" : undefined,
+                  filter:
+                    att.style === "vintage"
+                      ? "sepia(0.24) contrast(0.96)"
+                      : att.style === "plain" && att.borderlessContour === "paper"
+                        ? `url(#${contourFilterId}) drop-shadow(0 4px 10px rgba(24, 15, 8, 0.22))`
+                        : undefined,
                 }}
               />
             </div>

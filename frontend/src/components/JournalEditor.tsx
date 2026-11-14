@@ -112,6 +112,78 @@ export {
 const MAX_LINES_PER_PAGE = JOURNAL_MAX_LINES_PER_PAGE;
 const MAX_CHARS_PER_PAGE = JOURNAL_MAX_CHARS_PER_PAGE;
 
+interface VisualLineSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/**
+ * Computes wrapped visual lines with their exact character offsets in `text`.
+ */
+function getVisualLinesForTextarea(
+  text: string,
+  maxWidth: number,
+  ctx: CanvasRenderingContext2D
+): VisualLineSegment[] {
+  const result: VisualLineSegment[] = [];
+  const paragraphs = text.split("\n");
+  let offset = 0;
+
+  for (let p = 0; p < paragraphs.length; p++) {
+    const para = paragraphs[p];
+    if (para.length === 0) {
+      result.push({ start: offset, end: offset, text: "" });
+      offset += 1;
+      continue;
+    }
+
+    const tokens = para.match(/\S+|\s+/g) || [para];
+    let lineStart = offset;
+    let lineText = "";
+
+    for (const token of tokens) {
+      const candidate = lineText + token;
+      if (lineText.length > 0 && ctx.measureText(candidate).width > maxWidth) {
+        result.push({
+          start: lineStart,
+          end: lineStart + lineText.length,
+          text: lineText,
+        });
+        lineStart += lineText.length;
+        lineText = token;
+      } else {
+        lineText = candidate;
+      }
+
+      // Break single oversized token across lines if wider than the sheet
+      while (ctx.measureText(lineText).width > maxWidth && lineText.length > 1) {
+        let cut = lineText.length - 1;
+        while (cut > 1 && ctx.measureText(lineText.slice(0, cut)).width > maxWidth) {
+          cut--;
+        }
+        const part = lineText.slice(0, cut);
+        result.push({
+          start: lineStart,
+          end: lineStart + part.length,
+          text: part,
+        });
+        lineStart += part.length;
+        lineText = lineText.slice(cut);
+      }
+    }
+
+    result.push({
+      start: lineStart,
+      end: lineStart + lineText.length,
+      text: lineText,
+    });
+    offset += para.length + 1;
+  }
+
+  return result;
+}
+
 function EyeIcon({ className = "", filled = false }: { className?: string; filled?: boolean }) {
   return (
     <svg
@@ -1306,7 +1378,10 @@ export default function JournalEditor() {
 
   const handleUpdateSelectedAttachment = (
     patch: Partial<
-      Pick<JournalAttachment, "style" | "caption" | "width" | "height" | "rotation">
+      Pick<
+        JournalAttachment,
+        "style" | "borderlessContour" | "caption" | "width" | "height" | "rotation"
+      >
     >
   ) => {
     if (!selectedScrapbookItem || selectedScrapbookItem.kind !== "attachment") return;
@@ -1864,6 +1939,140 @@ export default function JournalEditor() {
           avancarParaProximaPaginaComTexto(excedente, textoQueCabe);
         }
       }
+    }
+  };
+
+  const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTextareaMouseDown = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const down = pointerDownPosRef.current;
+    pointerDownPosRef.current = null;
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) {
+      return;
+    }
+    if (textarea.selectionStart !== textarea.selectionEnd) {
+      return;
+    }
+
+    const rect = textarea.getBoundingClientRect();
+    const scaleX = textarea.clientWidth > 0 ? rect.width / textarea.clientWidth : 1;
+    const scaleY = textarea.clientHeight > 0 ? rect.height / textarea.clientHeight : 1;
+    const localX = (e.clientX - rect.left) / scaleX;
+    const localY = (e.clientY - rect.top) / scaleY;
+
+    const cs = window.getComputedStyle(textarea);
+    const paddingTop = parseFloat(cs.paddingTop) || 0;
+    const paddingLeft = parseFloat(cs.paddingLeft) || 0;
+    const paddingRight = parseFloat(cs.paddingRight) || 0;
+    const fontSize = parseFloat(cs.fontSize) || 18;
+    const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.5;
+    const contentWidth = Math.max(40, textarea.clientWidth - paddingLeft - paddingRight);
+
+    const clickedLine = Math.max(
+      0,
+      Math.min(
+        MAX_LINES_PER_PAGE - 1,
+        Math.floor((localY - paddingTop + textarea.scrollTop) / lineHeight)
+      )
+    );
+    const clickedX = Math.max(0, localX - paddingLeft);
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.font =
+      cs.font && cs.font.trim()
+        ? cs.font
+        : `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+
+    const text = normalizeJournalLineEndings(cadernoConteudo);
+    const visualLines = getVisualLinesForTextarea(text, contentWidth, ctx);
+    const spaceW = Math.max(4, ctx.measureText(" ").width);
+
+    if (clickedLine < visualLines.length) {
+      const target = visualLines[clickedLine];
+      const lineW = ctx.measureText(target.text).width;
+
+      if (clickedX <= lineW) {
+        let bestIdx = 0;
+        let bestDiff = clickedX;
+        for (let i = 1; i <= target.text.length; i++) {
+          const w = ctx.measureText(target.text.slice(0, i)).width;
+          const diff = Math.abs(w - clickedX);
+          if (diff <= bestDiff) {
+            bestDiff = diff;
+            bestIdx = i;
+          } else {
+            break;
+          }
+        }
+        const pos = target.start + bestIdx;
+        textarea.setSelectionRange(pos, pos);
+        return;
+      }
+
+      // Clicked past the end of an existing line: pad spaces up to clickedX
+      const rawExtra = Math.round((clickedX - lineW) / spaceW);
+      const remainingChars = Math.max(0, MAX_CHARS_PER_PAGE - countNonNewlineChars(text));
+      let spacesCount = Math.min(rawExtra, remainingChars);
+      while (
+        spacesCount > 0 &&
+        ctx.measureText(target.text + " ".repeat(spacesCount)).width > contentWidth - 2
+      ) {
+        spacesCount--;
+      }
+
+      if (spacesCount > 0) {
+        const padding = " ".repeat(spacesCount);
+        const nextText = text.slice(0, target.end) + padding + text.slice(target.end);
+        const nextPos = target.end + spacesCount;
+        setCadernoConteudo(nextText);
+        atualizarRascunhoCaderno(nextText);
+        requestAnimationFrame(() => {
+          textareaRef.current?.setSelectionRange(nextPos, nextPos);
+        });
+      } else {
+        textarea.setSelectionRange(target.end, target.end);
+      }
+      return;
+    }
+
+    // Clicked below the last existing line: add newlines + spaces to reach line & X
+    const linesToAdd = Math.min(
+      MAX_LINES_PER_PAGE - visualLines.length,
+      clickedLine - (visualLines.length - 1)
+    );
+    if (linesToAdd <= 0) {
+      textarea.setSelectionRange(text.length, text.length);
+      return;
+    }
+
+    const remainingChars = Math.max(0, MAX_CHARS_PER_PAGE - countNonNewlineChars(text));
+    let spacesCount = Math.min(Math.max(0, Math.round(clickedX / spaceW)), remainingChars);
+    while (spacesCount > 0 && ctx.measureText(" ".repeat(spacesCount)).width > contentWidth - 2) {
+      spacesCount--;
+    }
+
+    const nextText = text + "\n".repeat(linesToAdd) + " ".repeat(spacesCount);
+    setCadernoConteudo(nextText);
+    atualizarRascunhoCaderno(nextText);
+    requestAnimationFrame(() => {
+      textareaRef.current?.setSelectionRange(nextText.length, nextText.length);
+    });
+  };
+
+  const handleTextareaBlur = () => {
+    const cleaned = normalizeJournalContentForStorage(cadernoConteudo);
+    if (cleaned !== cadernoConteudo) {
+      setCadernoConteudo(cleaned);
+      atualizarRascunhoCaderno(cleaned);
     }
   };
 
@@ -2602,6 +2811,9 @@ export default function JournalEditor() {
                       onKeyDown={handleKeyDown}
                       onPaste={handlePaste}
                       onKeyUp={handleKeyUp}
+                      onMouseDown={handleTextareaMouseDown}
+                      onClick={handleTextareaClick}
+                      onBlur={handleTextareaBlur}
                       placeholder="Write your journal entry here..."
                       aria-label="Journal page content"
                       rows={MAX_LINES_PER_PAGE}

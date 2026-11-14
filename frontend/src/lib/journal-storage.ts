@@ -55,6 +55,8 @@ export type JournalEntry = {
 
 export type JournalAttachmentStyle = "polaroid" | "washi" | "vintage" | "plain";
 
+export type BorderlessContourMode = "none" | "paper";
+
 export interface JournalAttachment {
   id: string;
   objectKey: string;
@@ -66,6 +68,7 @@ export interface JournalAttachment {
   rotation: number;
   zIndex: number;
   style: JournalAttachmentStyle;
+  borderlessContour?: BorderlessContourMode;
   caption?: string;
 }
 

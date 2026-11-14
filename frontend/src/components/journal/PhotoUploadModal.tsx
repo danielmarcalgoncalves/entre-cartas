@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { api } from "@/services/api";
-import { type JournalAttachment, type JournalAttachmentStyle } from "@/lib/journal-storage";
+import {
+  type BorderlessContourMode,
+  type JournalAttachment,
+  type JournalAttachmentStyle,
+} from "@/lib/journal-storage";
 
 export interface PhotoUploadModalProps {
   open: boolean;
@@ -19,6 +23,11 @@ const STYLE_OPTIONS: { id: JournalAttachmentStyle; label: string; desc: string }
   { id: "plain", label: "Borderless", desc: "Clean cut photograph on the paper" },
 ];
 
+const BORDERLESS_CONTOUR_OPTIONS: { id: BorderlessContourMode; label: string; desc: string }[] = [
+  { id: "paper", label: "Paper Cutout Border", desc: "Paper outline following the PNG silhouette" },
+  { id: "none", label: "No Border", desc: "Pure image with no outline or border" },
+];
+
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -33,6 +42,7 @@ export function PhotoUploadModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [naturalDims, setNaturalDims] = useState<{ w: number; h: number }>({ w: 180, h: 160 });
   const [style, setStyle] = useState<JournalAttachmentStyle>("polaroid");
+  const [borderlessContour, setBorderlessContour] = useState<BorderlessContourMode>("paper");
   const [caption, setCaption] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +102,7 @@ export function PhotoUploadModal({
         rotation: -3,
         zIndex: nextZIndex,
         style,
+        borderlessContour: style === "plain" ? borderlessContour : undefined,
         caption: caption.trim() || undefined,
       };
       onInsertAttachment(attachment);
@@ -188,18 +199,44 @@ export function PhotoUploadModal({
           </span>
         </label>
 
+        <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+          <defs>
+            <filter id="modal-paper-contour" x="-20%" y="-20%" width="140%" height="140%">
+              <feMorphology in="SourceAlpha" operator="dilate" radius="4" result="dilated" />
+              <feFlood floodColor="#fbf8f1" result="paperColor" />
+              <feComposite in="paperColor" in2="dilated" operator="in" result="paperBorder" />
+              <feMerge>
+                <feMergeNode in="paperBorder" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+        </svg>
+
         {previewUrl && (
           <div style={{ marginBottom: "14px", textAlign: "center" }}>
             <img
               src={previewUrl}
               alt="Selected photograph preview"
-              style={{
-                maxHeight: "170px",
-                maxWidth: "100%",
-                borderRadius: "4px",
-                border: "4px solid #fbf8f1",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
-              }}
+              style={
+                style === "plain"
+                  ? {
+                      maxHeight: "170px",
+                      maxWidth: "100%",
+                      objectFit: "contain",
+                      filter:
+                        borderlessContour === "paper"
+                          ? "url(#modal-paper-contour) drop-shadow(0 4px 10px rgba(24, 15, 8, 0.22))"
+                          : "none",
+                    }
+                  : {
+                      maxHeight: "170px",
+                      maxWidth: "100%",
+                      borderRadius: "4px",
+                      border: "4px solid #fbf8f1",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+                    }
+              }
             />
           </div>
         )}
@@ -229,6 +266,34 @@ export function PhotoUploadModal({
             ))}
           </div>
         </div>
+
+        {style === "plain" && (
+          <div style={{ marginBottom: "14px" }}>
+            <span style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "6px" }}>
+              Borderless Edge
+            </span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
+              {BORDERLESS_CONTOUR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setBorderlessContour(opt.id)}
+                  style={{
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    border: borderlessContour === opt.id ? "1.5px solid #6b4423" : "1px solid #d5c3a7",
+                    backgroundColor: borderlessContour === opt.id ? "#efe2cc" : "#fbf6ec",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#362417" }}>{opt.label}</div>
+                  <div style={{ fontSize: "11px", color: "#6d5742" }}>{opt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ marginBottom: "14px" }}>
           <label style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "5px" }}>

@@ -3,6 +3,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
+  BorderlessContourMode,
   JournalAttachment,
   JournalAttachmentStyle,
   JournalSticker,
@@ -20,7 +21,7 @@ const STYLE_LABELS: Record<JournalAttachmentStyle, string> = {
   polaroid: "Polaroid",
   washi: "Washi Tape",
   vintage: "Vintage Frame",
-  plain: "Clean Edge",
+  plain: "Borderless",
 };
 
 function derivePhotoName(attachment: JournalAttachment): string {
@@ -37,7 +38,7 @@ export interface ScrapbookInspectorPanelProps {
   selectedAttachment: JournalAttachment | null;
   selectedSticker: JournalSticker | null;
   onUpdateAttachment: (
-    patch: Partial<Pick<JournalAttachment, "style" | "caption" | "width" | "height" | "rotation">>
+    patch: Partial<Pick<JournalAttachment, "style" | "borderlessContour" | "caption" | "width" | "height" | "rotation">>
   ) => void;
   onUpdateSticker: (
     patch: Partial<Pick<JournalSticker, "scale" | "rotation">>
@@ -149,9 +150,27 @@ export function ScrapbookInspectorPanel({
                   <option value="polaroid">Polaroid</option>
                   <option value="washi">Washi Tape</option>
                   <option value="vintage">Vintage Frame</option>
-                  <option value="plain">Clean Edge</option>
+                  <option value="plain">Borderless</option>
                 </select>
               </label>
+
+              {selectedAttachment.style === "plain" && (
+                <label className="scrapbook-inspector-field">
+                  <span className="scrapbook-inspector-label">Borderless Edge</span>
+                  <select
+                    className="scrapbook-inspector-select"
+                    value={selectedAttachment.borderlessContour || "none"}
+                    onChange={(e) =>
+                      onUpdateAttachment({
+                        borderlessContour: e.target.value as BorderlessContourMode,
+                      })
+                    }
+                  >
+                    <option value="paper">Paper Cutout Border</option>
+                    <option value="none">No Border</option>
+                  </select>
+                </label>
+              )}
 
               <label className="scrapbook-inspector-field">
                 <span className="scrapbook-inspector-label">Caption</span>
