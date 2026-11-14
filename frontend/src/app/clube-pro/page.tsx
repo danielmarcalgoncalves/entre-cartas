@@ -7,28 +7,55 @@ import { api } from "@/services/api";
 import AuthModal from "@/components/AuthModal";
 
 export default function ClubeProPage() {
-  const { user, isPro } = useAuth();
+  const { user, isPro, refreshUser } = useAuth();
   const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [loadingPortal, setLoadingPortal] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [status, setStatus] = useState<any>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Parâmetros de retorno do Stripe
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const checkoutSuccess = urlParams?.get("checkout") === "success";
-  const checkoutCancel = urlParams?.get("checkout") === "cancel";
+  const checkoutCancel =
+    urlParams?.get("checkout") === "cancel" || urlParams?.get("checkout") === "cancelled";
 
   useEffect(() => {
     if (!user) {
       setLoadingStatus(false);
       return;
     }
-    api.stripe
-      .getStatus()
-      .then((data) => setStatus(data))
-      .catch(() => {})
-      .finally(() => setLoadingStatus(false));
-  }, [user]);
+
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const fetchSubscriptionState = async () => {
+      try {
+        const data = await api.stripe.getStatus();
+        if (cancelled) return;
+        setStatus(data);
+        if (data?.isPremium && user.papel !== "premium" && user.papel !== "admin") {
+          await refreshUser();
+        } else if (checkoutSuccess && !data?.isPremium && attempts < 6) {
+          attempts += 1;
+          pollTimer = setTimeout(fetchSubscriptionState, 2000);
+        }
+      } catch {
+        // Preserve session even if status check temporarily fails
+      } finally {
+        if (!cancelled) setLoadingStatus(false);
+      }
+    };
+
+    fetchSubscriptionState();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [user?.id, checkoutSuccess]);
 
   const handleAssinar = async () => {
     if (!user) {
@@ -36,31 +63,46 @@ export default function ClubeProPage() {
       return;
     }
 
+    setErrorMessage(null);
     setLoadingCheckout(true);
     try {
       const data = await api.stripe.createCheckout();
       if (data && data.url) {
         window.location.href = data.url;
       } else {
-        alert("Unable to generate payment session. Please check Stripe keys in .env");
+        setErrorMessage("Unable to generate payment session. Please verify Stripe configuration.");
       }
     } catch (err: any) {
-      alert(err.message || "Error connecting to Stripe.");
+      setErrorMessage(err.message || "Error connecting to Stripe Checkout.");
     } finally {
       setLoadingCheckout(false);
     }
   };
 
   const handleGerenciarAssinatura = async () => {
+    setErrorMessage(null);
+    setLoadingPortal(true);
     try {
       const data = await api.stripe.createPortalSession();
       if (data && data.url) {
         window.location.href = data.url;
+      } else {
+        setErrorMessage("Unable to open the Stripe Billing Portal.");
       }
     } catch (err: any) {
-      alert(err.message || "Error opening subscriber portal.");
+      setErrorMessage(err.message || "Error opening subscriber billing portal.");
+    } finally {
+      setLoadingPortal(false);
     }
   };
+
+  const isPastDue = Boolean(
+    status?.isPastDue ||
+      status?.subscription?.status === "past_due" ||
+      user?.isPastDue ||
+      user?.subscriptionStatus === "past_due"
+  );
+  const canOpenPortal = Boolean(isPro || isPastDue || status?.canManageBilling);
 
   return (
     <div className="page-shell">
@@ -110,6 +152,60 @@ export default function ClubeProPage() {
         </div>
       )}
 
+      {isPastDue && (
+        <div
+          className="paper-panel"
+          role="alert"
+          style={{
+            marginBottom: "28px",
+            backgroundColor: "rgba(142, 65, 46, 0.32)",
+            border: "1px solid rgba(226, 132, 92, 0.75)",
+            textAlign: "center",
+            padding: "24px",
+          }}
+        >
+          <span className="stamp-mark" style={{ color: "#ffd2be", borderColor: "#e2845c" }}>
+            PAYMENT PAST DUE · ACTION REQUIRED
+          </span>
+          <h2 className="section-title" style={{ marginTop: "12px", fontSize: "24px", color: "#fff3ec" }}>
+            We could not process your most recent renewal payment
+          </h2>
+          <p className="page-intro" style={{ margin: "8px auto 18px", color: "#f6d5c6", maxWidth: "600px" }}>
+            Your Pro Sender subscription is currently marked as <strong>past_due</strong>. Please update your payment method in the Stripe Billing Portal to keep your Pro benefits active without interruption.
+          </p>
+          <button
+            type="button"
+            disabled={loadingPortal}
+            onClick={handleGerenciarAssinatura}
+            className="primary-cta"
+            style={{
+              background: "var(--color-red-sands, #ad5b30)",
+              color: "#fcfbf7",
+              border: "1px solid rgba(255, 210, 190, 0.5)",
+            }}
+          >
+            {loadingPortal ? "Opening Billing Portal..." : "Update Payment Method in Stripe ↗"}
+          </button>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div
+          className="paper-panel"
+          role="alert"
+          style={{
+            marginBottom: "24px",
+            backgroundColor: "rgba(121, 59, 43, 0.35)",
+            border: "1px solid rgba(226, 132, 92, 0.65)",
+            textAlign: "center",
+            padding: "16px 20px",
+            color: "#ffd2be",
+          }}
+        >
+          {errorMessage}
+        </div>
+      )}
+
       {isPro ? (
         <div
           className="letter-paper"
@@ -130,8 +226,13 @@ export default function ClubeProPage() {
           <p className="page-intro" style={{ margin: "0 auto 24px" }}>
             Thank you for supporting the preservation of this epistolary archive free of advertisements and algorithmic noise.
           </p>
-          <button type="button" onClick={handleGerenciarAssinatura} className="primary-cta">
-            Manage my subscription on Stripe ↗
+          <button
+            type="button"
+            disabled={loadingPortal}
+            onClick={handleGerenciarAssinatura}
+            className="primary-cta"
+          >
+            {loadingPortal ? "Opening Billing Portal..." : "Manage my subscription on Stripe ↗"}
           </button>
         </div>
       ) : (
@@ -211,6 +312,18 @@ export default function ClubeProPage() {
             >
               {loadingCheckout ? "Opening Stripe..." : "Join Pro Club for $14.90 ↗"}
             </button>
+
+            {canOpenPortal && (
+              <button
+                type="button"
+                disabled={loadingPortal}
+                onClick={handleGerenciarAssinatura}
+                className="stamp-button"
+                style={{ width: "100%", marginTop: "10px" }}
+              >
+                {loadingPortal ? "Opening Billing Portal..." : "Manage Billing History on Stripe ↗"}
+              </button>
+            )}
           </div>
         </div>
       )}

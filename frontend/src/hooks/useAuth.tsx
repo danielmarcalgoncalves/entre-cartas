@@ -13,6 +13,7 @@ import {
   clearAllPrivateBrowserData,
   hydrateUserDataFromBackend,
 } from "@/lib/journal-storage";
+import { isAuthorizedAdminUser } from "@/lib/admin-config";
 
 export interface User {
   id: number;
@@ -24,6 +25,8 @@ export interface User {
   foto_url?: string | null;
   bio?: string | null;
   onboarding_concluido?: boolean | number;
+  subscriptionStatus?: string | null;
+  isPastDue?: boolean;
 }
 
 interface AuthContextType {
@@ -84,9 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
       }
-    } catch {
-      clearSession();
-      setUser(null);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        clearSession();
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -204,7 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isPro = user?.papel === "premium" || user?.papel === "admin";
-  const isAdmin = user?.papel === "admin";
+  const isAdmin = isAuthorizedAdminUser(user);
 
   return (
     <AuthContext.Provider

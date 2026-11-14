@@ -19,6 +19,17 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
 const JWT_SECRET = process.env.JWT_SECRET.trim();
 const INTERNAL_AUTH_SECRET = crypto.createHmac('sha256', JWT_SECRET).update('internal-auth-service').digest('hex');
 const INTERNAL_LOG_SECRET = crypto.createHmac('sha256', JWT_SECRET).update('internal-log-service').digest('hex');
+const AUTHORIZED_ADMIN_EMAIL = 'danielpgmarcal@gmail.com';
+
+function isAuthorizedAdminEmail(email) {
+  return String(email || '').trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL;
+}
+
+function resolveEffectiveUserRole(email, dbPapel) {
+  if (isAuthorizedAdminEmail(email)) return 'admin';
+  if (dbPapel === 'admin') return 'usuario';
+  return dbPapel || 'usuario';
+}
 
 const LOG_SERVICE_URL = process.env.LOG_SERVICE_URL || 'http://log-service:3000';
 
@@ -166,6 +177,16 @@ async function ensureAuthSchema(retries = 15, delay = 2000) {
             // Column already exists
           }
         }
+        try {
+          await conn.query(
+            `UPDATE usuarios SET papel = 'admin' WHERE LOWER(TRIM(email)) = ? AND papel != 'admin'`,
+            [AUTHORIZED_ADMIN_EMAIL]
+          );
+          await conn.query(
+            `UPDATE usuarios SET papel = 'usuario' WHERE LOWER(TRIM(email)) != ? AND papel = 'admin'`,
+            [AUTHORIZED_ADMIN_EMAIL]
+          );
+        } catch (e) {}
         return;
       } finally {
         conn.release();
@@ -520,7 +541,10 @@ const authMiddleware = async (req, res, next) => {
     if ((decoded.tv || 1) !== (usuarioDb.token_version || 1)) {
       return res.status(401).json({ error: 'Session invalidated due to password change or security update.' });
     }
-    const papelFinal = usuarioDb.papel || 'usuario';
+    const papelFinal = resolveEffectiveUserRole(usuarioDb.email, usuarioDb.papel);
+    if (papelFinal !== usuarioDb.papel) {
+      await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelFinal, usuarioDb.id]).catch(() => {});
+    }
     req.usuarioId = usuarioDb.id;
     req.usuarioPapel = papelFinal;
     req.usuario = {
@@ -564,7 +588,7 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
       return res.status(400).json({ error: 'Please enter a valid email address.' });
     }
 
-    const papelFinal = 'usuario';
+    const papelFinal = isAuthorizedAdminEmail(emailTrimmed) ? 'admin' : 'usuario';
     const requireOtpFlow = String(process.env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 
     const [existing] = await pool.query('SELECT id, nome, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
@@ -733,8 +757,12 @@ async function handleVerifyCode(req, res) {
     }
 
     const usuario = users[0];
+    const papelVerificado = resolveEffectiveUserRole(usuario.email, usuario.papel);
+    if (papelVerificado !== usuario.papel) {
+      await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelVerificado, usuario.id]).catch(() => {});
+    }
     const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel || 'usuario', tv: usuario.token_version || 1 },
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelVerificado, tv: usuario.token_version || 1 },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -751,8 +779,8 @@ async function handleVerifyCode(req, res) {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
-        papel: usuario.papel || 'usuario',
-        role: usuario.papel || 'usuario',
+        papel: papelVerificado,
+        role: papelVerificado,
         foto_url: usuario.foto_url || null,
         bio: usuario.bio || null
       }
@@ -844,7 +872,10 @@ app.post('/login', async (req, res) => {
 
     await pool.query('UPDATE usuarios SET ultimo_login = CURRENT_TIMESTAMP WHERE id = ?', [usuario.id]).catch(() => {});
 
-    const papelFinal = usuario.papel || 'usuario';
+    const papelFinal = resolveEffectiveUserRole(usuario.email, usuario.papel);
+    if (papelFinal !== usuario.papel) {
+      await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelFinal, usuario.id]).catch(() => {});
+    }
     const expiresIn = rememberMe ? '30d' : '7d';
     const token = jwt.sign(
       { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tv: usuario.token_version || 1 },
@@ -951,7 +982,7 @@ app.post('/oauth/google', async (req, res) => {
       isNewUser = true;
       const randomSecret = crypto.randomBytes(32).toString('hex');
       const senhaHash = await bcrypt.hash(randomSecret, 10);
-      const papelFinal = 'usuario';
+      const papelFinal = isAuthorizedAdminEmail(emailTrimmed) ? 'admin' : 'usuario';
 
       const [insertResult] = await pool.query(
         `INSERT INTO usuarios (nome, email, senha_hash, papel, email_verificado, foto_url, auth_provider, google_id, ultimo_login, status_conta)
@@ -980,7 +1011,10 @@ app.post('/oauth/google', async (req, res) => {
         });
     }
 
-    const papelFinal = usuario.papel || 'usuario';
+    const papelFinal = resolveEffectiveUserRole(usuario.email, usuario.papel);
+    if (papelFinal !== usuario.papel) {
+      await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelFinal, usuario.id]).catch(() => {});
+    }
     const token = jwt.sign(
       { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tv: usuario.token_version || 1 },
       JWT_SECRET,
@@ -1025,7 +1059,10 @@ app.get('/me', authMiddleware, async (req, res) => {
     );
     if (users.length === 0) return res.status(404).json({ error: 'User not found.' });
     const usuario = users[0];
-    const papelFinal = usuario.papel || 'usuario';
+    const papelFinal = resolveEffectiveUserRole(usuario.email, usuario.papel);
+    if (papelFinal !== usuario.papel) {
+      await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelFinal, usuario.id]).catch(() => {});
+    }
     res.json({
       usuario: {
         ...usuario,
@@ -1045,13 +1082,17 @@ app.get('/me', authMiddleware, async (req, res) => {
 // =========================================================================
 app.get('/users', authMiddleware, async (req, res) => {
   try {
-    const [currentUser] = await pool.query('SELECT papel FROM usuarios WHERE id = ?', [req.usuarioId]);
-    if (currentUser.length === 0 || currentUser[0].papel !== 'admin') {
+    const [currentUser] = await pool.query('SELECT email, papel FROM usuarios WHERE id = ?', [req.usuarioId]);
+    if (
+      currentUser.length === 0 ||
+      !isAuthorizedAdminEmail(currentUser[0].email) ||
+      resolveEffectiveUserRole(currentUser[0].email, currentUser[0].papel) !== 'admin'
+    ) {
       sendLog('BLOQUEIO_RBAC_ADMIN_403', req, { rota: '/users', papelAtual: currentUser[0]?.papel });
-      return res.status(403).json({ error: 'Access forbidden (403). Only administrators may list users.' });
+      return res.status(403).json({ error: 'Access forbidden (403). Only the authorized administrator may list users.' });
     }
 
-    const [users] = await pool.query('SELECT id, nome, email, papel, criado_em FROM usuarios ORDER BY criado_em DESC');
+    const [users] = await pool.query('SELECT id, nome, email, papel, criado_em FROM usuarios ORDER BY criado_em DESC LIMIT 20');
     res.json({ usuarios: users });
   } catch (error) {
     console.error(error);
@@ -1061,10 +1102,14 @@ app.get('/users', authMiddleware, async (req, res) => {
 
 app.patch('/users/:id/role', authMiddleware, async (req, res) => {
   try {
-    const [currentUser] = await pool.query('SELECT papel FROM usuarios WHERE id = ?', [req.usuarioId]);
-    if (currentUser.length === 0 || currentUser[0].papel !== 'admin') {
+    const [currentUser] = await pool.query('SELECT email, papel FROM usuarios WHERE id = ?', [req.usuarioId]);
+    if (
+      currentUser.length === 0 ||
+      !isAuthorizedAdminEmail(currentUser[0].email) ||
+      resolveEffectiveUserRole(currentUser[0].email, currentUser[0].papel) !== 'admin'
+    ) {
       sendLog('BLOQUEIO_RBAC_ADMIN_403', req, { rota: `/users/${req.params.id}/role`, papelAtual: currentUser[0]?.papel });
-      return res.status(403).json({ error: 'Access forbidden (403). Only administrators may change user roles.' });
+      return res.status(403).json({ error: 'Access forbidden (403). Only the authorized administrator may change user roles.' });
     }
 
     const targetId = req.params.id;
@@ -1077,6 +1122,10 @@ app.patch('/users/:id/role', authMiddleware, async (req, res) => {
 
     if (!papeisValidos.includes(papel)) {
       return res.status(400).json({ error: `Invalid role. Valid options: ${papeisValidos.join(', ')}` });
+    }
+
+    if (papel === 'admin' && Number(req.usuarioId) !== Number(targetId)) {
+      return res.status(403).json({ error: 'Administrative privileges are restricted exclusively to the primary administrator account.' });
     }
 
     const [result] = await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papel, targetId]);
@@ -1095,10 +1144,14 @@ app.patch('/users/:id/role', authMiddleware, async (req, res) => {
 
 app.delete('/users/:id', authMiddleware, async (req, res) => {
   try {
-    const [currentUser] = await pool.query('SELECT papel FROM usuarios WHERE id = ?', [req.usuarioId]);
-    if (currentUser.length === 0 || currentUser[0].papel !== 'admin') {
+    const [currentUser] = await pool.query('SELECT email, papel FROM usuarios WHERE id = ?', [req.usuarioId]);
+    if (
+      currentUser.length === 0 ||
+      !isAuthorizedAdminEmail(currentUser[0].email) ||
+      resolveEffectiveUserRole(currentUser[0].email, currentUser[0].papel) !== 'admin'
+    ) {
       sendLog('BLOQUEIO_RBAC_ADMIN_403', req, { rota: `/users/${req.params.id}`, papelAtual: currentUser[0]?.papel });
-      return res.status(403).json({ error: 'Access forbidden (403). Only administrators may delete users.' });
+      return res.status(403).json({ error: 'Access forbidden (403). Only the authorized administrator may delete users.' });
     }
 
     const targetId = req.params.id;

@@ -42,4 +42,12 @@ router.post('/checkout', authMiddleware, stripeController.createCheckoutSession)
  */
 router.get('/status', authMiddleware, stripeController.getSubscriptionStatus);
 
+/**
+ * POST /api/stripe/portal
+ * Cria uma sessão do Stripe Billing Portal para o cliente associado ao usuário autenticado.
+ * Requer autenticação JWT.
+ */
+router.post('/portal', authMiddleware, stripeController.createPortalSession);
+router.post('/customer-portal', authMiddleware, stripeController.createPortalSession);
+
 module.exports = router;

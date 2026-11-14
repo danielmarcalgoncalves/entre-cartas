@@ -2003,10 +2003,10 @@ export default function JournalEditor() {
 
     const limiteCadernos = isPro ? 10 : 3;
     if (notebooks.length >= limiteCadernos) {
-      alert(
+      setCadernoPromptNotice(
         isPro
-          ? `You have reached the limit of ${limiteCadernos} journals on the Premium Plan.`
-          : `You have reached the limit of ${limiteCadernos} journals on the Standard Plan. Join Pro Club to have up to 10 journals!`
+          ? `You have reached the Premium Plan limit of ${limiteCadernos} journals (${notebooks.length}/${limiteCadernos}).`
+          : `You have reached the Free Plan limit of ${limiteCadernos} journals (${notebooks.length}/${limiteCadernos}). Upgrade to the Pro Sender Club to create up to 10 journals.`
       );
       return;
     }
@@ -2917,8 +2917,26 @@ export default function JournalEditor() {
                 <div className="drawer-mandatory-alert">
                   <span className="drawer-alert-icon">!</span>
                   <div className="drawer-alert-body">
-                    <strong>Journal Required:</strong>
+                    <strong>{notebooks.length >= (isPro ? 10 : 3) ? "Plan Limit Reached:" : "Journal Notice:"}</strong>
                     <span>{cadernoPromptNotice}</span>
+                    {!isPro && notebooks.length >= 3 && (
+                      <div style={{ marginTop: "8px" }}>
+                        <Link
+                          href="/clube-pro"
+                          className="stamp-button compact"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            background: "var(--color-red-sands, #ad5b30)",
+                            color: "#fcfbf7",
+                            textDecoration: "none",
+                          }}
+                        >
+                          Upgrade to Pro Club (up to 10 journals) →
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

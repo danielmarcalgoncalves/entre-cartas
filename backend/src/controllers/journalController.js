@@ -9,6 +9,8 @@
 
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
+const { evaluateUserEntitlement } = require('../utils/entitlement');
 const {
   uploadJournalMedia,
   getJournalMediaStream,
@@ -178,22 +180,32 @@ async function upsertNotebook(req, res) {
       );
 
       if (existing.length === 0) {
-        const isPro = papelEfetivo === 'premium' || papelEfetivo === 'admin';
+        const entitlement = await evaluateUserEntitlement(conn, usuarioId);
+        const isPro = entitlement ? entitlement.isPro : (papelEfetivo === 'premium' || papelEfetivo === 'admin');
         const limit = isPro ? 10 : 3;
         const [countRows] = await conn.query(
           'SELECT COUNT(*) as total FROM cadernos WHERE usuario_id = ?',
           [usuarioId]
         );
-        const total = countRows[0] ? countRows[0].total : 0;
+        const total = countRows[0] ? Number(countRows[0].total) : 0;
         if (total >= limit) {
           await conn.rollback();
-          return res.status(403).json({
-            error: isPro
-              ? `You have reached the limit of ${limit} journals on the Premium Plan.`
-              : `You have reached the limit of ${limit} journals on the Standard Plan. Join Pro Club for up to 10 journals!`,
-            isLimitReached: true,
+          sendLog('BLOQUEIO_LIMITE_CADERNOS_403', req, {
+            usuario_id: usuarioId,
+            total,
             limite: limit,
+            papel: entitlement?.papel || papelEfetivo,
           });
+          return res.status(403).json(
+            buildPlanLimitError({
+              feature: 'journals',
+              resourceLabel: 'writing journals',
+              currentUsage: total,
+              freePlanLimit: 3,
+              proPlanLimit: 10,
+              isPremium: isPro,
+            })
+          );
         }
 
         await conn.query(
@@ -336,22 +348,32 @@ async function upsertFolder(req, res) {
       );
 
       if (existing.length === 0) {
-        const isPro = papelEfetivo === 'premium' || papelEfetivo === 'admin';
+        const entitlement = await evaluateUserEntitlement(conn, usuarioId);
+        const isPro = entitlement ? entitlement.isPro : (papelEfetivo === 'premium' || papelEfetivo === 'admin');
         const limit = isPro ? 10 : 3;
         const [countRows] = await conn.query(
           'SELECT COUNT(*) as total FROM pastas_cartas WHERE usuario_id = ?',
           [usuarioId]
         );
-        const total = countRows[0] ? countRows[0].total : 0;
+        const total = countRows[0] ? Number(countRows[0].total) : 0;
         if (total >= limit) {
           await conn.rollback();
-          return res.status(403).json({
-            error: isPro
-              ? `You have reached the limit of ${limit} folders on the Premium Plan.`
-              : `You have reached the limit of ${limit} folders on the Standard Plan. Join Pro Club for up to 10 folders!`,
-            isLimitReached: true,
+          sendLog('BLOQUEIO_LIMITE_PASTAS_403', req, {
+            usuario_id: usuarioId,
+            total,
             limite: limit,
+            papel: entitlement?.papel || papelEfetivo,
           });
+          return res.status(403).json(
+            buildPlanLimitError({
+              feature: 'letter_folders',
+              resourceLabel: 'correspondence folders',
+              currentUsage: total,
+              freePlanLimit: 3,
+              proPlanLimit: 10,
+              isPremium: isPro,
+            })
+          );
         }
 
         await conn.query(

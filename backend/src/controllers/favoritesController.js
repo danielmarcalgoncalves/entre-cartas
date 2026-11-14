@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
 
 // Lista todos os filmes favoritos do usuário autenticado
 async function getFavorites(req, res) {
@@ -66,13 +67,16 @@ async function addFavorite(req, res) {
           papelAtual: papelUsuario,
           limite
         });
-        return res.status(403).json({
-          error: `Limite de ${limite} filmes favoritos atingido. Assine o Plano Premium para ter favoritos ilimitados!`,
-          isLimitReached: true,
-          papelAtual: papelUsuario,
-          limite,
-          upgradeToPremium: true
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'favorites',
+            resourceLabel: 'favorite items',
+            currentUsage: Number(totalFavoritos),
+            freePlanLimit: 5,
+            proPlanLimit: null,
+            isPremium: false
+          })
+        );
       }
     }
 

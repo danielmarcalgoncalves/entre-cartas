@@ -97,6 +97,20 @@ async function initDb(retries = 15, delay = 2000) {
       await connection.query(`ALTER TABLE usuarios ADD COLUMN token_version INT NOT NULL DEFAULT 1;`);
     } catch (e) {}
 
+    try {
+      await connection.query(`ALTER TABLE usuarios ADD INDEX idx_usuarios_papel (papel);`);
+    } catch (e) {}
+
+    // Enforce exclusive administrator role for danielpgmarcal@gmail.com
+    try {
+      await connection.query(
+        `UPDATE usuarios SET papel = 'admin' WHERE LOWER(TRIM(email)) = 'danielpgmarcal@gmail.com' AND papel != 'admin'`
+      );
+      await connection.query(
+        `UPDATE usuarios SET papel = 'usuario' WHERE LOWER(TRIM(email)) != 'danielpgmarcal@gmail.com' AND papel = 'admin'`
+      );
+    } catch (e) {}
+
     // 3. Códigos de verificação OTP
     await connection.query(`
       CREATE TABLE IF NOT EXISTS codigos_verificacao (
@@ -274,9 +288,13 @@ async function initDb(retries = 15, delay = 2000) {
         FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         UNIQUE KEY uk_usuario_stripe (usuario_id),
         INDEX idx_stripe_customer (stripe_customer_id),
-        INDEX idx_stripe_subscription (stripe_subscription_id)
+        INDEX idx_stripe_subscription (stripe_subscription_id),
+        INDEX idx_stripe_status (status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+    try {
+      await connection.query(`ALTER TABLE stripe_subscriptions ADD INDEX idx_stripe_status (status);`);
+    } catch (e) {}
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS stripe_webhook_events (

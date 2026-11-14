@@ -2,6 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { sendLog, getAuditLogs } = require('../services/logClient');
+const { isAuthorizedAdminEmail } = require('../utils/entitlement');
 
 const PRIMARY_AUTH_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3000';
 const FALLBACK_LOCAL_AUTH_URL = 'http://127.0.0.1:3001';
@@ -131,7 +132,13 @@ async function register(req, res) {
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, true, req);
       if (response.data.usuario) {
-        response.data.usuario.role = response.data.usuario.papel || 'usuario';
+        const effectiveRole = isAuthorizedAdminEmail(response.data.usuario.email)
+          ? 'admin'
+          : response.data.usuario.papel === 'admin'
+          ? 'usuario'
+          : response.data.usuario.papel || 'usuario';
+        response.data.usuario.papel = effectiveRole;
+        response.data.usuario.role = effectiveRole;
       }
     }
 
@@ -155,7 +162,13 @@ async function login(req, res) {
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, Boolean(req.body?.rememberMe), req);
       if (response.data.usuario) {
-        response.data.usuario.role = response.data.usuario.papel || 'usuario';
+        const effectiveRole = isAuthorizedAdminEmail(response.data.usuario.email)
+          ? 'admin'
+          : response.data.usuario.papel === 'admin'
+          ? 'usuario'
+          : response.data.usuario.papel || 'usuario';
+        response.data.usuario.papel = effectiveRole;
+        response.data.usuario.role = effectiveRole;
         if (!response.data.usuario.foto_url) {
           try {
             const [rows] = await pool.query('SELECT foto_url, bio FROM usuarios WHERE id = ?', [response.data.usuario.id]);
@@ -244,17 +257,29 @@ async function me(req, res) {
       }
     });
     if (response.data && response.data.usuario) {
-      response.data.usuario.role = response.data.usuario.papel || 'usuario';
+      const effectiveRole = req.usuarioPapel || response.data.usuario.papel || 'usuario';
+      response.data.usuario.papel = effectiveRole;
+      response.data.usuario.role = effectiveRole;
       response.data.usuario.foto_url = response.data.usuario.foto_url || req.usuario?.foto_url || null;
       response.data.usuario.bio = response.data.usuario.bio || req.usuario?.bio || null;
+      if (req.entitlement?.subscription) {
+        response.data.usuario.subscriptionStatus = req.entitlement.subscription.status || null;
+        response.data.usuario.isPastDue = Boolean(req.entitlement.isPastDue);
+      }
     }
     return res.status(response.status).json(response.data);
   } catch (error) {
+    if (req.usuario) {
+      return res.json({
+        usuario: {
+          ...req.usuario,
+          subscriptionStatus: req.entitlement?.subscription?.status || null,
+          isPastDue: Boolean(req.entitlement?.isPastDue),
+        }
+      });
+    }
     if (error.response) {
       return res.status(error.response.status).json(error.response.data);
-    }
-    if (req.usuario) {
-      return res.json({ usuario: req.usuario });
     }
     return res.status(500).json({ error: 'Unable to verify session with the authentication service.' });
   }
@@ -498,7 +523,13 @@ async function verifyCode(req, res) {
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, true, req);
       if (response.data.usuario) {
-        response.data.usuario.role = response.data.usuario.papel || 'usuario';
+        const effectiveRole = isAuthorizedAdminEmail(response.data.usuario.email)
+          ? 'admin'
+          : response.data.usuario.papel === 'admin'
+          ? 'usuario'
+          : response.data.usuario.papel || 'usuario';
+        response.data.usuario.papel = effectiveRole;
+        response.data.usuario.role = effectiveRole;
       }
     }
     return res.status(response.status).json(response.data);

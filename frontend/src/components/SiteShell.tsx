@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import AuthModal from "@/components/AuthModal";
 import { guardJournalNavigation } from "@/lib/journal-navigation-guard";
+import { ADMIN_ROUTE_PATH, isAuthorizedAdminUser } from "@/lib/admin-config";
 
 interface NavItem {
   href: string;
@@ -78,7 +79,7 @@ const navItems: NavItem[] = [
 export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, isPro, logout } = useAuth();
+  const { user, loading, isPro, isAdmin, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === "light";
   const [authOpen, setAuthOpen] = useState(false);
@@ -319,6 +320,33 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+
+            {isAdmin && isAuthorizedAdminUser(user) && (
+              <Link
+                href={ADMIN_ROUTE_PATH}
+                className={`nav-link${
+                  pathname === ADMIN_ROUTE_PATH || pathname.startsWith(`${ADMIN_ROUTE_PATH}/`)
+                    ? " active"
+                    : ""
+                }`}
+                aria-current={
+                  pathname === ADMIN_ROUTE_PATH || pathname.startsWith(`${ADMIN_ROUTE_PATH}/`)
+                    ? "page"
+                    : undefined
+                }
+                title="Admin"
+              >
+                <span className="nav-link-symbol" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                </span>
+                <span className="nav-link-label sidebar-collapsible-content">
+                  Admin
+                </span>
+              </Link>
+            )}
 
             {/* 3. Settings Item with Collapsible Submenu */}
             <div className="nav-settings-block">

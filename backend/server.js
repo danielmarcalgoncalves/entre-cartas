@@ -42,18 +42,20 @@ app.set('trust proxy', trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) 
 // Headers de segurança e proteção HTTP
 app.use(securityHeaders);
 
-// ⚠️ IMPORTANTE: O webhook do Stripe DEVE ser registrado ANTES do express.json() global.
-// A rota /api/stripe/webhook usa express.raw() internamente para preservar o corpo
-// original da requisição, necessário para validação criptográfica da assinatura do Stripe.
-app.use('/api/stripe', stripeRoutes);
-
-// Configuração de CORS (permitindo envio de cookies/credentials) e Parsers
+// Configuração de CORS (permitindo envio de cookies/credentials) e Parsers de Cookie/CSRF
+// Registrados ANTES de /api/stripe para que req.cookies.access_token esteja disponível em /api/stripe/*
 app.use(cors({
   origin: true,
   credentials: true
 }));
 app.use(cookieParser());
 app.use(csrfProtection);
+
+// ⚠️ IMPORTANTE: O webhook do Stripe DEVE ser registrado ANTES do express.json() global.
+// A rota /api/stripe/webhook usa express.raw() internamente para preservar o corpo
+// original da requisição, necessário para validação criptográfica da assinatura do Stripe.
+app.use('/api/stripe', stripeRoutes);
+
 app.use(express.json({ limit: '1mb' }));
 
 // Rotas da API
@@ -66,10 +68,13 @@ app.use('/api/lists', listsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/journal', journalRoutes);
 
-// Rota direta de administração para Logs de Auditoria (Atividade 5 - RBAC Admin)
-const authController = require('./src/controllers/authController');
+// Rotas administrativas protegidas (acesso exclusivo para danielpgmarcal@gmail.com)
+const adminController = require('./src/controllers/adminController');
 const { authMiddleware, requireAdmin } = require('./src/middlewares/auth');
-app.get('/api/admin/logs', authMiddleware, requireAdmin, authController.getAuditLogs);
+app.get('/api/admin/metrics', authMiddleware, requireAdmin, adminController.getMetrics);
+app.get('/api/admin/users', authMiddleware, requireAdmin, adminController.listUsers);
+app.get('/api/admin/users/:id', authMiddleware, requireAdmin, adminController.getUserDetail);
+app.get('/api/admin/logs', authMiddleware, requireAdmin, adminController.getLogs);
 
 // Health check para monitoramento e Portainer
 app.get('/api/health', (req, res) => {
@@ -96,6 +101,16 @@ if (fs.existsSync(path.join(publicPath, 'index.html'))) {
 }
 
 if (staticPath) {
+  // Never expose predictable /admin path
+  app.get(['/admin', '/admin/*'], (req, res) => {
+    const notFoundHtml = path.join(staticPath, '404.html');
+    res.status(404);
+    if (fs.existsSync(notFoundHtml)) {
+      return res.sendFile(notFoundHtml);
+    }
+    return res.send('Not Found');
+  });
+
   app.use(express.static(staticPath, { redirect: false, extensions: ['html'] }));
   app.get('*', (req, res) => {
     // Se for rota da API, retorna 404 JSON
@@ -108,6 +123,10 @@ if (staticPath) {
     const specificHtml = path.join(staticPath, `${cleanPath}.html`);
     if (cleanPath && fs.existsSync(specificHtml)) {
       return res.sendFile(specificHtml);
+    }
+    const indexInDir = path.join(staticPath, cleanPath, 'index.html');
+    if (cleanPath && fs.existsSync(indexInDir)) {
+      return res.sendFile(indexInDir);
     }
 
     // Fallback padrão para index.html

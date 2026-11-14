@@ -1,5 +1,7 @@
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
+const { evaluateUserEntitlement } = require('../utils/entitlement');
 
 const PUBLIC_ARCHIVE_CONDITION = `c.is_public = TRUE AND c.status_curadoria = 'aprovada' AND (c.status_carta IS NULL OR c.status_carta = 'completed') AND (c.na_lixeira IS NULL OR c.na_lixeira = FALSE)`;
 const ACCESSIBLE_LETTER_CONDITION = `((${PUBLIC_ARCHIVE_CONDITION}) OR (? IS NOT NULL AND c.usuario_id = ? AND (c.na_lixeira IS NULL OR c.na_lixeira = FALSE)))`;
@@ -9,15 +11,16 @@ async function enforceActiveLetterQuota(connection, usuarioId, papelFallback = '
     'SELECT id, papel FROM usuarios WHERE id = ? FOR UPDATE',
     [usuarioId]
   );
-  const papelEfetivo = (userRows[0] && userRows[0].papel) || papelFallback;
-  const isPremium = papelEfetivo === 'premium' || papelEfetivo === 'admin';
+  const entitlement = await evaluateUserEntitlement(connection, usuarioId);
+  const papelEfetivo = entitlement ? entitlement.papel : ((userRows[0] && userRows[0].papel) || papelFallback);
+  const isPremium = entitlement ? entitlement.isPro : (papelEfetivo === 'premium' || papelEfetivo === 'admin');
   const limiteCartas = isPremium ? 30 : 10;
 
   const [contagemCartas] = await connection.query(
     'SELECT COUNT(*) as total FROM cartas WHERE usuario_id = ? AND (na_lixeira IS NULL OR na_lixeira = FALSE)',
     [usuarioId]
   );
-  const totalEscritas = contagemCartas[0] ? contagemCartas[0].total : 0;
+  const totalEscritas = contagemCartas[0] ? Number(contagemCartas[0].total) : 0;
 
   return {
     allowed: totalEscritas < limiteCartas,
@@ -241,14 +244,16 @@ async function criarCarta(req, res) {
             totalEscritas: quota.totalEscritas,
             limiteCartas: quota.limiteCartas
           });
-          return res.status(403).json({
-            error: quota.isPremium
-              ? `You have reached the limit of ${quota.limiteCartas} archived letters on the Premium Plan.`
-              : `You have reached the limit of ${quota.limiteCartas} letters on the Standard Plan. Join Pro Club to write up to 30 letters!`,
-            isLimitReached: true,
-            limite: quota.limiteCartas,
-            upgradeToPremium: !quota.isPremium
-          });
+          return res.status(403).json(
+            buildPlanLimitError({
+              feature: 'letters',
+              resourceLabel: 'written and archived letters',
+              currentUsage: quota.totalEscritas,
+              freePlanLimit: 10,
+              proPlanLimit: 30,
+              isPremium: quota.isPremium
+            })
+          );
         }
       }
 
@@ -365,12 +370,16 @@ async function carimbarCarta(req, res) {
           limite
         });
 
-        return res.status(403).json({
-          error: `Your memory box has reached the limit of ${limite} saved letters. Join Pro Sender Club to collect unlimited memories!`,
-          isLimitReached: true,
-          limite,
-          upgradeToPremium: true
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'saved_letters',
+            resourceLabel: 'saved archive letters in your memory box',
+            currentUsage: Number(totalGuardadas),
+            freePlanLimit: 5,
+            proPlanLimit: null,
+            isPremium: false
+          })
+        );
       }
     }
 
@@ -634,14 +643,16 @@ async function atualizarMinhaCarta(req, res) {
       const quota = await enforceActiveLetterQuota(connection, usuarioId, papelUsuario);
       if (!quota.allowed) {
         await connection.rollback();
-        return res.status(403).json({
-          error: quota.isPremium
-            ? `You have reached the limit of ${quota.limiteCartas} archived letters on the Premium Plan.`
-            : `You have reached the limit of ${quota.limiteCartas} letters on the Standard Plan. Join Pro Club to restore more letters!`,
-          isLimitReached: true,
-          limite: quota.limiteCartas,
-          upgradeToPremium: !quota.isPremium
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'letters',
+            resourceLabel: 'written and archived letters',
+            currentUsage: quota.totalEscritas,
+            freePlanLimit: 10,
+            proPlanLimit: 30,
+            isPremium: quota.isPremium
+          })
+        );
       }
     }
 
@@ -726,14 +737,16 @@ async function atualizarLixeiraCarta(req, res) {
       const quota = await enforceActiveLetterQuota(connection, usuarioId, papelUsuario);
       if (!quota.allowed) {
         await connection.rollback();
-        return res.status(403).json({
-          error: quota.isPremium
-            ? `You have reached the limit of ${quota.limiteCartas} archived letters on the Premium Plan.`
-            : `You have reached the limit of ${quota.limiteCartas} letters on the Standard Plan. Join Pro Club to restore more letters!`,
-          isLimitReached: true,
-          limite: quota.limiteCartas,
-          upgradeToPremium: !quota.isPremium
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'letters',
+            resourceLabel: 'written and archived letters',
+            currentUsage: quota.totalEscritas,
+            freePlanLimit: 10,
+            proPlanLimit: 30,
+            isPremium: quota.isPremium
+          })
+        );
       }
     }
 

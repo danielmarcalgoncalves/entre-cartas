@@ -2,6 +2,11 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const {
+  AUTHORIZED_ADMIN_EMAIL,
+  isAuthorizedAdminEmail,
+  evaluateUserEntitlement
+} = require('../utils/entitlement');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
   throw new Error('[SECURITY] JWT_SECRET must be configured and at least 32 characters long.');
@@ -98,10 +103,19 @@ async function authMiddleware(req, res, next) {
     }
 
     // Associa dados validados diretamente do banco de dados ao request (imutáveis)
-    const papelFinal = usuarioDb.papel || 'usuario';
+    const entitlement = await evaluateUserEntitlement(pool, usuarioDb.id);
+    const papelFinal = entitlement
+      ? entitlement.papel
+      : isAuthorizedAdminEmail(usuarioDb.email)
+      ? 'admin'
+      : usuarioDb.papel === 'admin'
+      ? 'usuario'
+      : usuarioDb.papel || 'usuario';
+
     req.token = token;
     req.usuarioId = Number(usuarioDb.id);
     req.usuarioPapel = papelFinal;
+    req.entitlement = entitlement;
     req.usuario = {
       id: Number(usuarioDb.id),
       nome: usuarioDb.nome,
@@ -148,13 +162,21 @@ function requireRole(...papeisPermitidos) {
 }
 
 function requireAdmin(req, res, next) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+
   const role = req.usuarioPapel || (req.usuario && (req.usuario.papel || req.usuario.role));
-  if (role !== 'admin') {
+  const email = req.usuario && req.usuario.email ? String(req.usuario.email).trim().toLowerCase() : '';
+
+  if (!req.usuarioId || !req.usuario || role !== 'admin' || !isAuthorizedAdminEmail(email)) {
     sendLog('BLOQUEIO_RBAC_ADMIN_403', req, {
-      motivo: 'Unauthorized access attempt to administrative resource',
-      papelAtual: role || 'unknown'
+      motivo: 'Unauthorized access attempt to exclusive administrative resource',
+      usuario_id: req.usuarioId || null,
+      papelAtual: role || 'unauthenticated'
     });
-    return res.status(403).json({ error: 'Access restricted to administrators only.' });
+    return res.status(403).json({
+      error: 'Access restricted exclusively to the authorized administrator account.'
+    });
   }
   next();
 }

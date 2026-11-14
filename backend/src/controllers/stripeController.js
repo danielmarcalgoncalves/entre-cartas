@@ -19,12 +19,16 @@
 
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
+const {
+  resolvePublicAppUrl,
+  evaluateUserEntitlement,
+} = require('../utils/entitlement');
 
 // Configurações centralizadas do plano (dinâmicas para cada requisição)
-function getStripeConfig() {
+function getStripeConfig(req = null) {
   return {
     PRICE_ID: process.env.STRIPE_PRICE_ID || null,
-    APP_URL: process.env.APP_URL || 'http://localhost:3000',
+    APP_URL: resolvePublicAppUrl(req),
   };
 }
 
@@ -49,7 +53,7 @@ function getStripe() {
 async function createCheckoutSession(req, res) {
   try {
     const stripe = getStripe();
-    const config = getStripeConfig();
+    const config = getStripeConfig(req);
 
     if (!config.PRICE_ID) {
       return res.status(503).json({
@@ -146,8 +150,8 @@ async function createCheckoutSession(req, res) {
         usuario_nome: usuario.nome
       },
       // URLs de retorno após o checkout (hospedadas pelo Stripe)
-      success_url: `${config.APP_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.APP_URL}/?checkout=cancelled`,
+      success_url: `${config.APP_URL}/clube-pro?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${config.APP_URL}/clube-pro?checkout=cancel`,
       // Configurações regionais
       locale: 'pt-BR',
       // Permite código de promoção (útil para testes)
@@ -274,9 +278,7 @@ async function handleWebhook(req, res) {
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
         console.warn(`[Webhook] Falha de pagamento para assinatura ${invoice.subscription}.`);
-        if (invoice.subscription) {
-          await _atualizarStatusSubscription(invoice.subscription, 'past_due');
-        }
+        await _registrarFalhaPagamento(invoice);
         break;
       }
 
@@ -317,29 +319,21 @@ async function handleWebhook(req, res) {
 async function getSubscriptionStatus(req, res) {
   try {
     const usuarioId = req.usuarioId;
+    const entitlement = await evaluateUserEntitlement(pool, usuarioId);
 
-    const [userRows] = await pool.query(
-      'SELECT id, nome, email, papel FROM usuarios WHERE id = ?',
-      [usuarioId]
-    );
-    if (userRows.length === 0) {
+    if (!entitlement) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
 
-    const usuario = userRows[0];
-    const isPremium = usuario.papel === 'premium' || usuario.papel === 'admin';
-
-    // Busca metadados da assinatura Stripe (se existir)
-    const [subRows] = await pool.query(
-      'SELECT stripe_subscription_id, stripe_customer_id, status, periodo_inicio, periodo_fim, atualizado_em FROM stripe_subscriptions WHERE usuario_id = ? ORDER BY criado_em DESC LIMIT 1',
-      [usuarioId]
-    );
-
-    const subscription = subRows[0] || null;
+    const subscription = entitlement.subscription;
 
     return res.json({
-      isPremium,
-      papel: usuario.papel,
+      isPremium: entitlement.isPro,
+      papel: entitlement.papel,
+      plan: entitlement.plan,
+      isPastDue: entitlement.isPastDue,
+      billingWarning: entitlement.billingWarning,
+      canManageBilling: entitlement.canManageBilling,
       subscription: subscription ? {
         id: subscription.stripe_subscription_id,
         status: subscription.status,
@@ -352,6 +346,89 @@ async function getSubscriptionStatus(req, res) {
   } catch (error) {
     console.error('[stripeController] getSubscriptionStatus error:', error.message);
     return res.status(500).json({ error: 'Erro ao consultar status da assinatura.' });
+  }
+}
+
+/**
+ * POST /api/stripe/portal
+ * Cria uma sessão do Stripe Billing Portal para o cliente associado ao usuário autenticado.
+ */
+async function createPortalSession(req, res) {
+  try {
+    const stripe = getStripe();
+    const config = getStripeConfig(req);
+    const usuarioId = req.usuarioId;
+
+    const [subRows] = await pool.query(
+      `SELECT stripe_customer_id, stripe_subscription_id, status
+       FROM stripe_subscriptions
+       WHERE usuario_id = ? AND stripe_customer_id IS NOT NULL
+       ORDER BY atualizado_em DESC, criado_em DESC
+       LIMIT 1`,
+      [usuarioId]
+    );
+
+    const customerId = subRows[0]?.stripe_customer_id || null;
+    if (!customerId) {
+      return res.status(404).json({
+        error: 'No Stripe billing profile was found for your account. Subscribe to the Pro Sender Club first to manage billing.'
+      });
+    }
+
+    // Verify customer ownership on Stripe before creating portal session
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer || customer.deleted) {
+        return res.status(404).json({
+          error: 'Your Stripe billing profile is no longer active. Please contact support or start a new subscription.'
+        });
+      }
+      if (customer.metadata?.usuario_id && Number(customer.metadata.usuario_id) !== Number(usuarioId)) {
+        sendLog('STRIPE_PORTAL_OWNERSHIP_MISMATCH', req, {
+          usuario_id: usuarioId,
+          customer_id: customerId
+        });
+        return res.status(403).json({
+          error: 'Billing profile ownership verification failed.'
+        });
+      }
+    } catch (custLookupErr) {
+      if (custLookupErr.statusCode === 404 || custLookupErr.code === 'resource_missing') {
+        return res.status(404).json({
+          error: 'Stripe customer record could not be found in the current Stripe environment.'
+        });
+      }
+      throw custLookupErr;
+    }
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${config.APP_URL}/clube-pro`
+    });
+
+    sendLog('STRIPE_PORTAL_CRIADO', req, {
+      usuario_id: usuarioId,
+      customer_id: customerId
+    });
+
+    return res.json({
+      url: portalSession.url
+    });
+  } catch (error) {
+    console.error('[stripeController] createPortalSession error:', error.message);
+    sendLog('STRIPE_PORTAL_ERRO', req, {
+      usuario_id: req.usuarioId,
+      erro: error.message
+    });
+
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({
+        error: 'Unable to open the Stripe Billing Portal: ' + error.message
+      });
+    }
+    return res.status(502).json({
+      error: 'Unable to connect to the Stripe Billing Portal right now. Please try again shortly.'
+    });
   }
 }
 
@@ -482,6 +559,60 @@ async function _atualizarStatusSubscription(subscriptionId, status) {
 }
 
 /**
+ * Registra falha de pagamento (invoice.payment_failed), marcando a assinatura como past_due
+ * e registrando evento de auditoria sem derrubar a sessão do usuário.
+ */
+async function _registrarFalhaPagamento(invoice) {
+  const subscriptionId = invoice.subscription || null;
+  const customerId = invoice.customer || null;
+
+  if (!subscriptionId && !customerId) {
+    return;
+  }
+
+  let usuarioId = null;
+  if (subscriptionId) {
+    const [rows] = await pool.query(
+      'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_subscription_id = ? LIMIT 1',
+      [subscriptionId]
+    );
+    if (rows.length > 0) {
+      usuarioId = rows[0].usuario_id;
+      await pool.query(
+        'UPDATE stripe_subscriptions SET status = ?, atualizado_em = NOW() WHERE stripe_subscription_id = ?',
+        ['past_due', subscriptionId]
+      );
+    }
+  }
+
+  if (!usuarioId && customerId) {
+    const [rows] = await pool.query(
+      'SELECT usuario_id FROM stripe_subscriptions WHERE stripe_customer_id = ? LIMIT 1',
+      [customerId]
+    );
+    if (rows.length > 0) {
+      usuarioId = rows[0].usuario_id;
+      await pool.query(
+        `UPDATE stripe_subscriptions
+         SET status = 'past_due',
+             stripe_subscription_id = COALESCE(stripe_subscription_id, ?),
+             atualizado_em = NOW()
+         WHERE stripe_customer_id = ?`,
+        [subscriptionId, customerId]
+      );
+    }
+  }
+
+  sendLog('STRIPE_PAGAMENTO_FALHOU', null, {
+    usuario_id: usuarioId || 'desconhecido',
+    subscription_id: subscriptionId,
+    customer_id: customerId,
+    attempt_count: invoice.attempt_count || 1,
+    status: 'past_due'
+  });
+}
+
+/**
  * Sincroniza o estado de uma subscription atualizada pelo Stripe.
  * Apenas promove/revoga baseado no status atual.
  */
@@ -518,8 +649,10 @@ async function _sincronizarSubscription(subscription) {
     if (currentUser.length > 0 && currentUser[0].papel !== 'admin') {
       await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['premium', usuarioId]);
     }
-  } else if (status === 'canceled' || status === 'unpaid') {
+  } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
     await _rebaixarParaUsuarioComum(usuarioId, subscriptionId, status);
+  } else if (status === 'past_due') {
+    await evaluateUserEntitlement(pool, usuarioId);
   }
 }
 
@@ -584,6 +717,7 @@ async function _rebaixarParaUsuarioComum(usuarioId, subscriptionId, motivo) {
 
 module.exports = {
   createCheckoutSession,
+  createPortalSession,
   handleWebhook,
   getSubscriptionStatus
 };

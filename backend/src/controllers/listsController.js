@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { buildPlanLimitError } = require('../utils/quotaErrors');
 
 // Helper para garantir que o usuário tenha sua Watchlist fixa criada
 async function getOrCreateWatchlist(usuarioId) {
@@ -212,11 +213,16 @@ async function toggleWatchlist(req, res) {
       const totalAtual = countRows[0].total;
 
       if (totalAtual >= 10) {
-        return res.status(403).json({
-          error: 'Limite de 10 filmes na Watchlist atingido para o plano Comum. Faça upgrade para o Premium para salvar filmes ilimitados!',
-          limite: 10,
-          papelAtual: papelUsuario
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'watchlist',
+            resourceLabel: 'Watchlist items',
+            currentUsage: Number(totalAtual),
+            freePlanLimit: 10,
+            proPlanLimit: null,
+            isPremium: false
+          })
+        );
       }
     }
 
@@ -258,11 +264,16 @@ async function createList(req, res) {
     const totalCriadas = countRows[0].total;
 
     if (totalCriadas >= limiteListas) {
-      return res.status(403).json({
-        error: `Você atingiu o limite de ${limiteListas} listas personalizadas para o seu plano (${papelUsuario === 'usuario' ? 'Comum' : 'Premium'}). Faça upgrade para criar mais listas!`,
-        limite: limiteListas,
-        papelAtual: papelUsuario
-      });
+      return res.status(403).json(
+        buildPlanLimitError({
+          feature: 'custom_lists',
+          resourceLabel: 'custom collections',
+          currentUsage: Number(totalCriadas),
+          freePlanLimit: 2,
+          proPlanLimit: 10,
+          isPremium: papelUsuario === 'premium' || papelUsuario === 'admin'
+        })
+      );
     }
 
     const [result] = await pool.query(
@@ -364,11 +375,16 @@ async function addMovieToList(req, res) {
         [listId]
       );
       if (countRows[0].total >= 20) {
-        return res.status(403).json({
-          error: 'Limite de 20 filmes por lista atingido para o plano Comum. Faça upgrade para o Premium para listas ilimitadas!',
-          limite: 20,
-          papelAtual: papelUsuario
-        });
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'list_items',
+            resourceLabel: 'items per collection',
+            currentUsage: Number(countRows[0].total),
+            freePlanLimit: 20,
+            proPlanLimit: null,
+            isPremium: false
+          })
+        );
       }
     }
 

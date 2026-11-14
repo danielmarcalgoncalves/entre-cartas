@@ -80,6 +80,7 @@ export default function LetterEditor() {
   // Feedback & Drafts Drawer
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [limitNotice, setLimitNotice] = useState<string | null>(null);
   const [draftsDrawerOpen, setDraftsDrawerOpen] = useState(false);
 
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -428,10 +429,10 @@ export default function LetterEditor() {
     );
 
     if (!isUpdating && savedLetters.length >= limitLetters) {
-      alert(
+      setLimitNotice(
         isPro
-          ? `You have reached the limit of ${limitLetters} letters on the Premium Plan.`
-          : `You have reached the limit of ${limitLetters} letters on the Standard Plan. Join the Pro Sender Club to write up to 30 letters!`
+          ? `You have reached the Premium Plan limit of ${limitLetters} letters (${savedLetters.length}/${limitLetters}).`
+          : `You have reached the Free Plan limit of ${limitLetters} letters (${savedLetters.length}/${limitLetters}). Join the Pro Sender Club to write up to 30 letters.`
       );
       return;
     }
@@ -489,7 +490,9 @@ export default function LetterEditor() {
         }
       } catch (err: any) {
         if (err?.isLimitReached && err?.message) {
-          alert(err.message);
+          setLimitNotice(err.message);
+          setSaving(false);
+          return;
         }
       }
     }
@@ -535,10 +538,11 @@ export default function LetterEditor() {
 
     const limitFolders = isPro ? 10 : 3;
     if (letterFolders.length >= limitFolders) {
-      alert(
+      setShowNewFolderModal(false);
+      setLimitNotice(
         isPro
-          ? `You have reached the limit of ${limitFolders} folders on the Premium Plan.`
-          : `You have reached the limit of ${limitFolders} folders on the Standard Plan. Join Pro Club for up to 10 folders!`
+          ? `You have reached the Premium Plan limit of ${limitFolders} folders (${letterFolders.length}/${limitFolders}).`
+          : `You have reached the Free Plan limit of ${limitFolders} folders (${letterFolders.length}/${limitFolders}). Join the Pro Sender Club to create up to 10 folders.`
       );
       return;
     }
@@ -594,6 +598,50 @@ export default function LetterEditor() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {limitNotice && (
+        <div
+          className="paper-panel"
+          role="alert"
+          style={{
+            maxWidth: "820px",
+            margin: "0 auto 16px",
+            padding: "14px 18px",
+            backgroundColor: "rgba(121, 59, 43, 0.32)",
+            border: "1px solid rgba(207, 169, 111, 0.55)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+          }}
+        >
+          <span style={{ fontSize: "14px", color: "#f6e7d0" }}>{limitNotice}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {!isPro && (
+              <Link
+                href="/clube-pro"
+                className="stamp-button compact"
+                style={{
+                  background: "var(--color-red-sands, #ad5b30)",
+                  color: "#fcfbf7",
+                  textDecoration: "none",
+                }}
+              >
+                Upgrade to Pro Club →
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => setLimitNotice(null)}
+              className="stamp-button compact"
+              aria-label="Dismiss limit notice"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Essential Customization Controls Bar */}
       <header className="letter-essential-controls-bar" aria-label="Letter writing controls">

@@ -86,11 +86,20 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}):
     const errorMsg = data.error || data.message || `Request failed (${response.status})`;
     const err: any = new Error(errorMsg);
     err.status = response.status;
+    err.code = data.code;
+    err.feature = data.feature;
+    err.currentUsage = data.currentUsage;
+    err.freePlanLimit = data.freePlanLimit;
+    err.proPlanLimit = data.proPlanLimit;
+    err.upgradeAvailable = data.upgradeAvailable;
+    err.upgradeDestination = data.upgradeDestination || '/clube-pro';
+    err.details = data.details;
+    err.upgrade = data.upgrade;
     err.requireVerification = data.requireVerification;
     err.email = data.email;
-    err.isLimitReached = Boolean(data.isLimitReached || data.limite);
-    err.limite = data.limite;
-    err.upgradeToPremium = data.upgradeToPremium;
+    err.isLimitReached = Boolean(data.isLimitReached || data.limite || data.code === 'PLAN_LIMIT_REACHED');
+    err.limite = data.limite || data.freePlanLimit;
+    err.upgradeToPremium = Boolean(data.upgradeToPremium || data.upgradeAvailable);
     throw err;
   }
 
@@ -255,7 +264,7 @@ export const api = {
       }),
     getStatus: () => apiRequest('/stripe/status'),
     createPortalSession: () =>
-      apiRequest('/stripe/customer-portal', {
+      apiRequest('/stripe/portal', {
         method: 'POST',
       }),
   },
@@ -282,6 +291,47 @@ export const api = {
   },
 
   admin: {
-    getLogs: () => apiRequest('/admin/logs'),
+    getMetrics: () => apiRequest('/admin/metrics'),
+    getUsers: (params?: {
+      page?: number;
+      limit?: number;
+      q?: string;
+      plan?: string;
+      subscriptionStatus?: string;
+    }) => {
+      const sp = new URLSearchParams();
+      if (params?.page) sp.append('page', String(params.page));
+      if (params?.limit) sp.append('limit', String(params.limit));
+      if (params?.q) sp.append('q', params.q);
+      if (params?.plan && params.plan !== 'all') sp.append('plan', params.plan);
+      if (params?.subscriptionStatus && params.subscriptionStatus !== 'all') {
+        sp.append('subscriptionStatus', params.subscriptionStatus);
+      }
+      const qs = sp.toString();
+      return apiRequest(`/admin/users${qs ? `?${qs}` : ''}`);
+    },
+    getUserDetail: (id: number | string) => apiRequest(`/admin/users/${encodeURIComponent(String(id))}`),
+    getLogs: (params?: {
+      page?: number;
+      limit?: number;
+      userId?: string | number;
+      eventType?: string;
+      action?: string;
+      from?: string;
+      to?: string;
+      q?: string;
+    }) => {
+      const sp = new URLSearchParams();
+      if (params?.page) sp.append('page', String(params.page));
+      if (params?.limit) sp.append('limit', String(params.limit));
+      if (params?.userId) sp.append('userId', String(params.userId));
+      if (params?.eventType && params.eventType !== 'all') sp.append('eventType', params.eventType);
+      if (params?.action) sp.append('action', params.action);
+      if (params?.from) sp.append('from', params.from);
+      if (params?.to) sp.append('to', params.to);
+      if (params?.q) sp.append('q', params.q);
+      const qs = sp.toString();
+      return apiRequest(`/admin/logs${qs ? `?${qs}` : ''}`);
+    },
   },
 };

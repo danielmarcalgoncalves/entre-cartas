@@ -192,13 +192,25 @@ function csrfProtection(req, res, next) {
 
   if (req.cookies && req.cookies.access_token) {
     const origin = req.headers['origin'];
-    const host = req.headers['host'];
-
     if (origin) {
       try {
         const originUrl = new URL(origin);
-        if (originUrl.host !== host) {
-          console.warn(`[CSRF BLOCK] Suspicious origin blocked: ${origin} vs Host ${host}`);
+        const allowedHosts = new Set();
+        if (req.headers['host']) {
+          allowedHosts.add(String(req.headers['host']).split(',')[0].trim().toLowerCase());
+        }
+        if (req.headers['x-forwarded-host']) {
+          for (const h of String(req.headers['x-forwarded-host']).split(',')) {
+            if (h.trim()) allowedHosts.add(h.trim().toLowerCase());
+          }
+        }
+        if (process.env.APP_URL) {
+          try {
+            allowedHosts.add(new URL(process.env.APP_URL).host.toLowerCase());
+          } catch {}
+        }
+        if (allowedHosts.size > 0 && !allowedHosts.has(originUrl.host.toLowerCase())) {
+          console.warn(`[CSRF BLOCK] Suspicious origin blocked: ${origin} vs Allowed [${Array.from(allowedHosts).join(', ')}]`);
           return res.status(403).json({ error: 'Request blocked by security policy (CSRF validation).' });
         }
       } catch {
