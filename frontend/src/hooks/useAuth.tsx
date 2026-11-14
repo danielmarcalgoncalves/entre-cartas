@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   api,
@@ -32,6 +40,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  restoringSession: boolean;
   isPro: boolean;
   isAdmin: boolean;
   login: (email: string, senha: string, rememberMe?: boolean) => Promise<any>;
@@ -44,6 +53,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  restoringSession: false,
   isPro: false,
   isAdmin: false,
   login: async () => {},
@@ -54,12 +64,33 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const LAST_USER_MARKER_KEY = "entre-cartas:last-uid";
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+function hasStoredSessionHint(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return Boolean(
+      window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
+        window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
+        window.localStorage.getItem(LAST_USER_MARKER_KEY) ||
+        window.sessionStorage.getItem(LAST_USER_MARKER_KEY)
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasSessionHint, setHasSessionHint] = useState(false);
   const logoutInFlightRef = useRef(false);
+
+  useIsomorphicLayoutEffect(() => {
+    setHasSessionHint(hasStoredSessionHint());
+  }, []);
 
   const syncUserAccountScope = async (authenticatedUser: User) => {
     if (typeof window !== "undefined") {
@@ -83,13 +114,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await api.auth.me();
       if (data && data.usuario) {
         await syncUserAccountScope(data.usuario);
+        setHasSessionHint(true);
         setUser(data.usuario);
       } else {
+        clearSession();
+        setHasSessionHint(false);
         setUser(null);
       }
     } catch (err: any) {
       if (err?.status === 401) {
         clearSession();
+        await clearAllPrivateBrowserData();
+        setHasSessionHint(false);
+        setUser(null);
+      } else {
+        setHasSessionHint(false);
         setUser(null);
       }
     } finally {
@@ -105,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleUnauthorized = async () => {
       clearSession();
       await clearAllPrivateBrowserData();
+      setHasSessionHint(false);
       setUser(null);
     };
 
@@ -198,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Fail closed: always purge local auth tokens, private caches, and user state
       clearSession();
       await clearAllPrivateBrowserData();
+      setHasSessionHint(false);
       setUser(null);
       logoutInFlightRef.current = false;
       router.replace("/");
@@ -208,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const restoringSession = loading && hasSessionHint;
   const isPro = user?.papel === "premium" || user?.papel === "admin";
   const isAdmin = isAuthorizedAdminUser(user);
 
@@ -216,6 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading,
+        restoringSession,
         isPro,
         isAdmin,
         login,

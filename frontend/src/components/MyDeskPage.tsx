@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
+import AuthSessionLoadingScreen from "@/components/auth/AuthSessionLoadingScreen";
 import {
   ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
@@ -56,7 +57,7 @@ function formatPolaroidCaption(rawName: string): string {
 
 export default function MyDeskPage() {
   const router = useRouter();
-  const { user, loading, refreshUser } = useAuth();
+  const { user, loading, restoringSession, refreshUser } = useAuth();
 
   // DOM Refs for GSAP physical hover & entrance animations
   const stageRef = useRef<HTMLDivElement>(null);
@@ -114,9 +115,6 @@ export default function MyDeskPage() {
       setToast(null);
     }, 3200);
   }, []);
-
-  // First-login guided onboarding
-  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
 
   const cropStorageKey = `entre-cartas:polaroid-crop:${user?.id || "guest"}`;
 
@@ -193,17 +191,13 @@ export default function MyDeskPage() {
         }
       }
       setLocalPhotoUrl(user.foto_url || null);
-      const isDone = user.onboarding_concluido === 1 || user.onboarding_concluido === true;
-      if (!isDone && onboardingStep === null) {
-        setOnboardingStep(1);
-      }
     } else {
       setLocalPhotoUrl(null);
       setNameValue("");
       setBio("");
       setEditBioValue("");
     }
-  }, [user, onboardingStep, isEditingBio]);
+  }, [user, isEditingBio]);
 
   // Fetch authoritative profile from backend on mount & when user session resolves
   useEffect(() => {
@@ -223,12 +217,6 @@ export default function MyDeskPage() {
         }
         if (u.nome) setNameValue(u.nome);
         if (u.foto_url) setLocalPhotoUrl(u.foto_url);
-        const isDone = u.onboarding_concluido === 1 || u.onboarding_concluido === true;
-        if (!isDone) {
-          setOnboardingStep(1);
-        } else {
-          setOnboardingStep(null);
-        }
       })
       .catch(() => {
         // Fallback to auth context user data
@@ -692,50 +680,18 @@ export default function MyDeskPage() {
     }
   };
 
-  // ==========================================================================
-  // Guided First-Login Onboarding
-  // ==========================================================================
-  const handleNextOnboarding = () => {
-    if (onboardingStep === null) return;
-    if (onboardingStep < 4) {
-      setOnboardingStep(onboardingStep + 1);
-    } else {
-      handleFinishOnboarding();
-    }
-  };
-
-  const handleFinishOnboarding = async () => {
-    setOnboardingStep(null);
-    try {
-      await api.profile.update({ onboarding_concluido: true });
-      await refreshUser();
-    } catch {
-      // Ignore if guest
-    }
-  };
-
   const activePhotoUrl = localPhotoUrl || user?.foto_url || null;
   const fullUserName = user?.nome || nameValue || "NAME";
   const polaroidCaptionText = formatPolaroidCaption(fullUserName);
 
-  if (loading) {
+  if (restoringSession) {
+    return <AuthSessionLoadingScreen />;
+  }
+
+  if (loading || !user) {
     return (
       <main className="desk-page-container" aria-label="Loading desk...">
         <div className="desk-ambient-lighting" aria-hidden="true" />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "100vh",
-            color: "var(--color-ink-muted, #d8c6aa)",
-            fontFamily: "var(--font-serif, serif)",
-          }}
-        >
-          <span style={{ fontSize: "1.1rem", letterSpacing: "0.05em", fontStyle: "italic" }}>
-            Opening your desk…
-          </span>
-        </div>
       </main>
     );
   }
@@ -1343,79 +1299,6 @@ export default function MyDeskPage() {
           </div>
         </Link>
 
-        {/* ================================================================
-            FIRST-LOGIN GUIDED ONBOARDING
-            ================================================================ */}
-        {onboardingStep !== null && (
-          <div
-            className="desk-onboarding-bubble"
-            style={
-              onboardingStep === 1
-                ? { top: "18%", left: "26%" }
-                : onboardingStep === 2
-                ? { top: "48%", left: "26%" }
-                : onboardingStep === 3
-                ? { top: "44%", left: "50%", transform: "translate(-50%, -50%)" }
-                : { top: "38%", right: "26%" }
-            }
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="My Desk guided tour"
-          >
-            {onboardingStep === 1 && (
-              <>
-                <h2 className="desk-onboarding-title">Your Polaroid Portrait</h2>
-                <p className="desk-onboarding-text">
-                  Click the Polaroid or drag a photograph onto it to frame your portrait, and click
-                  the bottom caption to set your name.
-                </p>
-              </>
-            )}
-            {onboardingStep === 2 && (
-              <>
-                <h2 className="desk-onboarding-title">About Me Biography</h2>
-                <p className="desk-onboarding-text">
-                  Click the &ldquo;About Me&rdquo; note directly below your Polaroid to slide out
-                  and edit your personal biography page.
-                </p>
-              </>
-            )}
-            {onboardingStep === 3 && (
-              <>
-                <h2 className="desk-onboarding-title">Your Leather Journal</h2>
-                <p className="desk-onboarding-text">
-                  Click your central leather-bound volume anytime to open the Journal editor and
-                  record your daily reflections.
-                </p>
-              </>
-            )}
-            {onboardingStep === 4 && (
-              <>
-                <h2 className="desk-onboarding-title">Personal Correspondence</h2>
-                <p className="desk-onboarding-text">
-                  Click the sealed envelope on the right to compose personal letters, fold
-                  stationery, and seal them with wax.
-                </p>
-              </>
-            )}
-            <div className="desk-onboarding-actions">
-              <button
-                type="button"
-                className="desk-onboarding-btn-secondary"
-                onClick={handleFinishOnboarding}
-              >
-                Skip tour
-              </button>
-              <button
-                type="button"
-                className="desk-onboarding-btn-primary"
-                onClick={handleNextOnboarding}
-              >
-                {onboardingStep === 4 ? "Finish" : "Next →"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ====================================================================

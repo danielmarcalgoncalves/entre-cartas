@@ -1,0 +1,96 @@
+.bl-session-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: #140f0c;
+  color: #f4ead7;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bl-session-loading-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2.2vw, 18px);
+  max-width: 100%;
+  animation: blBrandFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.bl-session-loading-icon {
+  flex-shrink: 0;
+  width: clamp(36px, 5vw, 46px);
+  height: clamp(36px, 5vw, 46px);
+  display: block;
+}
+
+.bl-session-loading-text-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--serif-title, "Cormorant Garamond", Georgia, serif);
+  font-size: clamp(1.7rem, 4.2vw, 2.65rem);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  color: #f4ead7;
+  white-space: nowrap;
+}
+
+.bl-session-loading-cursor {
+  display: inline-block;
+  width: 1.5px;
+  height: 0.92em;
+  margin-left: 3px;
+  background-color: #d1b679;
+  transform: translateY(0.06em);
+  animation: blCaretBlink 0.9s ease-in-out infinite;
+}
+
+.bl-session-loading-cursor.is-complete {
+  opacity: 0.45;
+  animation: blCaretSoftFade 1.4s ease-in-out infinite;
+}
+
+@keyframes blBrandFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes blCaretBlink {
+  0%, 49% {
+    opacity: 0.9;
+  }
+  50%, 100% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes blCaretSoftFade {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.12;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bl-session-loading-brand {
+    animation: none;
+  }
+  .bl-session-loading-cursor {
+    animation: none;
+    opacity: 0.5;
+  }
+}

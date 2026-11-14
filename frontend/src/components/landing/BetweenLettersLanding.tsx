@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,7 +36,7 @@ export function BetweenLettersLanding({
   className = "",
 }: BetweenLettersLandingProps) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, restoringSession } = useAuth();
   const [activeTheme, setActiveTheme] = useState<"sunset" | "meadow">(initialBackground);
   const heroRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
@@ -144,6 +145,18 @@ export function BetweenLettersLanding({
     >
       {/* 1. Cinematic Background Layer with Smooth 15s Cross-Fading */}
       <LandingBackground ref={bgRef} activeTheme={activeTheme} />
+
+      {/* Upper-right Account Access Buttons (visible only to unauthenticated visitors) */}
+      {!restoringSession && !user && (
+        <nav className="landing-auth-nav" aria-label="Account access">
+          <Link href="/login" className="landing-auth-link landing-auth-link--login">
+            Log in
+          </Link>
+          <Link href="/login?mode=signup" className="landing-auth-link landing-auth-link--signup">
+            Sign up
+          </Link>
+        </nav>
+      )}
 
       {/* 2. Hand-Drawn Sketched Title */}
       <LandingTitle

@@ -1589,64 +1589,6 @@
   }
 }
 
-.desk-onboarding-bubble {
-  position: fixed;
-  z-index: 60;
-  background-color: #f6ecd9;
-  background-image: url("/images/nova-ui/auth-paper-texture.jpg");
-  background-size: cover;
-  border: 1.5px solid #6b4928;
-  border-radius: 4px;
-  padding: 16px 20px;
-  width: clamp(235px, 23vw, 295px);
-  box-shadow: 0 18px 42px rgba(8, 3, 1, 0.75);
-  color: #24160a;
-}
-
-.desk-onboarding-title {
-  font-family: var(--serif, "Playfair Display", Georgia, serif);
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0 0 6px 0;
-  color: #1c1006;
-}
-
-.desk-onboarding-text {
-  font-family: var(--serif, Georgia, serif);
-  font-size: 13px;
-  line-height: 1.5;
-  color: #3f2915;
-  margin: 0 0 14px 0;
-}
-
-.desk-onboarding-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.desk-onboarding-btn-primary {
-  background-color: #462b14;
-  color: #f7ecda;
-  border: 1px solid #2b1808;
-  border-radius: 2px;
-  padding: 5px 12px;
-  font-family: var(--serif, Georgia, serif);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.desk-onboarding-btn-secondary {
-  background: transparent;
-  border: none;
-  color: #745130;
-  font-family: var(--serif, Georgia, serif);
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
 /* ============================================================================
    RESPONSIVE ADAPTATION (TABLET & MOBILE)
    - Keeps About Me directly below the Polaroid on all screen sizes
@@ -1705,14 +1647,5 @@
   .desk-envelope-object {
     justify-self: center;
     width: min(84vw, 325px);
-  }
-
-  .desk-onboarding-bubble {
-    left: 50% !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: 20px !important;
-    transform: translateX(-50%) !important;
-    width: min(90vw, 310px);
   }
 }
