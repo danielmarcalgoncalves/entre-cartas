@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { letters, type Letter } from "@/lib/letters";
 import { Tape, Sticker } from "@/components/paper-kit";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,6 +29,7 @@ import PaperInkModal from "@/components/journal/PaperInkModal";
 import MobileJournalOverlays from "@/components/journal/MobileJournalOverlays";
 import { useMobileJournalGestures } from "@/components/journal/useMobileJournalGestures";
 import "./journal/journal-sidebar.css";
+import "./journal/journal-modes.css";
 import "./journal/mobile-journal.css";
 import { type StickerDefinition } from "@/lib/scrapbook-stickers";
 import {
@@ -420,6 +421,24 @@ export default function JournalEditor() {
 
   // Dedicated mobile-first Journal state (<= 768px only; desktop remains untouched)
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [desktopEditorMode, setDesktopEditorMode] = useState<"edit" | "writing">("edit");
+  const prefersReducedMotion = useReducedMotion();
+  const isWritingMode = !isMobileViewport && desktopEditorMode === "writing";
+
+  const handleSwitchDesktopMode = useCallback(
+    (nextMode: "edit" | "writing") => {
+      if (nextMode === desktopEditorMode) return;
+      playPaperSound();
+      if (nextMode === "writing") {
+        setSelectedScrapbookItem(null);
+        setStickerDrawerOpen(false);
+        setPhotoModalOpen(false);
+        setCustomMenuOpen(false);
+      }
+      setDesktopEditorMode(nextMode);
+    },
+    [desktopEditorMode]
+  );
   const [mobileSheetMetrics, setMobileSheetMetrics] = useState({
     scale: 0.65,
     width: Math.round(JOURNAL_PAGE_WIDTH * 0.65),
@@ -2125,6 +2144,17 @@ export default function JournalEditor() {
       const target = visualLines[clickedLine];
       const lineW = ctx.measureText(target.text).width;
 
+      if (isWritingMode) {
+        if (!hasMeaningfulJournalText(text)) {
+          textarea.setSelectionRange(0, 0);
+          return;
+        }
+        if (clickedX > lineW) {
+          textarea.setSelectionRange(target.end, target.end);
+        }
+        return;
+      }
+
       if (clickedX <= lineW) {
         let bestIdx = 0;
         let bestDiff = clickedX;
@@ -2166,6 +2196,13 @@ export default function JournalEditor() {
       } else {
         textarea.setSelectionRange(target.end, target.end);
       }
+      return;
+    }
+
+    // Writing Mode: clicking empty lower area places cursor at end of existing text (or 0 if empty)
+    if (isWritingMode) {
+      const nextPos = hasMeaningfulJournalText(text) ? text.length : 0;
+      textarea.setSelectionRange(nextPos, nextPos);
       return;
     }
 
@@ -2541,7 +2578,7 @@ export default function JournalEditor() {
     <section
       className={`writing-desk-wrap ${modoFoco ? "is-focus-mode" : ""} ${
         isMobileViewport ? "is-mobile-journal" : ""
-      }`}
+      } ${isWritingMode ? "is-desktop-writing-mode" : ""}`}
       id="mesa-de-escrita"
       aria-label="Personal Journal Writing Desk"
     >
@@ -2703,30 +2740,124 @@ export default function JournalEditor() {
           />
         </div>
 
-        {/* Center Column: Dedicated Ruled Notebook Sheet */}
+        {/* Center Column: Mode Selector Toolbar & Dedicated Ruled Notebook Sheet */}
         <div className="desk-center-col">
-          <div className="notebook-tabs-container">
-            <div className="notebook-tab notebook-tab--caderno active" aria-current="page">
-              {activeNotebook ? `Journal · ${activeNotebook.nome}` : "Personal Journal"}
+          {!isMobileViewport && !modoFoco && (
+            <div className="journal-mode-toolbar">
+              <div
+                className="journal-mode-switcher"
+                role="tablist"
+                aria-label="Journal editor mode"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!isWritingMode}
+                  className={`journal-mode-btn ${!isWritingMode ? "is-active" : ""}`}
+                  onClick={() => handleSwitchDesktopMode("edit")}
+                >
+                  {!isWritingMode && (
+                    <motion.span
+                      layoutId="journal-mode-pill"
+                      className="journal-mode-pill"
+                      transition={
+                        prefersReducedMotion
+                          ? { duration: 0.01 }
+                          : { type: "spring", stiffness: 420, damping: 34 }
+                      }
+                    />
+                  )}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                  </svg>
+                  <span>Edit Mode</span>
+                </button>
+
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isWritingMode}
+                  className={`journal-mode-btn ${isWritingMode ? "is-active" : ""}`}
+                  onClick={() => handleSwitchDesktopMode("writing")}
+                >
+                  {isWritingMode && (
+                    <motion.span
+                      layoutId="journal-mode-pill"
+                      className="journal-mode-pill"
+                      transition={
+                        prefersReducedMotion
+                          ? { duration: 0.01 }
+                          : { type: "spring", stiffness: 420, damping: 34 }
+                      }
+                    />
+                  )}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                    <path d="M2 2l7.586 7.586" />
+                  </svg>
+                  <span>Writing Mode</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="journal-top-volume-btn"
+                onClick={() => {
+                  if (isGuestMode) {
+                    playPaperSound();
+                    openGuestPrompt("notebook-open");
+                    return;
+                  }
+                  setCadernoPromptNotice(null);
+                  setNotebookDrawerOpen(true);
+                  playPaperSound();
+                }}
+                title="Switch or create a journal volume"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <span className="journal-top-volume-name">
+                  {activeNotebook ? activeNotebook.nome : "Personal Journal"}
+                </span>
+                <span aria-hidden="true">▾</span>
+              </button>
             </div>
-            <button
-              type="button"
-              className="notebook-tab"
-              style={{
-                background: "rgba(43, 34, 26, 0.78)",
-                color: "var(--color-pollen, #cfa96f)",
-                fontSize: "11px",
-              }}
-              onClick={() => {
-                setCadernoPromptNotice(null);
-                setNotebookDrawerOpen(true);
-                playPaperSound();
-              }}
-              title="Switch or create a journal volume"
-            >
-              Switch Volume ▾
-            </button>
-          </div>
+          )}
 
           <div
             className="sheet-stage-wrapper"
@@ -2812,6 +2943,23 @@ export default function JournalEditor() {
                     if (isMobileViewport && mobileActiveOverlay !== "closed") {
                       closeMobileOverlay();
                     }
+                  }}
+                  onClick={(e) => {
+                    if (!isWritingMode) return;
+                    const target = e.target as HTMLElement | null;
+                    if (target?.closest("input, textarea, button, a")) return;
+                    const ta = textareaRef.current;
+                    if (!ta) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const isUpperHalf = e.clientY - rect.top < rect.height * 0.45;
+                    const pos =
+                      !hasMeaningfulJournalText(cadernoConteudo) || isUpperHalf
+                        ? 0
+                        : cadernoConteudo.length;
+                    ta.focus();
+                    requestAnimationFrame(() => {
+                      textareaRef.current?.setSelectionRange(pos, pos);
+                    });
                   }}
                   initial={{ opacity: 0.9, scale: 0.99 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2912,9 +3060,9 @@ export default function JournalEditor() {
                   <ScrapbookLayer
                     attachments={currentPageAttachments}
                     stickers={currentPageStickers}
-                    readonly={false}
+                    readonly={isWritingMode}
                     sheetScale={isMobileViewport ? mobileSheetMetrics.scale : sheetScale}
-                    selectedItem={selectedScrapbookItem}
+                    selectedItem={isWritingMode ? null : selectedScrapbookItem}
                     onSelectItem={setSelectedScrapbookItem}
                     onChangeAttachments={handleChangePageAttachments}
                     onChangeStickers={handleChangePageStickers}
@@ -3104,9 +3252,22 @@ export default function JournalEditor() {
               )}
             </div>
 
-            {/* Group 2: Writing Tools */}
-            <div className="journal-rail-group">
-              <span className="journal-rail-group-label">Writing Tools</span>
+            {/* Group 2: Writing & Customization Tools (hidden in Writing Mode) */}
+            <AnimatePresence initial={false}>
+              {!isWritingMode && (
+                <motion.div
+                  key="journal-rail-customization-group"
+                  className="journal-rail-group"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={
+                    prefersReducedMotion
+                      ? { duration: 0.01 }
+                      : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
+                  }
+                >
+                  <span className="journal-rail-group-label">Writing Tools</span>
 
               {!modoFoco && (
                 <button
@@ -3236,7 +3397,9 @@ export default function JournalEditor() {
                   <p className="pinned-theme-phrase">“{temaSalvo}”</p>
                 </div>
               )}
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Group 3: Writing Actions */}

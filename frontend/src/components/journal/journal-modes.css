@@ -1,0 +1,177 @@
+/* ==========================================================================
+   MY JOURNAL WEB/DESKTOP — DUAL EDITING MODES (EDIT MODE & WRITING MODE)
+   Strictly scoped to Web/Desktop (.writing-desk-wrap:not(.is-mobile-journal)).
+   Mobile experience (<= 768px) remains 100% untouched.
+   ========================================================================== */
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 580px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 4;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(28, 21, 15, 0.86);
+  border: 1px solid rgba(207, 169, 111, 0.28);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(236, 225, 201, 0.06);
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-switcher {
+  background: rgba(250, 244, 232, 0.94);
+  border-color: rgba(138, 131, 95, 0.34);
+  box-shadow:
+    0 6px 18px rgba(74, 70, 57, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: rgba(236, 225, 201, 0.72);
+  font-family: var(--sans, sans-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.18s ease;
+  z-index: 1;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn {
+  color: rgba(62, 58, 47, 0.72);
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn:hover {
+  color: #f6ebd4;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn:hover {
+  color: #3e3a2f;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn.is-active {
+  color: #20170f;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn.is-active {
+  color: #fcfaf4;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn:focus-visible,
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:focus-visible {
+  outline: 2px solid var(--color-pollen, #cfa96f);
+  outline-offset: 2px;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #dfc08a 0%, #c69f61 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: -1;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-pill {
+  background: linear-gradient(180deg, #9d5027 0%, #83401d 100%);
+  box-shadow: 0 2px 8px rgba(131, 64, 29, 0.28);
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(207, 169, 111, 0.26);
+  background: rgba(34, 26, 19, 0.78);
+  color: var(--color-pollen, #cfa96f);
+  font-family: var(--serif, "EB Garamond", Georgia, serif);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
+  background: rgba(250, 244, 232, 0.92);
+  border-color: rgba(138, 131, 95, 0.34);
+  color: #6b4c28;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:hover {
+  border-color: rgba(207, 169, 111, 0.55);
+  background: rgba(46, 35, 25, 0.9);
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:hover {
+  background: #f5ecdb;
+  border-color: rgba(140, 72, 36, 0.45);
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   SMOOTH TRANSITIONS BETWEEN EDIT MODE AND WRITING MODE
+   Keeps the central sheet anchored in place with zero layout jump.
+   ========================================================================== */
+
+.writing-desk-wrap:not(.is-mobile-journal) .desk-left-col {
+  transition:
+    opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .desk-left-col {
+  opacity: 0;
+  transform: translateX(-14px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* In Writing Mode, decorative elements stay visible on the sheet but cannot be
+   selected, dragged, resized, or rotated */
+.writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .scrapbook-layer {
+  pointer-events: none !important;
+  user-select: none;
+}
+
+.writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .writing-sheet-card.mode-caderno {
+  cursor: text;
+}
+
+.writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .caderno-textarea-ruled {
+  cursor: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .writing-desk-wrap:not(.is-mobile-journal) .desk-left-col,
+  .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn,
+  .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
+    transition-duration: 0.01ms !important;
+  }
+}
