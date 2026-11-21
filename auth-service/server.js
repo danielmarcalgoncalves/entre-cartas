@@ -600,7 +600,7 @@ async function issueSessionTokens({ id, nome, email, papel, tokenVersion = 1 }, 
   const accessToken = jwt.sign(
     { id, nome, email, papel, tv: tokenVersion || 1 },
     JWT_SECRET,
-    { expiresIn: ACCESS_TOKEN_TTL }
+    { expiresIn: ACCESS_TOKEN_TTL, jwtid: crypto.randomUUID() }
   );
   const rawRefreshToken = crypto.randomBytes(48).toString('hex');
   const refreshHash = hashTokenValue(rawRefreshToken);

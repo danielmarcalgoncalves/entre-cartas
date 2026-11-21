@@ -7,6 +7,7 @@ import gsap from "gsap";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 import AuthSessionLoadingScreen from "@/components/auth/AuthSessionLoadingScreen";
+import AvatarPickerModal, { type DefaultAvatarItem } from "@/components/my-desk/AvatarPickerModal";
 import {
   ACTIVE_NOTEBOOK_ID_KEY,
   JOURNAL_UPDATED_EVENT,
@@ -89,7 +90,9 @@ export default function MyDeskPage() {
   const [isSavingName, setIsSavingName] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Polaroid Photo upload, drag-drop, and crop/reposition state
+  // Polaroid Photo upload, drag-drop, default avatar picker, and crop/reposition state
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [photoLoadError, setPhotoLoadError] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [localPhotoUrl, setLocalPhotoUrl] = useState<string | null>(null);
@@ -680,7 +683,30 @@ export default function MyDeskPage() {
     }
   };
 
-  const activePhotoUrl = localPhotoUrl || user?.foto_url || null;
+  const handleSelectDefaultAvatar = async (avatar: DefaultAvatarItem) => {
+    try {
+      setIsUploadingPhoto(true);
+      const response = await api.profile.selectDefaultAvatar(avatar.id);
+      const nextUrl = response?.foto_url || avatar.url;
+      setPhotoLoadError(false);
+      setLocalPhotoUrl(nextUrl);
+      const resetCrop: PolaroidCropState = { offsetX: 0, offsetY: 0, scale: 1 };
+      setCrop(resetCrop);
+      setIsCropMode(false);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(cropStorageKey, JSON.stringify(resetCrop));
+      }
+      await refreshUser();
+      showToast("Portrait updated", "success");
+    } catch (err: any) {
+      showToast(err.message || "Could not update portrait.", "error");
+      throw err;
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const activePhotoUrl = photoLoadError ? null : localPhotoUrl || user?.foto_url || null;
   const fullUserName = user?.nome || nameValue || "NAME";
   const polaroidCaptionText = formatPolaroidCaption(fullUserName);
 
@@ -711,6 +737,18 @@ export default function MyDeskPage() {
         aria-hidden="true"
       />
 
+      {/* Portrait Choice & Default Avatar Gallery Modal */}
+      <AvatarPickerModal
+        isOpen={isAvatarPickerOpen}
+        currentPhotoUrl={activePhotoUrl}
+        onClose={() => setIsAvatarPickerOpen(false)}
+        onChooseUploadFromDevice={() => {
+          setPhotoLoadError(false);
+          fileInputRef.current?.click();
+        }}
+        onConfirmDefaultAvatar={handleSelectDefaultAvatar}
+      />
+
       {/* Warm Ambient Overhead Desk Lighting & Vignette */}
       <div className="desk-ambient-lighting" aria-hidden="true" />
 
@@ -736,7 +774,7 @@ export default function MyDeskPage() {
               onClick={(e) => {
                 e.stopPropagation();
                 if (!isEditingName && !isUploadingPhoto && !isCropMode) {
-                  fileInputRef.current?.click();
+                  setIsAvatarPickerOpen(true);
                 }
               }}
               onDragOver={(e) => {
@@ -762,7 +800,7 @@ export default function MyDeskPage() {
               onKeyDown={(e) => {
                 if ((e.key === "Enter" || e.key === " ") && !isEditingName && !isCropMode) {
                   e.preventDefault();
-                  fileInputRef.current?.click();
+                  setIsAvatarPickerOpen(true);
                 }
               }}
             >
@@ -785,6 +823,7 @@ export default function MyDeskPage() {
                       onPointerDown={handlePhotoPointerDown}
                       onPointerMove={handlePhotoPointerMove}
                       onPointerUp={handlePhotoPointerUp}
+                      onError={() => setPhotoLoadError(true)}
                       draggable={false}
                     />
                   ) : (
@@ -906,7 +945,10 @@ export default function MyDeskPage() {
                   <button
                     type="button"
                     className="polaroid-crop-btn secondary"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      setIsCropMode(false);
+                      setIsAvatarPickerOpen(true);
+                    }}
                   >
                     New Photo
                   </button>

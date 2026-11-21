@@ -12,7 +12,15 @@ const router = express.Router();
 const multer = require('multer');
 const { authMiddleware } = require('../middlewares/auth');
 const { uploadRateLimiter } = require('../middlewares/security');
-const { getProfile, updateProfile, uploadAvatar, getAvatar } = require('../controllers/profileController');
+const {
+  getProfile,
+  updateProfile,
+  uploadAvatar,
+  getAvatar,
+  getDefaultAvatars,
+  streamDefaultAvatar,
+  selectDefaultAvatar
+} = require('../controllers/profileController');
 
 const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -39,6 +47,11 @@ function handleAvatarUploadMiddleware(req, res, next) {
     return res.status(err.statusCode || 400).json({ error: err.message || 'Invalid file upload.' });
   });
 }
+
+// Predefined portrait avatars (dynamically discovered from avatar-base)
+router.get('/default-avatars', getDefaultAvatars);
+router.get('/default-avatars/:id', streamDefaultAvatar);
+router.put('/avatar/default', authMiddleware, selectDefaultAvatar);
 
 // GET  /api/profile/avatar/:filename — streaming público da foto salva no MinIO
 router.get('/avatar/:filename', getAvatar);

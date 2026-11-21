@@ -7,8 +7,10 @@
  *   against MariaDB), never trusting client-supplied IDs.
  */
 
+const fs = require('fs');
 const { pool } = require('../config/database');
 const { uploadFile, getFileStream, deleteFile } = require('../services/minioClient');
+const { listDefaultAvatars, getDefaultAvatarById } = require('../services/avatarCatalog');
 const { sendLog } = require('../services/logClient');
 
 /**
@@ -251,4 +253,84 @@ async function getAvatar(req, res) {
   }
 }
 
-module.exports = { getProfile, updateProfile, uploadAvatar, getAvatar };
+/**
+ * GET /api/profile/default-avatars
+ * Lists all dynamically discovered predefined portrait avatars from avatar-base.
+ */
+function getDefaultAvatars(_req, res) {
+  const avatars = listDefaultAvatars();
+  return res.json({ avatars });
+}
+
+/**
+ * GET /api/profile/default-avatars/:id
+ * Streams a validated predefined portrait avatar by its allowlisted ID.
+ */
+function streamDefaultAvatar(req, res) {
+  const avatar = getDefaultAvatarById(req.params.id);
+  if (!avatar) {
+    return res.status(404).send('Default avatar not found.');
+  }
+
+  res.setHeader('Content-Type', avatar.contentType);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+
+  const stream = fs.createReadStream(avatar.filePath);
+  stream.on('error', (err) => {
+    console.error('[profileController] streamDefaultAvatar error:', err.message);
+    if (!res.headersSent) {
+      res.status(404).send('Default avatar not found.');
+    } else {
+      res.end();
+    }
+  });
+  stream.pipe(res);
+}
+
+/**
+ * PUT /api/profile/avatar/default
+ * Sets the authenticated user's profile picture to an approved predefined avatar.
+ */
+async function selectDefaultAvatar(req, res) {
+  try {
+    const avatarId = req.body && typeof req.body.avatarId === 'string' ? req.body.avatarId.trim() : '';
+    const avatar = getDefaultAvatarById(avatarId);
+    if (!avatar) {
+      return res.status(400).json({ error: 'Invalid or unavailable avatar selection.' });
+    }
+
+    await pool.query('UPDATE usuarios SET foto_url = ? WHERE id = ?', [avatar.url, req.usuarioId]);
+
+    const [updatedRows] = await pool.query(
+      'SELECT id, nome, email, papel, foto_url, bio, onboarding_concluido FROM usuarios WHERE id = ?',
+      [req.usuarioId]
+    );
+
+    sendLog('AVATAR_PADRAO_SELECIONADO', req, {
+      usuario_id: req.usuarioId,
+      avatar_id: avatar.id,
+      foto_url: avatar.url
+    });
+
+    return res.json({
+      message: 'Profile avatar updated successfully.',
+      foto_url: avatar.url,
+      avatarId: avatar.id,
+      usuario: updatedRows[0] || null
+    });
+  } catch (err) {
+    console.error('[profileController] selectDefaultAvatar error:', err.message);
+    return res.status(500).json({ error: 'Unable to update profile avatar right now.' });
+  }
+}
+
+module.exports = {
+  getProfile,
+  updateProfile,
+  uploadAvatar,
+  getAvatar,
+  getDefaultAvatars,
+  streamDefaultAvatar,
+  selectDefaultAvatar
+};

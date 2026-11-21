@@ -26,6 +26,7 @@ RUN npm ci --omit=dev
 
 COPY backend/ ./
 COPY --from=frontend-builder /app/frontend/out ./public
+COPY avatar-base /app/avatar-base
 
 RUN chown -R node:node /app
 USER node

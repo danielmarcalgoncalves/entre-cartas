@@ -305,6 +305,13 @@ export const api = {
       if (!res.ok) throw new Error(data.error || 'Failed to upload photograph');
       return data;
     },
+    listDefaultAvatars: (): Promise<{ avatars: Array<{ id: string; label: string; url: string }> }> =>
+      apiRequest('/profile/default-avatars'),
+    selectDefaultAvatar: (avatarId: string): Promise<{ message: string; foto_url: string; avatarId: string; usuario: any }> =>
+      apiRequest('/profile/avatar/default', {
+        method: 'PUT',
+        body: JSON.stringify({ avatarId }),
+      }),
   },
 
   admin: {
