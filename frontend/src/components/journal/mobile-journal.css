@@ -125,6 +125,7 @@
     gap: 6px !important;
     position: relative;
     overflow: hidden;
+    touch-action: pan-y;
   }
 
   /* Proportionally scaled 580x820 paper box — preserves exact 3D notebook aspect ratio (29:41) */
@@ -193,6 +194,7 @@
     font-size: 19px !important;
     line-height: 28px !important;
     resize: none;
+    touch-action: pan-y;
   }
 
   /* ------------------------------------------------------------------------

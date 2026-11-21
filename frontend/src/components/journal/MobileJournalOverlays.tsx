@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { MobileOverlayState } from "./useMobileJournalGestures";
 
@@ -52,6 +52,30 @@ export default function MobileJournalOverlays({
   onNavigate,
 }: MobileJournalOverlaysProps) {
   const prefersReducedMotion = useReducedMotion();
+  const drawerTouchRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleOverlayTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      drawerTouchRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    } else {
+      drawerTouchRef.current = null;
+    }
+  };
+
+  const handleNavDrawerTouchEnd = (e: React.TouchEvent) => {
+    const start = drawerTouchRef.current;
+    drawerTouchRef.current = null;
+    if (!start || e.changedTouches.length !== 1) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    // Allow dismissing the left drawer via left-to-right or right-to-left horizontal swipe
+    if (Math.abs(dx) >= 56 && Math.abs(dx) >= Math.abs(dy) * 1.4 && dx < 0) {
+      onCloseOverlay();
+    }
+  };
 
   useEffect(() => {
     if (activeOverlay === "closed") return;
@@ -90,7 +114,7 @@ export default function MobileJournalOverlays({
         )}
       </AnimatePresence>
 
-      {/* Left Navigation Submenu Drawer (Swipe Right-to-Left Only — No Persistent FAB) */}
+      {/* Left Navigation Submenu Drawer (Swipe Left-to-Right Only — No Persistent FAB) */}
       <AnimatePresence>
         {activeOverlay === "nav" && (
           <motion.aside
@@ -104,6 +128,8 @@ export default function MobileJournalOverlays({
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={springTransition}
+            onTouchStart={handleOverlayTouchStart}
+            onTouchEnd={handleNavDrawerTouchEnd}
           >
             <div>
               <div className="mobile-nav-header">

@@ -9,17 +9,19 @@ interface UseMobileJournalGesturesOptions {
   isMediaSelected: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   titleInputRef?: React.RefObject<HTMLInputElement | null>;
+  minSwipePx?: number;
 }
 
-const MIN_SWIPE_PX = 64;
+export const DEFAULT_MIN_SWIPE_PX = 68;
 const DIRECTION_RATIO = 1.55;
-const MAX_SWIPE_MS = 650;
+const MAX_SWIPE_MS = 950;
 
 export function useMobileJournalGestures({
   enabled,
   isMediaSelected,
   textareaRef,
   titleInputRef,
+  minSwipePx = DEFAULT_MIN_SWIPE_PX,
 }: UseMobileJournalGesturesOptions) {
   const [activeOverlay, setActiveOverlay] = useState<MobileOverlayState>("closed");
   const [cursorOffsetY, setCursorOffsetY] = useState(0);
@@ -31,6 +33,8 @@ export function useMobileJournalGestures({
   const touchStartRef = useRef<{
     x: number;
     y: number;
+    lastX: number;
+    lastY: number;
     time: number;
     ignored: boolean;
     startedInTextarea: boolean;
@@ -185,6 +189,8 @@ export function useMobileJournalGestures({
       touchStartRef.current = {
         x: e.touches[0].clientX,
         y: e.touches[0].clientY,
+        lastX: e.touches[0].clientX,
+        lastY: e.touches[0].clientY,
         time: Date.now(),
         ignored:
           isInteractive ||
@@ -197,6 +203,32 @@ export function useMobileJournalGestures({
       };
     },
     [enabled, isMediaSelected, textareaRef, titleInputRef]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      const start = touchStartRef.current;
+      if (!enabled || !start || start.ignored) return;
+      if (e.touches.length !== 1) {
+        start.ignored = true;
+        return;
+      }
+
+      start.lastX = e.touches[0].clientX;
+      start.lastY = e.touches[0].clientY;
+
+      // Cancel gesture recognition if user starts selecting text mid-touch
+      const ta = textareaRef.current;
+      const titleEl = titleInputRef?.current;
+      if (
+        (ta && ta.selectionStart !== ta.selectionEnd) ||
+        (titleEl && titleEl.selectionStart !== titleEl.selectionEnd) ||
+        (typeof window !== "undefined" && Boolean(window.getSelection()?.toString().length))
+      ) {
+        start.ignored = true;
+      }
+    },
+    [enabled, textareaRef, titleInputRef]
   );
 
   const handleTouchEnd = useCallback(
@@ -220,18 +252,18 @@ export function useMobileJournalGestures({
       const absX = Math.abs(dx);
       const absY = Math.abs(dy);
 
-      // Horizontal swipe: Right-to-Left opens left navigation submenu
-      if (absX >= MIN_SWIPE_PX && absX >= absY * DIRECTION_RATIO) {
-        if (dx < 0) {
+      // Horizontal swipe: Left-to-Right opens left navigation submenu; Right-to-Left closes it if open
+      if (absX >= minSwipePx && absX >= absY * DIRECTION_RATIO) {
+        if (dx > 0 && activeOverlay === "closed") {
           setActiveOverlay("nav");
-        } else if (dx > 0 && activeOverlay === "nav") {
+        } else if (dx < 0 && activeOverlay === "nav") {
           setActiveOverlay("closed");
         }
         return;
       }
 
       // Vertical swipes: Down -> Writing Tools, Up -> Save Journal Page
-      const verticalThreshold = start.startedInTextarea ? MIN_SWIPE_PX + 12 : MIN_SWIPE_PX;
+      const verticalThreshold = start.startedInTextarea ? minSwipePx + 12 : minSwipePx;
       if (absY >= verticalThreshold && absY >= absX * DIRECTION_RATIO) {
         if (dy > 0) {
           if (activeOverlay === "save") {
@@ -248,7 +280,7 @@ export function useMobileJournalGestures({
         }
       }
     },
-    [enabled, activeOverlay, textareaRef, titleInputRef]
+    [enabled, activeOverlay, minSwipePx, textareaRef, titleInputRef]
   );
 
   const handleTouchCancel = useCallback(() => {
@@ -265,6 +297,7 @@ export function useMobileJournalGestures({
     syncCursorVisibility,
     gestureHandlers: {
       onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
       onTouchEnd: handleTouchEnd,
       onTouchCancel: handleTouchCancel,
     },
