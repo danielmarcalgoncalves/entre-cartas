@@ -12,9 +12,12 @@ services:
       - DB_HOST=${DB_HOST:-mariadb}
       - DB_PORT=${DB_PORT:-3306}
       - DB_USER=${DB_USER:-root}
-      - DB_PASSWORD=${DB_PASSWORD:-root_password}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be configured}
       - DB_NAME=${DB_NAME:-filmes_db}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be configured}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - ALLOWED_APP_HOSTS=${ALLOWED_APP_HOSTS:-}
       - AUTH_SERVICE_URL=http://auth-service:3000
       - LOG_SERVICE_URL=http://log-service:3000
       # Google OAuth 2.0
@@ -24,8 +27,9 @@ services:
       # MinIO — Object Storage para fotos de perfil
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio}
       - MINIO_PORT=${MINIO_PORT:-9000}
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:?MINIO_ROOT_USER must be configured}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be configured}
       - MINIO_BUCKET=${MINIO_BUCKET:-perfil-fotos}
       - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://minio:9000}
       # Stripe — Pagamentos e Assinatura Premium (Modo de Teste)
@@ -49,9 +53,11 @@ services:
       - DB_HOST=${DB_HOST:-mariadb}
       - DB_PORT=${DB_PORT:-3306}
       - DB_USER=${DB_USER:-root}
-      - DB_PASSWORD=${DB_PASSWORD:-root_password}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD must be configured}
       - DB_NAME=${DB_NAME:-filmes_db}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be configured}
+      - ACCESS_TOKEN_TTL=${ACCESS_TOKEN_TTL:-30m}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
       - MAIL_HOST=${MAIL_HOST:-smtp-relay.brevo.com}
       - MAIL_PORT=${MAIL_PORT:-587}
       - MAIL_USER=${MAIL_USER:-}
@@ -60,7 +66,7 @@ services:
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
       - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-Between Letters}
-      - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-false}
+      - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-true}
       - APP_URL=${APP_URL:-http://localhost:3000}
       - LOG_SERVICE_URL=http://log-service:3000
     depends_on:
@@ -95,8 +101,8 @@ services:
       - "9000"
       - "9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be configured}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be configured}
     volumes:
       - minio_data:/data
 
@@ -106,7 +112,7 @@ services:
     expose:
       - "3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root_password}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be configured}
       MYSQL_DATABASE: ${DB_NAME:-filmes_db}
     volumes:
       - mariadb_data:/var/lib/mysql

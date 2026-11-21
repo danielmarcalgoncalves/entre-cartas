@@ -19,55 +19,54 @@ function isLocalhostUrl(urlStr) {
 }
 
 /**
- * Resolves the public-facing application URL in a remote-first manner (Portainer / Cloudflare / Reverse Proxy).
- * Priority:
- * 1. Explicit non-localhost APP_URL environment variable.
- * 2. Request Origin header (if valid http/https URL).
- * 3. X-Forwarded-Proto / CF-Visitor + X-Forwarded-Host / Host header from the incoming request.
- * 4. Configured APP_URL fallback (for local container testing).
+ * Resolves the canonical public application URL safely (SEC-04).
+ * Never derives Stripe Checkout / Portal return URLs from untrusted Origin, Host,
+ * X-Forwarded-Host, or CF-Visitor headers.
+ * - Production: requires a valid HTTPS APP_URL (fails closed if missing or localhost).
+ * - Multi-host: optionally matches req.headers.origin strictly against ALLOWED_APP_HOSTS.
+ * - Development: allows http://localhost:3000 fallback.
  */
 function resolvePublicAppUrl(req = null) {
+  const isProd = process.env.NODE_ENV === 'production';
   const configured = (process.env.APP_URL || '').trim().replace(/\/+$/, '');
-  if (configured && !isLocalhostUrl(configured)) {
-    return configured;
-  }
 
-  if (req && req.headers) {
-    const originHeader = req.headers.origin;
-    if (originHeader && typeof originHeader === 'string') {
+  if (configured) {
+    let parsedConfigured;
+    try {
+      parsedConfigured = new URL(configured);
+    } catch {
+      throw new Error('[SECURITY] APP_URL is not a valid URL.');
+    }
+
+    if (isProd && (parsedConfigured.protocol !== 'https:' || isLocalhostUrl(configured))) {
+      throw new Error('[SECURITY] APP_URL must be a valid non-localhost HTTPS URL in production.');
+    }
+
+    // Optional explicit multi-host allowlist (ALLOWED_APP_HOSTS=app.example.com,www.example.com)
+    if (req && req.headers && typeof req.headers.origin === 'string' && process.env.ALLOWED_APP_HOSTS) {
+      const allowedHosts = new Set(
+        String(process.env.ALLOWED_APP_HOSTS)
+          .split(',')
+          .map((h) => h.trim().toLowerCase())
+          .filter(Boolean)
+      );
       try {
-        const parsedOrigin = new URL(originHeader);
-        if (
-          (parsedOrigin.protocol === 'https:' || parsedOrigin.protocol === 'http:') &&
-          !isLocalhostUrl(parsedOrigin.origin)
-        ) {
+        const parsedOrigin = new URL(req.headers.origin);
+        const validProto = isProd ? parsedOrigin.protocol === 'https:' : (parsedOrigin.protocol === 'https:' || parsedOrigin.protocol === 'http:');
+        if (validProto && allowedHosts.has(parsedOrigin.host.toLowerCase())) {
           return parsedOrigin.origin.replace(/\/+$/, '');
         }
       } catch {}
     }
 
-    const forwardedHost = req.headers['x-forwarded-host'] || req.headers.host;
-    if (forwardedHost && typeof forwardedHost === 'string') {
-      const cleanHost = forwardedHost.split(',')[0].trim();
-      let proto = 'http';
-      if (req.headers['x-forwarded-proto']) {
-        proto = String(req.headers['x-forwarded-proto']).split(',')[0].trim();
-      } else if (req.headers['cf-visitor']) {
-        try {
-          const cf = JSON.parse(String(req.headers['cf-visitor']));
-          if (cf && cf.scheme) proto = cf.scheme;
-        } catch {}
-      } else if (req.secure) {
-        proto = 'https';
-      }
-      const candidate = `${proto}://${cleanHost}`;
-      if (!isLocalhostUrl(candidate) || !configured) {
-        return candidate.replace(/\/+$/, '');
-      }
-    }
+    return parsedConfigured.origin.replace(/\/+$/, '');
   }
 
-  return configured || 'http://localhost:3000';
+  if (isProd) {
+    throw new Error('[SECURITY] APP_URL must be configured in production.');
+  }
+
+  return 'http://localhost:3000';
 }
 
 /**
@@ -142,8 +141,8 @@ async function evaluateUserEntitlement(dbOrConn, usuarioId) {
         effectiveRole = 'usuario';
         await executor.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['usuario', usuarioId]).catch(() => {});
       }
-    } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired' || status === 'inactive') {
-      // Canceled or unpaid subscriptions must not retain PRO access indefinitely
+    } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired' || status === 'inactive' || status === 'paused') {
+      // Canceled, unpaid, expired, or paused subscriptions must not retain PRO access
       if (effectiveRole === 'premium') {
         effectiveRole = 'usuario';
         await executor.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['usuario', usuarioId]).catch(() => {});

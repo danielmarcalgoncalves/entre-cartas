@@ -71,9 +71,7 @@ function hasStoredSessionHint(): boolean {
   if (typeof window === "undefined") return false;
   try {
     return Boolean(
-      window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
-        window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
-        window.localStorage.getItem(LAST_USER_MARKER_KEY) ||
+      window.localStorage.getItem(LAST_USER_MARKER_KEY) ||
         window.sessionStorage.getItem(LAST_USER_MARKER_KEY)
     );
   } catch {
@@ -183,10 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Ensure clean slate before hydrating newly signed-in account
       await clearAllPrivateBrowserData();
+      clearSession();
       const res = await api.auth.login(email, senha, rememberMe);
-      if (res.token) {
-        setSession(res.token, rememberMe);
-      }
       if (res.usuario) {
         await syncUserAccountScope(res.usuario);
         setUser(res.usuario);
@@ -201,24 +197,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (nome: string, email: string, senha: string) => {
     const res = await api.auth.register(nome, email, senha);
-    if (res.token && !res.requireVerification) {
+    if (!res.requireVerification && res.usuario) {
       await clearAllPrivateBrowserData();
-      setSession(res.token, true);
-      if (res.usuario) {
-        await syncUserAccountScope(res.usuario);
-        setUser(res.usuario);
-      } else {
-        await refreshUser();
-      }
+      clearSession();
+      await syncUserAccountScope(res.usuario);
+      setUser(res.usuario);
     }
     return res;
   };
 
-  const applyTokenSession = async (token: string, persist = true) => {
+  const applyTokenSession = async (_token: string, _persist = true) => {
     setLoading(true);
     try {
       await clearAllPrivateBrowserData();
-      setSession(token, persist);
+      clearSession();
       await refreshUser();
     } finally {
       setLoading(false);

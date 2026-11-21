@@ -184,7 +184,7 @@ async function uploadAvatar(req, res) {
 
     // 3. Remove old photo from MinIO only after new one is successfully stored
     if (urlAntiga) {
-      const match = urlAntiga.match(/usuario-\d+-\d+\.[a-zA-Z0-9]+/);
+      const match = urlAntiga.match(/usuario-\d+-\d+(?:-[a-f0-9-]+)?\.[a-zA-Z0-9]+/i);
       if (match) {
         deleteFile('avatar/' + match[0]).catch(delErr => {
           console.warn('[profileController] Could not clean up previous avatar:', delErr.message);
@@ -207,8 +207,8 @@ async function uploadAvatar(req, res) {
     });
   } catch (err) {
     console.error('[profileController] uploadAvatar error:', err.message);
-    sendLog('AVATAR_UPLOAD_ERRO', req, { usuario_id: req.usuarioId, error: err.message });
-    return res.status(500).json({ error: 'Failed to upload photograph: ' + (err.message || 'Internal error.') });
+    sendLog('AVATAR_UPLOAD_ERRO', req, { usuario_id: req.usuarioId });
+    return res.status(500).json({ error: 'Unable to upload photograph right now. Please try again.' });
   } finally {
     activeAvatarUploads = Math.max(0, activeAvatarUploads - 1);
   }
@@ -237,6 +237,14 @@ async function getAvatar(req, res) {
     }
 
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    stream.on('error', (streamErr) => {
+      console.error('[profileController] getAvatar stream error:', streamErr.message);
+      if (!res.headersSent) {
+        res.status(404).send('Profile photograph not found.');
+      } else {
+        res.end();
+      }
+    });
     stream.pipe(res);
   } catch (err) {
     return res.status(404).send('Profile photograph not found.');

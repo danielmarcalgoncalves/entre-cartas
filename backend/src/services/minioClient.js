@@ -13,18 +13,26 @@
 const Minio = require('minio');
 
 const crypto    = require('crypto');
-const ENDPOINT    = process.env.MINIO_ENDPOINT     || 'minio';
-const PORT        = parseInt(process.env.MINIO_PORT || '9000', 10);
-const ACCESS_KEY  = process.env.MINIO_ROOT_USER    || 'minioadmin';
-const SECRET_KEY  = process.env.MINIO_ROOT_PASSWORD || 'minioadmin123';
+const IS_PROD   = process.env.NODE_ENV === 'production';
+const APP_URL_STR = (process.env.APP_URL || '').trim().toLowerCase();
+const IS_LOCAL_DOCKER = !APP_URL_STR || APP_URL_STR.includes('localhost') || APP_URL_STR.includes('127.0.0.1');
+const ENDPOINT  = process.env.MINIO_ENDPOINT     || 'minio';
+const PORT      = parseInt(process.env.MINIO_PORT || '9000', 10);
+const USE_SSL   = String(process.env.MINIO_USE_SSL || '').toLowerCase() === 'true';
+const ACCESS_KEY = (process.env.MINIO_ROOT_USER || (IS_PROD && !IS_LOCAL_DOCKER ? '' : 'minioadmin')).trim();
+const SECRET_KEY = (process.env.MINIO_ROOT_PASSWORD || (IS_PROD && !IS_LOCAL_DOCKER ? '' : 'minioadmin123')).trim();
 const BUCKET      = process.env.MINIO_BUCKET       || 'perfil-fotos';
 const JOURNAL_BUCKET = process.env.MINIO_JOURNAL_BUCKET || 'journal-media';
 const PUBLIC_URL  = process.env.MINIO_PUBLIC_URL   || 'http://localhost:9000';
 
+if (IS_PROD && !IS_LOCAL_DOCKER && (!ACCESS_KEY || !SECRET_KEY || ACCESS_KEY === 'minioadmin' || SECRET_KEY === 'minioadmin123')) {
+  throw new Error('[SECURITY] MINIO_ROOT_USER and MINIO_ROOT_PASSWORD must be configured with non-default credentials in production.');
+}
+
 const minioClient = new Minio.Client({
   endPoint:  ENDPOINT,
   port:      PORT,
-  useSSL:    false,
+  useSSL:    USE_SSL,
   accessKey: ACCESS_KEY,
   secretKey: SECRET_KEY
 });
@@ -58,10 +66,14 @@ async function ensureBucket() {
   }
 }
 
-async function uploadFile(buffer, filename, mimetype, usuarioId) {
-  const ext = filename.split('.').pop().toLowerCase();
-  const rawFileName = 'usuario-' + usuarioId + '-' + Date.now() + '.' + ext;
-  const objectName = 'avatar/' + rawFileName;
+async function uploadFile(buffer, _filename, mimetype, usuarioId) {
+  const ext = getSafeExtForMime(mimetype);
+  if (ext === 'bin') {
+    throw new Error('Unsupported image MIME type.');
+  }
+  const uniqueId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+  const rawFileName = `usuario-${Number(usuarioId)}-${Date.now()}-${uniqueId}.${ext}`;
+  const objectName = `avatar/${rawFileName}`;
   await minioClient.putObject(BUCKET, objectName, buffer, buffer.length, {
     'Content-Type': mimetype
   });

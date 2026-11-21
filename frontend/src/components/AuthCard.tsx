@@ -84,14 +84,16 @@ export default function AuthCard({
     const urlMode = searchParams.get("mode");
     const urlError = searchParams.get("error");
 
-    // 1. Handle Google OAuth callback completion (HttpOnly cookie session or token)
+    // 1. Handle Google OAuth callback completion (strictly via HttpOnly cookie; never ingest ?token=)
     if (oauthStatus === "success") {
       setLoading(true);
       setSuccess("Authenticated with Google. Opening your desk...");
-      const finalizeOAuth = oauthToken
-        ? applyTokenSession(oauthToken, true)
-        : refreshUser();
-      finalizeOAuth
+      if (typeof window !== "undefined") {
+        try {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch {}
+      }
+      refreshUser()
         .then(() => {
           if (onSuccess) onSuccess();
           else router.replace("/my-desk");

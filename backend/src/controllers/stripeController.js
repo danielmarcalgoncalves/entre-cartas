@@ -617,7 +617,18 @@ async function _registrarFalhaPagamento(invoice) {
  * Apenas promove/revoga baseado no status atual.
  */
 async function _sincronizarSubscription(subscription) {
-  const { id: subscriptionId, status } = subscription;
+  const subscriptionId = subscription.id;
+  let authoritative = subscription;
+  const stripe = getStripe();
+  if (stripe && subscriptionId) {
+    try {
+      // Retrieve live state from Stripe so out-of-order webhooks never overwrite newer status (SEC-16)
+      authoritative = await stripe.subscriptions.retrieve(subscriptionId);
+    } catch (retrieveErr) {
+      console.warn('[Webhook] subscription.updated: unable to retrieve live subscription, falling back to event payload:', retrieveErr.message);
+    }
+  }
+  const { status } = authoritative;
 
   // Correspondência estrita por stripe_subscription_id para evitar que assinatura antiga/cancelada revogue assinatura ativa
   const [rows] = await pool.query(
@@ -633,10 +644,10 @@ async function _sincronizarSubscription(subscription) {
   const usuarioId = rows[0].usuario_id;
 
   // Atualiza datas do período
-  const periodoInicio = subscription.current_period_start
-    ? new Date(subscription.current_period_start * 1000) : null;
-  const periodoFim = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000) : null;
+  const periodoInicio = authoritative.current_period_start
+    ? new Date(authoritative.current_period_start * 1000) : null;
+  const periodoFim = authoritative.current_period_end
+    ? new Date(authoritative.current_period_end * 1000) : null;
 
   await pool.query(
     'UPDATE stripe_subscriptions SET status = ?, periodo_inicio = ?, periodo_fim = ?, atualizado_em = NOW() WHERE stripe_subscription_id = ?',
@@ -649,7 +660,7 @@ async function _sincronizarSubscription(subscription) {
     if (currentUser.length > 0 && currentUser[0].papel !== 'admin') {
       await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', ['premium', usuarioId]);
     }
-  } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired') {
+  } else if (status === 'canceled' || status === 'unpaid' || status === 'incomplete_expired' || status === 'paused') {
     await _rebaixarParaUsuarioComum(usuarioId, subscriptionId, status);
   } else if (status === 'past_due') {
     await evaluateUserEntitlement(pool, usuarioId);
@@ -660,7 +671,17 @@ async function _sincronizarSubscription(subscription) {
  * Revoga o acesso Premium quando a assinatura é cancelada definitivamente.
  */
 async function _revogarPremium(subscription) {
-  const { id: subscriptionId } = subscription;
+  const subscriptionId = subscription.id;
+  const stripe = getStripe();
+  if (stripe && subscriptionId) {
+    try {
+      const authoritative = await stripe.subscriptions.retrieve(subscriptionId);
+      if (authoritative && (authoritative.status === 'active' || authoritative.status === 'trialing')) {
+        console.warn('[Webhook] subscription.deleted ignored because live subscription is active:', subscriptionId);
+        return;
+      }
+    } catch {}
+  }
 
   // Correspondência estrita por stripe_subscription_id para não revogar assinatura nova do mesmo customer
   const [rows] = await pool.query(

@@ -18,7 +18,11 @@ const {
 } = require('../services/minioClient');
 
 const MAX_CONCURRENT_JOURNAL_UPLOADS = 4;
+const MAX_CONCURRENT_UPLOADS_PER_USER = 1;
+const MAX_JOURNAL_MEDIA_FREE = 30;
+const MAX_JOURNAL_MEDIA_PRO = 150;
 let activeJournalUploads = 0;
+const activeUserJournalUploads = new Map();
 
 function hasValidImageMagicBytes(buffer, mimetype) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 12) return false;
@@ -433,12 +437,17 @@ async function deleteFolder(req, res) {
 // 7. UPLOAD JOURNAL PHOTOGRAPH (POST /api/journal/notebooks/:clientId/media)
 // =========================================================================
 async function uploadJournalPhoto(req, res) {
+  const usuarioId = req.usuarioId;
+  const userInFlight = activeUserJournalUploads.get(usuarioId) || 0;
+  if (userInFlight >= MAX_CONCURRENT_UPLOADS_PER_USER) {
+    return res.status(429).json({ error: 'An image upload is already in progress for your account. Please wait a moment.' });
+  }
   if (activeJournalUploads >= MAX_CONCURRENT_JOURNAL_UPLOADS) {
     return res.status(503).json({ error: 'Too many concurrent image uploads. Please try again in a moment.' });
   }
   activeJournalUploads += 1;
+  activeUserJournalUploads.set(usuarioId, userInFlight + 1);
   try {
-    const usuarioId = req.usuarioId;
     const clientId = String(req.params.clientId || '').trim().slice(0, 120);
     if (!clientId) {
       return res.status(400).json({ error: 'Journal identifier is required.' });
@@ -458,12 +467,46 @@ async function uploadJournalPhoto(req, res) {
       return res.status(400).json({ error: 'Invalid image format. Please upload JPEG, PNG, or WebP.' });
     }
 
-    // Verify ownership if notebook exists in DB (or ensure clientId isn't owned by another account)
+    // SEC-08: Verify notebook exists AND belongs to the authenticated user before storing in MinIO
     const [nbRows] = await pool.query(
-      'SELECT usuario_id FROM cadernos WHERE client_id = ? AND usuario_id = ? LIMIT 1',
+      'SELECT id, usuario_id FROM cadernos WHERE client_id = ? AND usuario_id = ? LIMIT 1',
       [clientId, usuarioId]
     );
-    // Note: uk_usuario_caderno is (usuario_id, client_id); if not yet saved in DB, upload is strictly scoped under journal/<usuarioId>/<clientId>/
+    if (nbRows.length === 0) {
+      return res.status(404).json({ error: 'Journal not found or not owned by your account. Save the journal before uploading media.' });
+    }
+
+    // SEC-08: Enforce per-user media attachment quota across all owned notebooks
+    const entitlement = await evaluateUserEntitlement(pool, usuarioId);
+    const isPro = entitlement?.papel === 'premium' || entitlement?.papel === 'admin';
+    const maxMedia = isPro ? MAX_JOURNAL_MEDIA_PRO : MAX_JOURNAL_MEDIA_FREE;
+    const [allNotebooks] = await pool.query(
+      'SELECT paginas_json FROM cadernos WHERE usuario_id = ?',
+      [usuarioId]
+    );
+    let totalAttachments = 0;
+    for (const row of allNotebooks) {
+      try {
+        const pages = typeof row.paginas_json === 'string' ? JSON.parse(row.paginas_json) : (row.paginas_json || []);
+        if (Array.isArray(pages)) {
+          for (const p of pages) {
+            if (p && Array.isArray(p.anexos)) totalAttachments += p.anexos.length;
+          }
+        }
+      } catch {}
+    }
+    if (totalAttachments >= maxMedia) {
+      return res.status(403).json(
+        buildPlanLimitError({
+          feature: 'journal_media',
+          resourceLabel: 'journal photographs',
+          currentUsage: totalAttachments,
+          freePlanLimit: MAX_JOURNAL_MEDIA_FREE,
+          proPlanLimit: MAX_JOURNAL_MEDIA_PRO,
+          isPremium: isPro
+        })
+      );
+    }
 
     const { objectKey, url } = await uploadJournalMedia(buffer, mimetype, usuarioId, clientId);
 
@@ -486,6 +529,9 @@ async function uploadJournalPhoto(req, res) {
     return res.status(500).json({ error: 'Failed to upload journal photograph.' });
   } finally {
     activeJournalUploads = Math.max(0, activeJournalUploads - 1);
+    const remaining = (activeUserJournalUploads.get(usuarioId) || 1) - 1;
+    if (remaining <= 0) activeUserJournalUploads.delete(usuarioId);
+    else activeUserJournalUploads.set(usuarioId, remaining);
   }
 }
 

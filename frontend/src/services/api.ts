@@ -4,51 +4,12 @@
  */
 
 const API_BASE = '/api';
+// Legacy key retained only so clearSession() purges any old tokens from prior builds
 export const SESSION_TOKEN_STORAGE_KEY = 'entre-cartas:auth:token';
 
-let inMemoryToken: string | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
 
-export function syncInMemoryTokenFromStorage(): string | null {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved =
-        window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) ||
-        window.sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
-      inMemoryToken = saved || null;
-      return inMemoryToken;
-    } catch {}
-  }
-  return inMemoryToken;
-}
-
-export function getToken(): string | null {
-  if (typeof window !== 'undefined') {
-    return syncInMemoryTokenFromStorage();
-  }
-  return inMemoryToken;
-}
-
-export function setSession(token: string | null, persist = true) {
-  inMemoryToken = token;
-  if (typeof window !== 'undefined') {
-    try {
-      if (token) {
-        if (persist) {
-          window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
-        } else {
-          window.sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
-          window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-        }
-      } else {
-        window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-        window.sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-      }
-    } catch {}
-  }
-}
-
-export function clearSession() {
-  inMemoryToken = null;
+function purgeLegacyWebStorageTokens() {
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
@@ -57,22 +18,67 @@ export function clearSession() {
   }
 }
 
-async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+export function syncInMemoryTokenFromStorage(): string | null {
+  purgeLegacyWebStorageTokens();
+  return null;
+}
+
+export function getToken(): string | null {
+  return null;
+}
+
+export function setSession(_token: string | null, _persist = true) {
+  // Browser sessions authenticate exclusively via HttpOnly cookies (SEC-03)
+  purgeLegacyWebStorageTokens();
+}
+
+export function clearSession() {
+  purgeLegacyWebStorageTokens();
+}
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+const NO_REFRESH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout', '/auth/verify-code', '/auth/verify-email'];
+
+async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}, _retried = false): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers,
   });
+
+  if (
+    response.status === 401 &&
+    !_retried &&
+    !NO_REFRESH_ENDPOINTS.some((prefix) => endpoint.startsWith(prefix))
+  ) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      return apiRequest<T>(endpoint, options, true);
+    }
+  }
 
   const data = await response.json().catch(() => ({}));
 
@@ -180,18 +186,24 @@ export const api = {
     ): Promise<{ objectKey: string; url: string; mimeType: string; size: number }> => {
       const formData = new FormData();
       formData.append('photo', file);
-      const token = getToken();
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(
+      let res = await fetch(
         `${API_BASE}/journal/notebooks/${encodeURIComponent(clientId)}/media`,
         {
           method: 'POST',
           credentials: 'include',
-          headers,
           body: formData,
         }
       );
+      if (res.status === 401 && (await tryRefreshSession())) {
+        res = await fetch(
+          `${API_BASE}/journal/notebooks/${encodeURIComponent(clientId)}/media`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          }
+        );
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 401) {
@@ -277,13 +289,18 @@ export const api = {
         body: JSON.stringify(dados),
       }),
     uploadAvatar: async (formData: FormData) => {
-      const token = getToken();
-      const res = await fetch('/api/profile/avatar', {
+      let res = await fetch('/api/profile/avatar', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
         credentials: 'include',
       });
+      if (res.status === 401 && (await tryRefreshSession())) {
+        res = await fetch('/api/profile/avatar', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to upload photograph');
       return data;

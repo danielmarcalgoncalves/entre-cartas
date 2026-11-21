@@ -1,5 +1,10 @@
 const { pool } = require('../config/database');
 const { buildPlanLimitError } = require('../utils/quotaErrors');
+const { evaluateUserEntitlement } = require('../utils/entitlement');
+
+function isProOrAdminRole(papel) {
+  return papel === 'premium' || papel === 'admin';
+}
 
 // Helper para garantir que o usuário tenha sua Watchlist fixa criada
 async function getOrCreateWatchlist(usuarioId) {
@@ -204,33 +209,48 @@ async function toggleWatchlist(req, res) {
       });
     }
 
-    // Se não está, valida limite de cota antes de adicionar
-    if (papelUsuario === 'usuario') {
-      const [countRows] = await pool.query(
-        'SELECT COUNT(*) as total FROM itens_lista WHERE lista_id = ?',
-        [watchlist.id]
-      );
-      const totalAtual = countRows[0].total;
+    // Atomic quota check + insert inside transaction with row lock (SEC-06, SEC-15)
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query('SELECT id FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      const entitlement = await evaluateUserEntitlement(conn, usuarioId);
+      const effectiveRole = entitlement?.papel || 'usuario';
+      const isPro = isProOrAdminRole(effectiveRole);
 
-      if (totalAtual >= 10) {
-        return res.status(403).json(
-          buildPlanLimitError({
-            feature: 'watchlist',
-            resourceLabel: 'Watchlist items',
-            currentUsage: Number(totalAtual),
-            freePlanLimit: 10,
-            proPlanLimit: null,
-            isPremium: false
-          })
+      if (!isPro) {
+        const [countRows] = await conn.query(
+          'SELECT COUNT(*) as total FROM itens_lista WHERE lista_id = ?',
+          [watchlist.id]
         );
-      }
-    }
+        const totalAtual = countRows[0].total;
 
-    // Insere na Watchlist
-    await pool.query(
-      'INSERT INTO itens_lista (lista_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
-      [watchlist.id, tmdb_movie_id, titulo, poster_path || null]
-    );
+        if (totalAtual >= 10) {
+          await conn.rollback();
+          return res.status(403).json(
+            buildPlanLimitError({
+              feature: 'watchlist',
+              resourceLabel: 'Watchlist items',
+              currentUsage: Number(totalAtual),
+              freePlanLimit: 10,
+              proPlanLimit: null,
+              isPremium: false
+            })
+          );
+        }
+      }
+
+      await conn.query(
+        'INSERT IGNORE INTO itens_lista (lista_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
+        [watchlist.id, tmdb_movie_id, titulo, poster_path || null]
+      );
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
+    }
 
     return res.status(201).json({
       inWatchlist: true,
@@ -253,49 +273,84 @@ async function createList(req, res) {
       return res.status(400).json({ error: 'Por favor, informe um título para a lista.' });
     }
 
-    // Regra de Cotas para Listas Personalizadas
-    // Comum: máx 2 listas | Premium: máx 10 listas | Admin: 50
-    const limiteListas = papelUsuario === 'admin' ? 50 : papelUsuario === 'premium' ? 10 : 2;
-
-    const [countRows] = await pool.query(
-      'SELECT COUNT(*) as total FROM listas WHERE usuario_id = ? AND is_watchlist = FALSE',
-      [usuarioId]
-    );
-    const totalCriadas = countRows[0].total;
-
-    if (totalCriadas >= limiteListas) {
-      return res.status(403).json(
-        buildPlanLimitError({
-          feature: 'custom_lists',
-          resourceLabel: 'custom collections',
-          currentUsage: Number(totalCriadas),
-          freePlanLimit: 2,
-          proPlanLimit: 10,
-          isPremium: papelUsuario === 'premium' || papelUsuario === 'admin'
-        })
-      );
+    if (filmes !== undefined && !Array.isArray(filmes)) {
+      return res.status(400).json({ error: 'filmes must be an array when provided.' });
     }
 
-    const [result] = await pool.query(
-      'INSERT INTO listas (usuario_id, nome, descricao, is_watchlist) VALUES (?, ?, ?, FALSE)',
-      [usuarioId, nome.trim(), descricao ? descricao.trim() : null]
-    );
+    // Atomic quota check + list creation + bounded item insert inside transaction (SEC-06, SEC-07, SEC-15)
+    const conn = await pool.getConnection();
+    let listaId;
+    try {
+      await conn.beginTransaction();
+      await conn.query('SELECT id FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      const entitlement = await evaluateUserEntitlement(conn, usuarioId);
+      const effectiveRole = entitlement?.papel || 'usuario';
+      const isPro = isProOrAdminRole(effectiveRole);
 
-    const listaId = result.insertId;
+      const limiteListas = effectiveRole === 'admin' ? 50 : effectiveRole === 'premium' ? 10 : 2;
+      const maxItemsPerList = isPro ? 200 : 20;
 
-    // Se foram enviados filmes para a nova lista, insere-os
-    if (Array.isArray(filmes) && filmes.length > 0) {
-      for (const item of filmes) {
-        const movieId = item.id || item.tmdb_movie_id;
-        const title = item.title || item.titulo || 'Sem título';
-        const poster = item.poster_path || null;
-        if (movieId) {
-          await pool.query(
-            'INSERT IGNORE INTO itens_lista (lista_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
-            [listaId, movieId, title, poster]
-          );
+      if (Array.isArray(filmes) && filmes.length > maxItemsPerList) {
+        await conn.rollback();
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'list_items',
+            resourceLabel: 'items per collection',
+            currentUsage: filmes.length,
+            freePlanLimit: 20,
+            proPlanLimit: 200,
+            isPremium: isPro
+          })
+        );
+      }
+
+      const [countRows] = await conn.query(
+        'SELECT COUNT(*) as total FROM listas WHERE usuario_id = ? AND is_watchlist = FALSE',
+        [usuarioId]
+      );
+      const totalCriadas = countRows[0].total;
+
+      if (totalCriadas >= limiteListas) {
+        await conn.rollback();
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: 'custom_lists',
+            resourceLabel: 'custom collections',
+            currentUsage: Number(totalCriadas),
+            freePlanLimit: 2,
+            proPlanLimit: 10,
+            isPremium: isPro
+          })
+        );
+      }
+
+      const [result] = await conn.query(
+        'INSERT INTO listas (usuario_id, nome, descricao, is_watchlist) VALUES (?, ?, ?, FALSE)',
+        [usuarioId, nome.trim().slice(0, 120), descricao ? String(descricao).trim().slice(0, 500) : null]
+      );
+      listaId = result.insertId;
+
+      if (Array.isArray(filmes) && filmes.length > 0) {
+        for (const item of filmes) {
+          if (!item || typeof item !== 'object') continue;
+          const movieId = item.id || item.tmdb_movie_id;
+          const title = String(item.title || item.titulo || 'Untitled').slice(0, 255);
+          const poster = item.poster_path ? String(item.poster_path).slice(0, 255) : null;
+          if (movieId) {
+            await conn.query(
+              'INSERT IGNORE INTO itens_lista (lista_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
+              [listaId, movieId, title, poster]
+            );
+          }
         }
       }
+
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
     }
 
     const [novaLista] = await pool.query(
@@ -368,40 +423,55 @@ async function addMovieToList(req, res) {
       return res.status(404).json({ error: 'Lista não encontrada ou não pertence a você.' });
     }
 
-    // Cota de filmes por lista personalizada (Comum: 20 filmes | Premium: ilimitado)
-    if (papelUsuario === 'usuario') {
-      const [countRows] = await pool.query(
-        'SELECT COUNT(*) as total FROM itens_lista WHERE lista_id = ?',
-        [listId]
-      );
-      if (countRows[0].total >= 20) {
-        return res.status(403).json(
-          buildPlanLimitError({
-            feature: 'list_items',
-            resourceLabel: 'items per collection',
-            currentUsage: Number(countRows[0].total),
-            freePlanLimit: 20,
-            proPlanLimit: null,
-            isPremium: false
-          })
+    // Atomic quota check + item insert inside transaction (SEC-06, SEC-15)
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query('SELECT id FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      const entitlement = await evaluateUserEntitlement(conn, usuarioId);
+      const isPro = isProOrAdminRole(entitlement?.papel || 'usuario');
+
+      if (!isPro) {
+        const [countRows] = await conn.query(
+          'SELECT COUNT(*) as total FROM itens_lista WHERE lista_id = ?',
+          [listId]
         );
+        if (countRows[0].total >= 20) {
+          await conn.rollback();
+          return res.status(403).json(
+            buildPlanLimitError({
+              feature: 'list_items',
+              resourceLabel: 'items per collection',
+              currentUsage: Number(countRows[0].total),
+              freePlanLimit: 20,
+              proPlanLimit: null,
+              isPremium: false
+            })
+          );
+        }
       }
+
+      const [existentes] = await conn.query(
+        'SELECT id FROM itens_lista WHERE lista_id = ? AND tmdb_movie_id = ?',
+        [listId, tmdb_movie_id]
+      );
+
+      if (existentes.length > 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This item is already in this list.' });
+      }
+
+      await conn.query(
+        'INSERT INTO itens_lista (lista_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
+        [listId, tmdb_movie_id, titulo, poster_path || null]
+      );
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
     }
-
-    // Verifica se já está na lista
-    const [existentes] = await pool.query(
-      'SELECT id FROM itens_lista WHERE lista_id = ? AND tmdb_movie_id = ?',
-      [listId, tmdb_movie_id]
-    );
-
-    if (existentes.length > 0) {
-      return res.status(400).json({ error: 'Este filme já foi adicionado a esta lista.' });
-    }
-
-    await pool.query(
-      'INSERT INTO itens_lista (lista_id, tmdb_movie_id, titulo, poster_path) VALUES (?, ?, ?, ?)',
-      [listId, tmdb_movie_id, titulo, poster_path || null]
-    );
 
     return res.status(201).json({ message: `"${titulo}" adicionado à lista!` });
   } catch (error) {
@@ -471,12 +541,19 @@ async function updateList(req, res) {
 
     // Se filmes foram enviados, sincroniza os itens
     if (Array.isArray(filmes)) {
-      const limiteFilmes = lista.is_watchlist ? 10 : (papelUsuario === 'usuario' ? 10 : 9999);
-      if (papelUsuario === 'usuario' && filmes.length > limiteFilmes) {
-        return res.status(403).json({
-          error: `Limite de ${limiteFilmes} filmes atingido para o plano Comum. Faça upgrade para o Premium para salvar mais filmes!`,
-          limite: limiteFilmes
-        });
+      const isPro = isProOrAdminRole(papelUsuario);
+      const limiteFilmes = lista.is_watchlist ? (isPro ? 200 : 10) : (isPro ? 200 : 20);
+      if (filmes.length > limiteFilmes) {
+        return res.status(403).json(
+          buildPlanLimitError({
+            feature: lista.is_watchlist ? 'watchlist' : 'list_items',
+            resourceLabel: lista.is_watchlist ? 'Watchlist items' : 'items per collection',
+            currentUsage: filmes.length,
+            freePlanLimit: lista.is_watchlist ? 10 : 20,
+            proPlanLimit: 200,
+            isPremium: isPro
+          })
+        );
       }
 
       // Substitui os itens de forma sincronizada

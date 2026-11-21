@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
-import { AUTHORIZED_ADMIN_EMAIL, isAuthorizedAdminUser } from "@/lib/admin-config";
+import { isAuthorizedAdminUser } from "@/lib/admin-config";
 
 type AdminTab = "overview" | "users" | "logs";
 
@@ -346,7 +346,7 @@ export default function AdminDashboardView() {
             Admin Dashboard
           </h1>
           <p className="page-intro" style={{ margin: 0 }}>
-            Authenticated as <strong>{AUTHORIZED_ADMIN_EMAIL}</strong> · Exclusive Administrative Session
+            Authenticated as <strong>{user?.email || "Administrator"}</strong> · Exclusive Administrative Session
           </p>
         </div>
 
@@ -479,7 +479,7 @@ export default function AdminDashboardView() {
                 {loadingMetrics && !metrics ? "…" : metrics?.users?.admin ?? 0}
               </div>
               <p style={{ fontSize: "12px", opacity: 0.75, margin: "6px 0 0" }}>
-                Exclusively {AUTHORIZED_ADMIN_EMAIL}
+                Server-verified exclusive administrator role
               </p>
             </div>
           </div>

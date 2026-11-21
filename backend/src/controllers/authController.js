@@ -1,13 +1,17 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const { sendLog, getAuditLogs } = require('../services/logClient');
 const { isAuthorizedAdminEmail } = require('../utils/entitlement');
 
 const PRIMARY_AUTH_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:3000';
 const FALLBACK_LOCAL_AUTH_URL = 'http://127.0.0.1:3001';
-const INTERNAL_AUTH_SECRET = process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32
-  ? crypto.createHmac('sha256', process.env.JWT_SECRET.trim()).update('internal-auth-service').digest('hex')
+const JWT_SECRET = process.env.JWT_SECRET && process.env.JWT_SECRET.trim().length >= 32
+  ? process.env.JWT_SECRET.trim()
+  : '';
+const INTERNAL_AUTH_SECRET = JWT_SECRET
+  ? crypto.createHmac('sha256', JWT_SECRET).update('internal-auth-service').digest('hex')
   : '';
 
 async function requestAuthService(config) {
@@ -17,8 +21,9 @@ async function requestAuthService(config) {
       url: `${PRIMARY_AUTH_URL}${config.path}`
     });
   } catch (err) {
-    // If running outside Docker where 'auth-service' hostname is not resolvable, try local port 3001
+    // Only allow localhost fallback outside production
     if (
+      process.env.NODE_ENV !== 'production' &&
       !err.response &&
       PRIMARY_AUTH_URL !== FALLBACK_LOCAL_AUTH_URL &&
       (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED' || err.code === 'EAI_AGAIN')
@@ -35,22 +40,31 @@ async function requestAuthService(config) {
 function isSecureConnection(req) {
   const appUrl = (process.env.APP_URL || '').toLowerCase();
   if (appUrl.startsWith('https://')) return true;
-  if (req && (req.secure || req.headers['x-forwarded-proto'] === 'https')) return true;
+  if (req && req.secure) return true;
   return false;
 }
 
-function setAuthCookie(res, token, rememberMe = false, req = null) {
+function setAuthCookie(res, token, _rememberMe = false, req = null) {
   const isHttps = isSecureConnection(req);
-  const cookieOpts = {
+  res.cookie('access_token', token, {
     httpOnly: true,
     secure: Boolean(isHttps),
     sameSite: 'lax',
-    path: '/'
-  };
-  if (rememberMe) {
-    cookieOpts.maxAge = 30 * 24 * 60 * 60 * 1000;
-  }
-  res.cookie('access_token', token, cookieOpts);
+    path: '/',
+    maxAge: 30 * 60 * 1000 // 30 minutes (paired with rotating refresh_token cookie)
+  });
+}
+
+function setRefreshCookie(res, refreshToken, rememberMe = false, req = null) {
+  if (!refreshToken) return;
+  const isHttps = isSecureConnection(req);
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: Boolean(isHttps),
+    sameSite: 'lax',
+    path: '/api/auth',
+    maxAge: (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000
+  });
 }
 
 function clearAuthCookie(res, req = null) {
@@ -60,6 +74,12 @@ function clearAuthCookie(res, req = null) {
     secure: Boolean(isHttps),
     sameSite: 'lax',
     path: '/'
+  });
+  res.clearCookie('refresh_token', {
+    httpOnly: true,
+    secure: Boolean(isHttps),
+    sameSite: 'lax',
+    path: '/api/auth'
   });
 }
 
@@ -131,6 +151,9 @@ async function register(req, res) {
 
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, true, req);
+      if (response.data.refreshToken) {
+        setRefreshCookie(res, response.data.refreshToken, true, req);
+      }
       if (response.data.usuario) {
         const effectiveRole = isAuthorizedAdminEmail(response.data.usuario.email)
           ? 'admin'
@@ -142,7 +165,8 @@ async function register(req, res) {
       }
     }
 
-    return res.status(response.status).json(response.data);
+    const { token: _t, refreshToken: _rt, ...safeResponse } = response.data || {};
+    return res.status(response.status).json(safeResponse);
   } catch (error) {
     if (error.response) {
       return res.status(error.response.status).json(error.response.data);
@@ -160,7 +184,11 @@ async function login(req, res) {
     });
 
     if (response.data && response.data.token) {
-      setAuthCookie(res, response.data.token, Boolean(req.body?.rememberMe), req);
+      const remember = Boolean(req.body?.rememberMe);
+      setAuthCookie(res, response.data.token, remember, req);
+      if (response.data.refreshToken) {
+        setRefreshCookie(res, response.data.refreshToken, remember, req);
+      }
       if (response.data.usuario) {
         const effectiveRole = isAuthorizedAdminEmail(response.data.usuario.email)
           ? 'admin'
@@ -181,10 +209,11 @@ async function login(req, res) {
       }
       sendLog('LOGIN_SUCESSO', req, {
         usuario_id: response.data.usuario?.id,
-        email: req.body?.email
+        email: typeof req.body?.email === 'string' ? req.body.email : undefined
       });
     }
-    return res.status(response.status).json(response.data);
+    const { token: _t, refreshToken: _rt, ...safeResponse } = response.data || {};
+    return res.status(response.status).json(safeResponse);
   } catch (error) {
     if (error.response) {
       sendLog('LOGIN_FALHA', req, {
@@ -202,27 +231,46 @@ async function logout(req, res) {
   const motivo = req.body?.motivo || 'user_action';
   const tokens = getAllAuthTokens(req);
   const primaryToken = tokens[0] || null;
+  const refreshToken = req.cookies && typeof req.cookies.refresh_token === 'string'
+    ? req.cookies.refresh_token.trim()
+    : '';
 
   try {
-    if (tokens.length > 0) {
+    if (tokens.length > 0 || refreshToken) {
       let revokedOk = false;
       try {
         await requestAuthService({
           method: 'POST',
           path: '/logout',
-          data: { token: primaryToken, tokens, motivo },
+          data: { token: primaryToken, tokens, refreshToken, motivo },
           headers: primaryToken ? { Authorization: `Bearer ${primaryToken}` } : {}
         });
         revokedOk = true;
       } catch (svcErr) {
-        // Fallback: revoke all presented tokens directly in MariaDB if auth-service is momentarily unreachable
-        const expDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        // Fallback: verify each JWT cryptographically before revoking in MariaDB
         for (const t of tokens) {
+          let decoded = null;
+          try {
+            decoded = JWT_SECRET ? jwt.verify(t, JWT_SECRET, { ignoreExpiration: true }) : null;
+          } catch {
+            continue;
+          }
+          if (!decoded || !decoded.id) continue;
+          const expDate = decoded.exp
+            ? new Date(decoded.exp * 1000)
+            : new Date(Date.now() + 30 * 60 * 1000);
           const tokenHash = crypto.createHash('sha256').update(t).digest('hex');
           await pool.query(
             `INSERT IGNORE INTO revoked_tokens (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)`,
-            [tokenHash, req.usuarioId || null, expDate]
+            [tokenHash, Number(decoded.id), expDate]
           );
+        }
+        if (refreshToken) {
+          const rtHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+          const [rtRows] = await pool.query('SELECT family_id FROM refresh_tokens WHERE token_hash = ? LIMIT 1', [rtHash]).catch(() => [[]]);
+          if (rtRows.length > 0) {
+            await pool.query('UPDATE refresh_tokens SET revogado = TRUE WHERE family_id = ?', [rtRows[0].family_id]).catch(() => {});
+          }
         }
         revokedOk = true;
       }
@@ -243,6 +291,37 @@ async function logout(req, res) {
     console.error('[authController] logout error:', err.message);
     clearAuthCookie(res, req);
     return res.status(500).json({ error: 'Server session invalidation failed during logout.' });
+  }
+}
+
+async function refreshSession(req, res) {
+  const refreshToken = req.cookies && typeof req.cookies.refresh_token === 'string'
+    ? req.cookies.refresh_token.trim()
+    : '';
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'No active refresh session.' });
+  }
+  try {
+    const response = await requestAuthService({
+      method: 'POST',
+      path: '/refresh',
+      headers: { 'X-Internal-Auth-Secret': INTERNAL_AUTH_SECRET },
+      data: { refreshToken }
+    });
+    const { token, refreshToken: rotatedRefresh, rememberMe, usuario } = response.data || {};
+    if (!token || !rotatedRefresh) {
+      clearAuthCookie(res, req);
+      return res.status(401).json({ error: 'Unable to refresh session.' });
+    }
+    setAuthCookie(res, token, Boolean(rememberMe), req);
+    setRefreshCookie(res, rotatedRefresh, Boolean(rememberMe), req);
+    return res.json({ usuario });
+  } catch (error) {
+    clearAuthCookie(res, req);
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    return res.status(401).json({ error: 'Session expired. Please sign in again.' });
   }
 }
 
@@ -324,7 +403,7 @@ async function resetPassword(req, res) {
       path: '/reset-password',
       data: req.body
     });
-    clearAuthCookie(res);
+    clearAuthCookie(res, req);
     return res.status(response.status).json(response.data);
   } catch (error) {
     if (error.response) {
@@ -436,7 +515,7 @@ async function googleAuthCallback(req, res) {
       return res.redirect('/login?error=google_profile_incomplete');
     }
 
-    if (profile.email_verified === false) {
+    if (profile.email_verified !== true) {
       return res.redirect('/login?error=google_email_unverified');
     }
 
@@ -456,12 +535,15 @@ async function googleAuthCallback(req, res) {
       }
     });
 
-    const { token, usuario } = authRes.data;
+    const { token, refreshToken, usuario } = authRes.data;
     if (!token) {
       return res.redirect('/login?error=google_session_failed');
     }
 
     setAuthCookie(res, token, true, req);
+    if (refreshToken) {
+      setRefreshCookie(res, refreshToken, true, req);
+    }
     sendLog('LOGIN_GOOGLE_SUCESSO', req, {
       usuario_id: usuario?.id,
       email: usuario?.email
@@ -522,6 +604,9 @@ async function verifyCode(req, res) {
     });
     if (response.data && response.data.token) {
       setAuthCookie(res, response.data.token, true, req);
+      if (response.data.refreshToken) {
+        setRefreshCookie(res, response.data.refreshToken, true, req);
+      }
       if (response.data.usuario) {
         const effectiveRole = isAuthorizedAdminEmail(response.data.usuario.email)
           ? 'admin'
@@ -532,7 +617,8 @@ async function verifyCode(req, res) {
         response.data.usuario.role = effectiveRole;
       }
     }
-    return res.status(response.status).json(response.data);
+    const { token: _t, refreshToken: _rt, ...safeResponse } = response.data || {};
+    return res.status(response.status).json(safeResponse);
   } catch (error) {
     if (error.response) {
       return res.status(error.response.status).json(error.response.data);
@@ -583,7 +669,7 @@ async function getAuditLogsController(req, res) {
     return res.json(logs);
   } catch (error) {
     console.error('[getAuditLogsController Error]:', error.message);
-    return res.status(500).json({ error: error.message || 'Error querying audit logs.' });
+    return res.status(500).json({ error: 'Error querying audit logs.' });
   }
 }
 
@@ -592,6 +678,7 @@ module.exports = {
   verifyCode,
   resendCode,
   login,
+  refreshSession,
   logout,
   me,
   forgotPassword,

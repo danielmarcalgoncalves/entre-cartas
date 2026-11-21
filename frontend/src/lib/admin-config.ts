@@ -1,7 +1,11 @@
 export const ADMIN_ROUTE_ID = "X2fQYLS5UbTYaIchwvwqLqzWqU32ZNoa";
 export const ADMIN_ROUTE_PATH = `/${ADMIN_ROUTE_ID}`;
-export const AUTHORIZED_ADMIN_EMAIL = "danielpgmarcal@gmail.com";
 
+/**
+ * UI-only visibility helper derived solely from server-verified role (SEC-14).
+ * Never hardcodes administrator emails in the public client bundle.
+ * Authoritative access control is enforced server-side by `requireAdmin`.
+ */
 export function isAuthorizedAdminUser(
   user?: {
     email?: string | null;
@@ -10,7 +14,6 @@ export function isAuthorizedAdminUser(
   } | null
 ): boolean {
   if (!user) return false;
-  const email = String(user.email || "").trim().toLowerCase();
   const role = String(user.papel || user.role || "").trim().toLowerCase();
-  return email === AUTHORIZED_ADMIN_EMAIL && role === "admin";
+  return role === "admin";
 }

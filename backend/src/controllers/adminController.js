@@ -726,7 +726,7 @@ async function getLogs(req, res) {
   } catch (error) {
     console.error('[adminController] getLogs error:', error.message);
     return res.status(502).json({
-      error: error.message || 'Unable to retrieve audit logs from log-service.',
+      error: 'Unable to retrieve audit logs from log-service.',
     });
   }
 }

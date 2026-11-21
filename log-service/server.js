@@ -5,8 +5,8 @@ const crypto = require('crypto');
 const { createClient } = require('redis');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+// Internal-only service: no wildcard browser CORS
+app.use(express.json({ limit: '100kb' }));
 
 const PORT = process.env.PORT || 3000;
 const REDIS_URL = process.env.REDIS_URL || 'redis://redis:6379';
@@ -31,7 +31,7 @@ function requireInternalLogAuth(req, res, next) {
   return next();
 }
 
-const SENSITIVE_LOG_KEYS = new Set(['token', 'senha', 'password', 'novasenha', 'authorization', 'cookie', 'secret', 'jwt']);
+const SENSITIVE_KEY_FRAGMENTS = ['token', 'senha', 'password', 'authorization', 'cookie', 'secret', 'jwt', 'resetlink'];
 
 function sanitizeLogDetails(value, depth = 0) {
   if (depth > 4 || value === null || value === undefined) return value;
@@ -40,7 +40,7 @@ function sanitizeLogDetails(value, depth = 0) {
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       const lower = k.toLowerCase();
-      if (SENSITIVE_LOG_KEYS.has(lower)) {
+      if (SENSITIVE_KEY_FRAGMENTS.some((frag) => lower.includes(frag))) {
         out[k] = '[REDACTED]';
       } else if (lower === 'email' && typeof v === 'string' && v.includes('@')) {
         const [local, domain] = v.split('@');
@@ -154,7 +154,7 @@ app.post('/logs', requireInternalLogAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('[POST /logs Error]:', error.message);
-    return res.status(500).json({ error: 'Erro ao gravar log no Redis Stream.', details: error.message });
+    return res.status(500).json({ error: 'Unable to record audit log entry.' });
   }
 });
 
@@ -217,7 +217,7 @@ app.get('/logs', requireInternalLogAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('[GET /logs Error]:', error.message);
-    return res.status(500).json({ error: 'Erro ao consultar logs no Redis Stream.', details: error.message });
+    return res.status(500).json({ error: 'Unable to query audit logs.' });
   }
 });
 

@@ -14,8 +14,8 @@ async function getTomHanksMovies(req, res) {
     const apiKey = process.env.TMDB_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({
-        error: 'Chave TMDB_API_KEY não configurada no servidor (.env).'
+      return res.status(503).json({
+        error: 'Movie catalog service is temporarily unavailable.'
       });
     }
 

@@ -6,7 +6,9 @@ const {
   registerLimiter,
   loginLimiter,
   verifyCodeLimiter,
+  resendCodeLimiter,
   forgotPasswordLimiter,
+  resetValidateLimiter,
   validateRegistrationInput
 } = require('../middlewares/security');
 
@@ -14,15 +16,16 @@ const {
 router.post('/register', registerLimiter, validateRegistrationInput, authController.register);
 router.post('/verify-code', verifyCodeLimiter, authController.verifyCode);
 router.post('/verify-email', verifyCodeLimiter, authController.verifyCode);
-router.post('/resend-code', verifyCodeLimiter, authController.resendCode);
-router.post('/resend-verification', verifyCodeLimiter, authController.resendCode);
+router.post('/resend-code', resendCodeLimiter, authController.resendCode);
+router.post('/resend-verification', resendCodeLimiter, authController.resendCode);
 router.post('/login', loginLimiter, authController.login);
+router.post('/refresh', authController.refreshSession);
 router.post('/logout', authController.logout);
 router.get('/me', authMiddleware, authController.me);
 
 // Password Recovery & Reset
 router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPassword);
-router.get('/reset-password/validate', authController.validateResetToken);
+router.get('/reset-password/validate', resetValidateLimiter, authController.validateResetToken);
 router.post('/reset-password', forgotPasswordLimiter, authController.resetPassword);
 
 // Google OAuth 2.0

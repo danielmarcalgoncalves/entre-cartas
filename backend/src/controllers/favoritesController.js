@@ -1,6 +1,7 @@
 const { pool } = require('../config/database');
 const { sendLog } = require('../services/logClient');
 const { buildPlanLimitError } = require('../utils/quotaErrors');
+const { evaluateUserEntitlement } = require('../utils/entitlement');
 
 // Lista todos os filmes favoritos do usuário autenticado
 async function getFavorites(req, res) {
@@ -31,62 +32,68 @@ async function addFavorite(req, res) {
     const { tmdb_movie_id, titulo, poster_path } = req.body;
 
     if (!tmdb_movie_id || !titulo) {
-      return res.status(400).json({ error: 'tmdb_movie_id e titulo são obrigatórios.' });
+      return res.status(400).json({ error: 'tmdb_movie_id and titulo are required.' });
     }
 
-    const papelUsuario = req.usuarioPapel || 'usuario';
+    const conn = await pool.getConnection();
+    let papelUsuario = req.usuarioPapel || 'usuario';
+    try {
+      await conn.beginTransaction();
+      await conn.query('SELECT id FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+      const entitlement = await evaluateUserEntitlement(conn, usuarioId);
+      papelUsuario = entitlement?.papel || 'usuario';
 
-    // Regra RBAC para limite de favoritos:
-    // - Usuário Comum: limite máximo de 5 favoritos
-    // - Usuário Premium: ILIMITADO (benefício do Plano Premium — Atividade 7)
-    // - Admin: ilimitado
-    let limite = null;
-    if (papelUsuario === 'usuario') {
-      limite = 5;
-    }
-    // Premium e Admin não possuem limite (limite permanece null = ilimitado)
+      // Fail-closed quota: only explicit 'premium' or 'admin' gets unlimited favorites (SEC-06, SEC-15)
+      const isPro = papelUsuario === 'premium' || papelUsuario === 'admin';
+      const limite = isPro ? null : 5;
 
-    if (limite !== null) {
-      const [favCountRows] = await pool.query(
-        'SELECT COUNT(*) as total FROM favoritos WHERE usuario_id = ?',
-        [usuarioId]
-      );
-      const totalFavoritos = favCountRows[0].total;
-
-      // Se já possui o limite e está tentando adicionar um novo filme que ainda não está favoritado
-      const [alreadyFav] = await pool.query(
-        'SELECT id FROM favoritos WHERE usuario_id = ? AND tmdb_movie_id = ?',
-        [usuarioId, tmdb_movie_id]
-      );
-
-      if (totalFavoritos >= limite && alreadyFav.length === 0) {
-        sendLog('BLOQUEIO_LIMITE_FAVORITOS_403', req, {
-          motivo: `Limite de ${limite} favoritos atingido para Usuário Comum`,
-          tmdb_movie_id,
-          titulo,
-          papelAtual: papelUsuario,
-          limite
-        });
-        return res.status(403).json(
-          buildPlanLimitError({
-            feature: 'favorites',
-            resourceLabel: 'favorite items',
-            currentUsage: Number(totalFavoritos),
-            freePlanLimit: 5,
-            proPlanLimit: null,
-            isPremium: false
-          })
+      if (limite !== null) {
+        const [favCountRows] = await conn.query(
+          'SELECT COUNT(*) as total FROM favoritos WHERE usuario_id = ?',
+          [usuarioId]
         );
-      }
-    }
+        const totalFavoritos = favCountRows[0].total;
 
-    // Insere garantindo que não duplicará (UNIQUE KEY usuario_id, tmdb_movie_id)
-    await pool.query(
-      `INSERT INTO favoritos (usuario_id, tmdb_movie_id, titulo, poster_path)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE titulo = VALUES(titulo), poster_path = VALUES(poster_path)`,
-      [usuarioId, tmdb_movie_id, titulo, poster_path || null]
-    );
+        const [alreadyFav] = await conn.query(
+          'SELECT id FROM favoritos WHERE usuario_id = ? AND tmdb_movie_id = ?',
+          [usuarioId, tmdb_movie_id]
+        );
+
+        if (totalFavoritos >= limite && alreadyFav.length === 0) {
+          await conn.rollback();
+          sendLog('BLOQUEIO_LIMITE_FAVORITOS_403', req, {
+            motivo: `Limite de ${limite} favoritos atingido`,
+            tmdb_movie_id,
+            titulo,
+            papelAtual: papelUsuario,
+            limite
+          });
+          return res.status(403).json(
+            buildPlanLimitError({
+              feature: 'favorites',
+              resourceLabel: 'favorite items',
+              currentUsage: Number(totalFavoritos),
+              freePlanLimit: 5,
+              proPlanLimit: null,
+              isPremium: false
+            })
+          );
+        }
+      }
+
+      await conn.query(
+        `INSERT INTO favoritos (usuario_id, tmdb_movie_id, titulo, poster_path)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE titulo = VALUES(titulo), poster_path = VALUES(poster_path)`,
+        [usuarioId, tmdb_movie_id, titulo, poster_path || null]
+      );
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
+    }
 
     sendLog('FAVORITAR_FILME', req, {
       tmdb_movie_id,

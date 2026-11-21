@@ -8,10 +8,52 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
 const app = express();
-const trustProxyEnv = process.env.TRUST_PROXY;
-app.set('trust proxy', trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) : false);
-app.use(cors());
-app.use(express.json());
+const trustProxyRaw = String(process.env.TRUST_PROXY || '').trim().toLowerCase();
+const trustProxyValue =
+  !trustProxyRaw || trustProxyRaw === 'false' || trustProxyRaw === '0'
+    ? false
+    : trustProxyRaw === 'true'
+    ? true
+    : /^\d+$/.test(trustProxyRaw)
+    ? Number(trustProxyRaw)
+    : process.env.TRUST_PROXY.trim();
+app.set('trust proxy', trustProxyValue);
+// Internal-only service: do not expose wildcard browser CORS
+app.use(express.json({ limit: '100kb' }));
+
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '30m';
+const REFRESH_TOKEN_DAYS_DEFAULT = 7;
+const REFRESH_TOKEN_DAYS_REMEMBER = 30;
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function maskEmail(email) {
+  const s = String(email || '');
+  if (!s.includes('@')) return '***';
+  const [local, domain] = s.split('@');
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+function validatePasswordPolicy(password) {
+  if (typeof password !== 'string' || password.length < 8) {
+    return 'Password must be at least 8 characters long.';
+  }
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    return 'Password must not exceed 72 bytes.';
+  }
+  return null;
+}
+
+function hashTokenValue(rawToken) {
+  return crypto.createHash('sha256').update(String(rawToken).trim()).digest('hex');
+}
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
   throw new Error('[SECURITY] JWT_SECRET must be configured and at least 32 characters long.');
@@ -96,7 +138,33 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'filmes_db',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  connectTimeout: 5000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
+});
+
+const DB_CONNECTIVITY_CODES = new Set([
+  'ETIMEDOUT',
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'PROTOCOL_CONNECTION_LOST',
+  'ECONNRESET',
+  'ER_ACCESS_DENIED_ERROR'
+]);
+
+function isDbConnectivityError(err) {
+  return Boolean(err && err.code && DB_CONNECTIVITY_CODES.has(err.code));
+}
+
+app.get('/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    return res.json({ status: 'ok', database: 'connected' });
+  } catch (err) {
+    return res.status(503).json({ status: 'degraded', database: 'unavailable', code: err.code || 'DB_ERROR' });
+  }
 });
 
 // Safe schema migration on startup with retries so cold-start MariaDB boots succeed cleanly
@@ -154,6 +222,24 @@ async function ensureAuthSchema(retries = 15, delay = 2000) {
             expira_em DATETIME NOT NULL,
             revogado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_expira (expira_em)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS refresh_tokens (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            token_hash VARCHAR(64) UNIQUE NOT NULL,
+            family_id VARCHAR(64) NOT NULL,
+            usuario_id INT NOT NULL,
+            remember_me BOOLEAN DEFAULT FALSE,
+            expira_em DATETIME NOT NULL,
+            usado BOOLEAN DEFAULT FALSE,
+            revogado BOOLEAN DEFAULT FALSE,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_rt_family (family_id),
+            INDEX idx_rt_usuario (usuario_id),
+            INDEX idx_rt_expira (expira_em),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
@@ -347,10 +433,11 @@ async function sendWelcomeEmail(email, nome) {
   const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
   const deskUrl = `${appUrl}/my-desk`;
   const safeName = (nome || 'Reader').trim();
+  const safeNameHtml = escapeHtml(safeName);
 
   const bodyHtml = `
     <p style="font-size: 17px; line-height: 1.7; color: #2d2319; margin: 0 0 18px 0;">
-      Dear <strong>${safeName}</strong>,
+      Dear <strong>${safeNameHtml}</strong>,
     </p>
     <p style="font-size: 16px; line-height: 1.75; color: #433526; margin: 0 0 18px 0; font-style: italic;">
       Some thoughts deserve a place to stay.
@@ -394,10 +481,11 @@ async function sendWelcomeEmail(email, nome) {
  */
 async function sendPasswordRecoveryEmail(email, nome, resetLink) {
   const safeName = (nome || 'Reader').trim();
+  const safeNameHtml = escapeHtml(safeName);
 
   const bodyHtml = `
     <p style="font-size: 17px; line-height: 1.7; color: #2d2319; margin: 0 0 18px 0;">
-      Dear <strong>${safeName}</strong>,
+      Dear <strong>${safeNameHtml}</strong>,
     </p>
     <p style="font-size: 16px; line-height: 1.75; color: #433526; margin: 0 0 18px 0; font-style: italic;">
       Sometimes we lose the key to a place that matters.
@@ -439,10 +527,11 @@ async function sendPasswordRecoveryEmail(email, nome, resetLink) {
  */
 async function sendVerificationEmail(email, nome, codigo) {
   const safeName = (nome || 'Reader').trim();
+  const safeNameHtml = escapeHtml(safeName);
 
   const bodyHtml = `
     <p style="font-size: 17px; line-height: 1.7; color: #2d2319; margin: 0 0 18px 0;">
-      Dear <strong>${safeName}</strong>,
+      Dear <strong>${safeNameHtml}</strong>,
     </p>
     <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 22px 0;">
       Thank you for beginning your story with <strong>Between Letters</strong>. Please enter the verification code below to confirm your email address:
@@ -478,25 +567,54 @@ async function sendVerificationEmail(email, nome, codigo) {
   });
 }
 
-// In-memory rate limiting in auth-service
+// In-memory rate limiting in auth-service (never trusts raw X-Forwarded-For; uses Express req.ip + optional logical bucket + per-email key)
 const authRateLimitMap = new Map();
-function rateLimit(windowMs, maxReqs, customMsg) {
+function rateLimit(windowMs, maxReqs, customMsg, options = {}) {
+  const bucketName = options.bucket || null;
+  const includeEmail = Boolean(options.includeEmail);
   return (req, res, next) => {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection?.remoteAddress || 'ip';
-    const key = `${req.path}:${ip}`;
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown-ip';
+    const bucket = bucketName || req.path;
     const now = Date.now();
-    let item = authRateLimitMap.get(key);
-    if (!item || now - item.time > windowMs) {
-      item = { count: 1, time: now };
-      authRateLimitMap.set(key, item);
-    } else {
-      item.count++;
+    const keys = [`${bucket}:ip:${ip}`];
+    if (includeEmail && req.body && typeof req.body.email === 'string' && req.body.email.trim()) {
+      keys.push(`${bucket}:email:${req.body.email.trim().toLowerCase()}`);
     }
-    if (item.count > maxReqs) {
-      return res.status(429).json({ error: customMsg || 'Too many attempts. Please wait a few minutes and try again.' });
+    for (const key of keys) {
+      let item = authRateLimitMap.get(key);
+      if (!item || now - item.time > windowMs) {
+        item = { count: 1, time: now };
+        authRateLimitMap.set(key, item);
+      } else {
+        item.count++;
+      }
+      if (item.count > maxReqs) {
+        return res.status(429).json({ error: customMsg || 'Too many attempts. Please wait a few minutes and try again.' });
+      }
     }
     next();
   };
+}
+
+async function issueSessionTokens({ id, nome, email, papel, tokenVersion = 1 }, rememberMe = false, existingFamilyId = null, db = pool) {
+  const accessToken = jwt.sign(
+    { id, nome, email, papel, tv: tokenVersion || 1 },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL }
+  );
+  const rawRefreshToken = crypto.randomBytes(48).toString('hex');
+  const refreshHash = hashTokenValue(rawRefreshToken);
+  const familyId = existingFamilyId || crypto.randomBytes(16).toString('hex');
+  const ttlDays = rememberMe ? REFRESH_TOKEN_DAYS_REMEMBER : REFRESH_TOKEN_DAYS_DEFAULT;
+  const expiraEm = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+
+  await db.query(
+    `INSERT INTO refresh_tokens (token_hash, family_id, usuario_id, remember_me, expira_em)
+     VALUES (?, ?, ?, ?, ?)`,
+    [refreshHash, familyId, id, Boolean(rememberMe), expiraEm]
+  );
+
+  return { token: accessToken, refreshToken: rawRefreshToken, rememberMe: Boolean(rememberMe) };
 }
 
 // Track failed OTP verification attempts (anti-brute-force)
@@ -567,8 +685,9 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
     if (!nome || !email || !senha) {
       return res.status(400).json({ error: 'Full name, email address, and password are required.' });
     }
-    if (String(senha).length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    const pwErr = validatePasswordPolicy(String(senha));
+    if (pwErr) {
+      return res.status(400).json({ error: pwErr });
     }
 
     const trimmedName = String(nome).trim();
@@ -594,25 +713,27 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
     const [existing] = await pool.query('SELECT id, nome, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
 
     if (existing.length > 0) {
-      if (requireOtpFlow && (existing[0].email_verificado === 0 || existing[0].email_verificado === false)) {
-        const codigo = crypto.randomInt(100000, 1000000).toString();
-        const expiraEm = new Date(Date.now() + 15 * 60000);
+      if (requireOtpFlow) {
+        if (existing[0].email_verificado === 0 || existing[0].email_verificado === false) {
+          const codigo = crypto.randomInt(100000, 1000000).toString();
+          const expiraEm = new Date(Date.now() + 15 * 60000);
 
-        await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
-        await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
-        failedVerifyAttempts.delete(emailTrimmed);
+          await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
+          await pool.query('INSERT INTO codigos_verificacao (email, codigo, expira_em) VALUES (?, ?, ?)', [emailTrimmed, codigo, expiraEm]);
+          failedVerifyAttempts.delete(emailTrimmed);
 
-        sendVerificationEmail(emailTrimmed, existing[0].nome || trimmedName, codigo).catch(err => {
-          console.warn('[Auth-Service] Failed to send verification email:', err.message);
-        });
-
+          sendVerificationEmail(emailTrimmed, existing[0].nome || trimmedName, codigo).catch(err => {
+            console.warn('[Auth-Service] Failed to send verification email:', err.message);
+          });
+        }
+        // Uniform response to prevent account enumeration when OTP verification is required
         return res.status(200).json({
-          message: 'A pending registration was found. A new verification code has been sent to your email.',
+          message: 'If this email address is eligible for registration, a verification code has been sent.',
           requireVerification: true,
           email: emailTrimmed
         });
       }
-      return res.status(409).json({ error: 'An account with this email address already exists.' });
+      return res.status(400).json({ error: 'Unable to complete registration with the provided details.' });
     }
 
     const senhaHash = await bcrypt.hash(String(senha), 10);
@@ -649,10 +770,9 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
     );
 
     const newUserId = insertResult.insertId;
-    const token = jwt.sign(
-      { id: newUserId, nome: trimmedName, email: emailTrimmed, papel: papelFinal, tv: 1 },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+    const { token, refreshToken } = await issueSessionTokens(
+      { id: newUserId, nome: trimmedName, email: emailTrimmed, papel: papelFinal, tokenVersion: 1 },
+      true
     );
 
     sendLog('REGISTRO_SUCESSO', req, {
@@ -664,16 +784,17 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
     // Send Welcome Email via Brevo asynchronously so email latency/errors never invalidate registration
     sendWelcomeEmail(emailTrimmed, trimmedName)
       .then((info) => {
-        console.log(`[Brevo] Welcome email sent to ${emailTrimmed} (${info.transport})`);
+        console.log(`[Brevo] Welcome email sent to ${maskEmail(emailTrimmed)} (${info.transport})`);
       })
       .catch((emailErr) => {
-        console.warn(`[Brevo] Welcome email could not be delivered to ${emailTrimmed}:`, emailErr.message);
+        console.warn(`[Brevo] Welcome email could not be delivered to ${maskEmail(emailTrimmed)}:`, emailErr.message);
       });
 
     return res.status(201).json({
       message: 'Welcome to Between Letters! Your account has been created.',
       requireVerification: false,
       token,
+      refreshToken,
       usuario: {
         id: newUserId,
         nome: trimmedName,
@@ -686,8 +807,11 @@ app.post('/register', rateLimit(15 * 60 * 1000, 10, 'Registration limit reached 
       }
     });
   } catch (error) {
-    console.error('[REGISTER ERROR]:', error);
-    res.status(500).json({ error: `Registration error: ${error.message || 'Internal server error.'}` });
+    console.error('[REGISTER ERROR]:', error.code || error.message);
+    if (isDbConnectivityError(error)) {
+      return res.status(503).json({ error: 'Authentication database is temporarily unavailable. Please try again shortly.' });
+    }
+    res.status(500).json({ error: 'Unable to complete registration right now. Please try again shortly.' });
   }
 });
 
@@ -761,10 +885,9 @@ async function handleVerifyCode(req, res) {
     if (papelVerificado !== usuario.papel) {
       await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelVerificado, usuario.id]).catch(() => {});
     }
-    const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelVerificado, tv: usuario.token_version || 1 },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+    const { token, refreshToken } = await issueSessionTokens(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelVerificado, tokenVersion: usuario.token_version || 1 },
+      true
     );
 
     // Send Welcome Email after verification
@@ -775,6 +898,7 @@ async function handleVerifyCode(req, res) {
     return res.json({
       message: 'Email verified successfully!',
       token,
+      refreshToken,
       usuario: {
         id: usuario.id,
         nome: usuario.nome,
@@ -791,24 +915,22 @@ async function handleVerifyCode(req, res) {
   }
 }
 
-app.post('/verify-code', rateLimit(10 * 60 * 1000, 8, 'Too many verification attempts. Please wait 10 minutes.'), handleVerifyCode);
-app.post('/verify-email', rateLimit(10 * 60 * 1000, 8, 'Too many verification attempts. Please wait 10 minutes.'), handleVerifyCode);
+const verifyCodeRateLimiter = rateLimit(10 * 60 * 1000, 8, 'Too many verification attempts. Please wait 10 minutes.', { bucket: 'verify-code', includeEmail: true });
+app.post('/verify-code', verifyCodeRateLimiter, handleVerifyCode);
+app.post('/verify-email', verifyCodeRateLimiter, handleVerifyCode);
 
-// Resend verification code
+// Resend verification code (non-enumerating response)
 async function handleResendCode(req, res) {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email address is required.' });
+    if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email address is required.' });
 
     const emailTrimmed = String(email).trim().toLowerCase();
+    const genericMsg = 'If an unverified account exists for this email address, a new verification code has been sent.';
     const [users] = await pool.query('SELECT id, nome, email_verificado FROM usuarios WHERE email = ?', [emailTrimmed]);
 
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'No account found for this email address.' });
-    }
-
-    if (users[0].email_verificado === 1 || users[0].email_verificado === true) {
-      return res.status(400).json({ error: 'This email address is already verified. You may sign in.' });
+    if (users.length === 0 || users[0].email_verificado === 1 || users[0].email_verificado === true) {
+      return res.json({ message: genericMsg });
     }
 
     await pool.query('UPDATE codigos_verificacao SET usado = TRUE WHERE email = ?', [emailTrimmed]);
@@ -821,20 +943,21 @@ async function handleResendCode(req, res) {
 
     await sendVerificationEmail(emailTrimmed, users[0].nome, codigo);
 
-    return res.json({ message: 'A new verification code has been sent to your email.' });
+    return res.json({ message: genericMsg });
   } catch (error) {
     console.error('[RESEND-CODE ERROR]:', error);
-    res.status(500).json({ error: `Failed to resend verification code: ${error.message || 'Internal error.'}` });
+    res.status(500).json({ error: 'Unable to resend verification code right now. Please try again shortly.' });
   }
 }
 
-app.post('/resend-code', handleResendCode);
-app.post('/resend-verification', handleResendCode);
+const resendCodeRateLimiter = rateLimit(15 * 60 * 1000, 5, 'Too many verification code requests. Please wait 15 minutes.', { bucket: 'resend-code', includeEmail: true });
+app.post('/resend-code', resendCodeRateLimiter, handleResendCode);
+app.post('/resend-verification', resendCodeRateLimiter, handleResendCode);
 
 // =========================================================================
 // 3. USER LOGIN (/login)
 // =========================================================================
-app.post('/login', async (req, res) => {
+app.post('/login', rateLimit(15 * 60 * 1000, 12, 'Too many consecutive sign-in attempts. Please wait 15 minutes.', { bucket: 'login', includeEmail: true }), async (req, res) => {
   try {
     const { email, senha, rememberMe } = req.body;
     if (!email || !senha) {
@@ -876,11 +999,9 @@ app.post('/login', async (req, res) => {
     if (papelFinal !== usuario.papel) {
       await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelFinal, usuario.id]).catch(() => {});
     }
-    const expiresIn = rememberMe ? '30d' : '7d';
-    const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tv: usuario.token_version || 1 },
-      JWT_SECRET,
-      { expiresIn }
+    const { token, refreshToken } = await issueSessionTokens(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tokenVersion: usuario.token_version || 1 },
+      Boolean(rememberMe)
     );
 
     sendLog('LOGIN_SUCESSO', req, {
@@ -892,6 +1013,7 @@ app.post('/login', async (req, res) => {
     res.json({
       message: 'Signed in successfully!',
       token,
+      refreshToken,
       usuario: {
         id: usuario.id,
         nome: usuario.nome,
@@ -904,7 +1026,10 @@ app.post('/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[LOGIN ERROR]:', error);
+    console.error('[LOGIN ERROR]:', error.code || error.message);
+    if (isDbConnectivityError(error)) {
+      return res.status(503).json({ error: 'Authentication database is temporarily unavailable. Please try again shortly.' });
+    }
     res.status(500).json({ error: 'Internal server error during sign in.' });
   }
 });
@@ -949,29 +1074,48 @@ app.post('/oauth/google', async (req, res) => {
         return res.status(409).json({ error: 'This email is already linked to a different Google account.' });
       }
       const updatedFoto = usuario.foto_url || fotoUrl || null;
-      // If an unverified local account existed for this email (potential pre-takeover), rotate its password hash
-      const wasUnverifiedLocal = !usuario.google_id && (usuario.email_verificado === 0 || usuario.email_verificado === false);
-      if (wasUnverifiedLocal) {
+      // SEC-01: Whenever an existing local account has no linked google_id yet, perform an atomic account claim:
+      // rotate password hash, increment token_version, and revoke all existing refresh sessions so a pre-registered
+      // attacker password/JWT can never persist after Google identity verification.
+      const isFirstTimeGoogleClaim = !usuario.google_id;
+      if (isFirstTimeGoogleClaim) {
         const rotatedHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-        await pool.query(
-          `UPDATE usuarios
-           SET google_id = COALESCE(google_id, ?),
-               foto_url = ?,
-               senha_hash = ?,
-               email_verificado = TRUE,
-               ultimo_login = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-          [String(googleId), updatedFoto, rotatedHash, usuario.id]
-        );
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
+          await conn.query(
+            `UPDATE usuarios
+             SET google_id = ?,
+                 foto_url = ?,
+                 senha_hash = ?,
+                 auth_provider = 'google',
+                 email_verificado = TRUE,
+                 token_version = COALESCE(token_version, 1) + 1,
+                 ultimo_login = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [String(googleId), updatedFoto, rotatedHash, usuario.id]
+          );
+          await conn.query(
+            `UPDATE refresh_tokens SET revogado = TRUE WHERE usuario_id = ?`,
+            [usuario.id]
+          );
+          await conn.commit();
+        } catch (claimErr) {
+          await conn.rollback();
+          throw claimErr;
+        } finally {
+          conn.release();
+        }
+        usuario.token_version = (usuario.token_version || 1) + 1;
+        usuario.auth_provider = 'google';
       } else {
         await pool.query(
           `UPDATE usuarios
-           SET google_id = COALESCE(google_id, ?),
-               foto_url = ?,
+           SET foto_url = ?,
                email_verificado = TRUE,
                ultimo_login = CURRENT_TIMESTAMP
            WHERE id = ?`,
-          [String(googleId), updatedFoto, usuario.id]
+          [updatedFoto, usuario.id]
         );
       }
       usuario.google_id = usuario.google_id || String(googleId);
@@ -995,6 +1139,7 @@ app.post('/oauth/google', async (req, res) => {
         nome: displayName.slice(0, 100),
         email: emailTrimmed,
         papel: papelFinal,
+        token_version: 1,
         foto_url: fotoUrl || null,
         bio: null,
         auth_provider: 'google',
@@ -1004,10 +1149,10 @@ app.post('/oauth/google', async (req, res) => {
       // Send Welcome Email via Brevo asynchronously for new Google users
       sendWelcomeEmail(emailTrimmed, usuario.nome)
         .then((info) => {
-          console.log(`[Brevo] Welcome email sent to new Google user ${emailTrimmed} (${info.transport})`);
+          console.log(`[Brevo] Welcome email sent to new Google user ${maskEmail(emailTrimmed)} (${info.transport})`);
         })
         .catch((err) => {
-          console.warn(`[Brevo] Welcome email could not be delivered to ${emailTrimmed}:`, err.message);
+          console.warn(`[Brevo] Welcome email could not be delivered to ${maskEmail(emailTrimmed)}:`, err.message);
         });
     }
 
@@ -1015,10 +1160,9 @@ app.post('/oauth/google', async (req, res) => {
     if (papelFinal !== usuario.papel) {
       await pool.query('UPDATE usuarios SET papel = ? WHERE id = ?', [papelFinal, usuario.id]).catch(() => {});
     }
-    const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tv: usuario.token_version || 1 },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+    const { token, refreshToken } = await issueSessionTokens(
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tokenVersion: usuario.token_version || 1 },
+      true
     );
 
     sendLog(isNewUser ? 'REGISTRO_GOOGLE_SUCESSO' : 'LOGIN_GOOGLE_SUCESSO', req, {
@@ -1031,6 +1175,7 @@ app.post('/oauth/google', async (req, res) => {
       message: isNewUser ? 'Welcome to Between Letters!' : 'Signed in with Google.',
       isNewUser,
       token,
+      refreshToken,
       usuario: {
         id: usuario.id,
         nome: usuario.nome,
@@ -1244,7 +1389,7 @@ app.post('/forgot-password', rateLimit(15 * 60 * 1000, 5, 'Too many password rec
 });
 
 // Validate a recovery token before showing the reset form
-app.get('/validate-reset-token', async (req, res) => {
+app.get('/validate-reset-token', rateLimit(15 * 60 * 1000, 15, 'Too many recovery token checks. Please wait a few minutes.', { bucket: 'validate-reset-token' }), async (req, res) => {
   try {
     const rawToken = req.query.token ? String(req.query.token).trim() : '';
     if (!rawToken) {
@@ -1277,43 +1422,50 @@ app.get('/validate-reset-token', async (req, res) => {
   }
 });
 
-app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password reset attempts. Please wait a few minutes.'), async (req, res) => {
+app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password reset attempts. Please wait a few minutes.', { bucket: 'reset-password' }), async (req, res) => {
   try {
     const { token, novaSenha } = req.body;
-    if (!token || !novaSenha || String(novaSenha).length < 6) {
-      return res.status(400).json({ error: 'A valid recovery token and a new password of at least 6 characters are required.' });
+    const pwErr = validatePasswordPolicy(String(novaSenha || ''));
+    if (!token || pwErr) {
+      return res.status(400).json({ error: pwErr || 'A valid recovery token and new password are required.' });
     }
 
     const rawToken = String(token).trim();
     const tokenHash = hashRecoveryToken(rawToken);
-
-    const [tokens] = await pool.query(
-      'SELECT * FROM reset_tokens WHERE token = ? LIMIT 1',
-      [tokenHash]
-    );
-    if (tokens.length === 0) {
-      return res.status(400).json({ error: 'This password recovery link is invalid.' });
-    }
-
-    const resetRequest = tokens[0];
-    if (resetRequest.usado) {
-      return res.status(400).json({ error: 'This password recovery link has already been used.' });
-    }
-    if (new Date() > new Date(resetRequest.expira_em)) {
-      return res.status(400).json({ error: 'This password recovery link has expired. Please request a new one.' });
-    }
-
     const senhaHash = await bcrypt.hash(String(novaSenha), 10);
 
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      const [tokens] = await conn.query(
+        'SELECT * FROM reset_tokens WHERE token = ? LIMIT 1 FOR UPDATE',
+        [tokenHash]
+      );
+      if (tokens.length === 0) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This password recovery link is invalid.' });
+      }
+
+      const resetRequest = tokens[0];
+      if (resetRequest.usado) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This password recovery link has already been used.' });
+      }
+      if (new Date() > new Date(resetRequest.expira_em)) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'This password recovery link has expired. Please request a new one.' });
+      }
+
       await conn.query(
         'UPDATE usuarios SET senha_hash = ?, email_verificado = TRUE, token_version = COALESCE(token_version, 1) + 1 WHERE id = ?',
         [senhaHash, resetRequest.usuario_id]
       );
       await conn.query(
         'UPDATE reset_tokens SET usado = TRUE WHERE usuario_id = ?',
+        [resetRequest.usuario_id]
+      );
+      await conn.query(
+        'UPDATE refresh_tokens SET revogado = TRUE WHERE usuario_id = ?',
         [resetRequest.usuario_id]
       );
       await conn.commit();
@@ -1333,7 +1485,107 @@ app.post('/reset-password', rateLimit(15 * 60 * 1000, 8, 'Too many password rese
   }
 });
 
-app.post('/logout', async (req, res) => {
+// =========================================================================
+// REFRESH TOKEN ROTATION & REUSE DETECTION (/refresh)
+// =========================================================================
+app.post('/refresh', rateLimit(15 * 60 * 1000, 30, 'Too many session refresh attempts. Please sign in again.', { bucket: 'refresh' }), async (req, res) => {
+  try {
+    const providedSecret = String(req.headers['x-internal-auth-secret'] || '');
+    const expectedBuf = Buffer.from(INTERNAL_AUTH_SECRET, 'utf8');
+    const providedBuf = Buffer.from(providedSecret, 'utf8');
+    if (expectedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(expectedBuf, providedBuf)) {
+      return res.status(403).json({ error: 'Forbidden: internal refresh authentication required.' });
+    }
+
+    const rawRefresh = req.body && typeof req.body.refreshToken === 'string' ? req.body.refreshToken.trim() : '';
+    if (!rawRefresh || rawRefresh.length < 32) {
+      return res.status(401).json({ error: 'Refresh token not provided.' });
+    }
+
+    const refreshHash = hashTokenValue(rawRefresh);
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [rows] = await conn.query(
+        'SELECT * FROM refresh_tokens WHERE token_hash = ? LIMIT 1 FOR UPDATE',
+        [refreshHash]
+      );
+      if (rows.length === 0) {
+        await conn.rollback();
+        return res.status(401).json({ error: 'Invalid refresh session. Please sign in again.' });
+      }
+
+      const rt = rows[0];
+      if (rt.revogado) {
+        await conn.rollback();
+        return res.status(401).json({ error: 'Session has been revoked. Please sign in again.' });
+      }
+
+      // Reuse detection: an already-rotated token was replayed! Revoke entire family and bump token_version.
+      if (rt.usado) {
+        await conn.query('UPDATE refresh_tokens SET revogado = TRUE WHERE family_id = ?', [rt.family_id]);
+        await conn.query('UPDATE usuarios SET token_version = COALESCE(token_version, 1) + 1 WHERE id = ?', [rt.usuario_id]);
+        await conn.commit();
+        sendLog('REFRESH_TOKEN_REUSE_DETECTED', req, { usuario_id: rt.usuario_id, family_id: rt.family_id });
+        return res.status(401).json({ error: 'Session security violation detected. All sessions have been revoked.' });
+      }
+
+      if (new Date() > new Date(rt.expira_em)) {
+        await conn.query('UPDATE refresh_tokens SET revogado = TRUE WHERE id = ?', [rt.id]);
+        await conn.commit();
+        return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+      }
+
+      const [users] = await conn.query(
+        'SELECT id, nome, email, papel, token_version, foto_url, bio, auth_provider FROM usuarios WHERE id = ? LIMIT 1',
+        [rt.usuario_id]
+      );
+      if (users.length === 0) {
+        await conn.query('UPDATE refresh_tokens SET revogado = TRUE WHERE family_id = ?', [rt.family_id]);
+        await conn.commit();
+        return res.status(401).json({ error: 'User account not found.' });
+      }
+
+      const usuario = users[0];
+      const papelFinal = resolveEffectiveUserRole(usuario.email, usuario.papel);
+      await conn.query('UPDATE refresh_tokens SET usado = TRUE WHERE id = ?', [rt.id]);
+
+      const issued = await issueSessionTokens(
+        { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: papelFinal, tokenVersion: usuario.token_version || 1 },
+        Boolean(rt.remember_me),
+        rt.family_id,
+        conn
+      );
+
+      await conn.commit();
+      return res.json({
+        token: issued.token,
+        refreshToken: issued.refreshToken,
+        rememberMe: issued.rememberMe,
+        usuario: {
+          id: usuario.id,
+          nome: usuario.nome,
+          email: usuario.email,
+          papel: papelFinal,
+          role: papelFinal,
+          auth_provider: usuario.auth_provider || 'local',
+          foto_url: usuario.foto_url || null,
+          bio: usuario.bio || null
+        }
+      });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    console.error('[REFRESH ERROR]:', error.message);
+    return res.status(500).json({ error: 'Unable to refresh session.' });
+  }
+});
+
+app.post('/logout', rateLimit(15 * 60 * 1000, 30, 'Too many logout requests.', { bucket: 'logout' }), async (req, res) => {
   try {
     const tokenSet = new Set();
     const authHeader = req.headers.authorization;
@@ -1373,7 +1625,19 @@ app.post('/logout', async (req, res) => {
       );
     }
 
-    if (tokenSet.size > 0) {
+    const rawRefresh = req.body && typeof req.body.refreshToken === 'string' ? req.body.refreshToken.trim() : '';
+    if (rawRefresh) {
+      const rtHash = hashTokenValue(rawRefresh);
+      const [rtRows] = await pool.query('SELECT family_id, usuario_id FROM refresh_tokens WHERE token_hash = ? LIMIT 1', [rtHash]);
+      if (rtRows.length > 0) {
+        await pool.query('UPDATE refresh_tokens SET revogado = TRUE WHERE family_id = ?', [rtRows[0].family_id]);
+        if (!lastUserId && rtRows[0].usuario_id) lastUserId = rtRows[0].usuario_id;
+      }
+    } else if (lastUserId) {
+      await pool.query('UPDATE refresh_tokens SET revogado = TRUE WHERE usuario_id = ?', [lastUserId]).catch(() => {});
+    }
+
+    if (tokenSet.size > 0 || rawRefresh) {
       await pool.query(`DELETE FROM revoked_tokens WHERE expira_em < NOW()`);
       sendLog('LOGOUT', req, { usuario_id: lastUserId || 'anonimo', motivo: req.body?.motivo || 'user_action' });
     }

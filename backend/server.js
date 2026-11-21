@@ -33,19 +33,33 @@ try {
     next();
   };
 }
-const { securityHeaders, csrfProtection } = require('./src/middlewares/security');
+const { securityHeaders, csrfProtection, getAllowedOrigins } = require('./src/middlewares/security');
 
 const app = express();
-const trustProxyEnv = process.env.TRUST_PROXY;
-app.set('trust proxy', trustProxyEnv ? (Number(trustProxyEnv) || trustProxyEnv) : false);
+const trustProxyRaw = String(process.env.TRUST_PROXY || '').trim().toLowerCase();
+const trustProxyValue =
+  !trustProxyRaw || trustProxyRaw === 'false' || trustProxyRaw === '0'
+    ? false
+    : trustProxyRaw === 'true'
+    ? true
+    : /^\d+$/.test(trustProxyRaw)
+    ? Number(trustProxyRaw)
+    : process.env.TRUST_PROXY.trim();
+app.set('trust proxy', trustProxyValue);
 
 // Headers de segurança e proteção HTTP
 app.use(securityHeaders);
 
-// Configuração de CORS (permitindo envio de cookies/credentials) e Parsers de Cookie/CSRF
-// Registrados ANTES de /api/stripe para que req.cookies.access_token esteja disponível em /api/stripe/*
+// Strict origin-allowlisted CORS (never reflects arbitrary Origin with credentials)
 app.use(cors({
-  origin: true,
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowed = getAllowedOrigins();
+    if (allowed.has(String(origin).toLowerCase())) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true
 }));
 app.use(cookieParser());
@@ -101,8 +115,8 @@ if (fs.existsSync(path.join(publicPath, 'index.html'))) {
 }
 
 if (staticPath) {
-  // Never expose predictable /admin path
-  app.get(['/admin', '/admin/*'], (req, res) => {
+  // Never expose predictable /admin or /admin.html path
+  app.get(['/admin', '/admin.html', '/admin/*'], (req, res) => {
     const notFoundHtml = path.join(staticPath, '404.html');
     res.status(404);
     if (fs.existsSync(notFoundHtml)) {

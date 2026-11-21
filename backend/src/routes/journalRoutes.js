@@ -3,6 +3,7 @@ const multer = require('multer');
 const router = express.Router();
 const journalController = require('../controllers/journalController');
 const { authMiddleware } = require('../middlewares/auth');
+const { uploadRateLimiter } = require('../middlewares/security');
 
 const ALLOWED_JOURNAL_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -34,7 +35,7 @@ router.use(authMiddleware);
 router.get('/notebooks', journalController.listNotebooks);
 router.put('/notebooks/:clientId', journalController.upsertNotebook);
 router.delete('/notebooks/:clientId', journalController.deleteNotebook);
-router.post('/notebooks/:clientId/media', handleJournalPhotoUploadMiddleware, journalController.uploadJournalPhoto);
+router.post('/notebooks/:clientId/media', uploadRateLimiter, handleJournalPhotoUploadMiddleware, journalController.uploadJournalPhoto);
 router.get('/media/:usuarioId/:notebookId/:filename', journalController.getJournalMedia);
 
 router.get('/folders', journalController.listFolders);

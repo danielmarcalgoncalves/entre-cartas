@@ -11,6 +11,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { authMiddleware } = require('../middlewares/auth');
+const { uploadRateLimiter } = require('../middlewares/security');
 const { getProfile, updateProfile, uploadAvatar, getAvatar } = require('../controllers/profileController');
 
 const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -51,6 +52,6 @@ router.put('/', authMiddleware, updateProfile);
 router.put('/:id', authMiddleware, updateProfile);
 
 // POST /api/profile/avatar           — upload de foto (campo multipart: "avatar")
-router.post('/avatar', authMiddleware, handleAvatarUploadMiddleware, uploadAvatar);
+router.post('/avatar', authMiddleware, uploadRateLimiter, handleAvatarUploadMiddleware, uploadAvatar);
 
 module.exports = router;

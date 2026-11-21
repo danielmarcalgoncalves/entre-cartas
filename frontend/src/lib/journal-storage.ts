@@ -495,29 +495,43 @@ export function saveAllNotebooks(notebooks: Notebook[], source?: string) {
   dispatchJournalUpdated(source);
 }
 
-export function renameUserNotebook(notebookId: string, newName: string): Notebook[] {
+export function renameUserNotebook(
+  notebookId: string,
+  newName: string,
+  userId?: number | string | null
+): Notebook[] {
   const trimmed = newName.trim();
-  if (!trimmed) return loadAllRawNotebooks();
+  const all = loadAllRawNotebooks();
+  if (!trimmed) return all;
   const nowIso = new Date().toISOString();
-  const target = loadAllRawNotebooks().find((nb) => nb.id === notebookId);
-  const updated = loadAllRawNotebooks().map((nb) =>
-    nb.id === notebookId ? { ...nb, nome: trimmed, atualizadoEm: nowIso } : nb
+  const matchesOwner = (nb: Notebook) =>
+    userId == null || nb.ownerId == null || String(nb.ownerId) === String(userId);
+  const target = all.find((nb) => nb.id === notebookId && matchesOwner(nb));
+  if (!target) return all;
+  const updated = all.map((nb) =>
+    nb.id === notebookId && matchesOwner(nb)
+      ? { ...nb, nome: trimmed, atualizadoEm: nowIso }
+      : nb
   );
   saveAllNotebooks(updated);
-  if (target) {
-    api.journal
-      .upsertNotebook(notebookId, {
-        nome: trimmed,
-        corCapa: target.corCapa || "marrom",
-        paginas: filterWrittenPages(target.paginas),
-      })
-      .catch(() => {});
-  }
+  api.journal
+    .upsertNotebook(notebookId, {
+      nome: trimmed,
+      corCapa: target.corCapa || "marrom",
+      paginas: filterWrittenPages(target.paginas),
+    })
+    .catch(() => {});
   return updated;
 }
 
-export function deleteUserNotebook(notebookId: string): Notebook[] {
-  const remaining = loadAllRawNotebooks().filter((nb) => nb.id !== notebookId);
+export function deleteUserNotebook(
+  notebookId: string,
+  userId?: number | string | null
+): Notebook[] {
+  const all = loadAllRawNotebooks();
+  const matchesOwner = (nb: Notebook) =>
+    userId == null || nb.ownerId == null || String(nb.ownerId) === String(userId);
+  const remaining = all.filter((nb) => !(nb.id === notebookId && matchesOwner(nb)));
   try {
     const activeId = window.localStorage.getItem(ACTIVE_NOTEBOOK_ID_KEY);
     if (activeId === notebookId) {
@@ -749,10 +763,19 @@ export function permanentlyDeleteLetterFromStorage(letterId: string) {
   dispatchJournalUpdated();
 }
 
-export function emptyAllPostalTrash() {
+export function emptyAllPostalTrash(userId?: number | string | null) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify([]));
+    if (userId != null) {
+      const raw = window.localStorage.getItem(TRASH_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const remaining = Array.isArray(parsed)
+        ? parsed.filter((item: any) => item && item.usuario_id != null && String(item.usuario_id) !== String(userId))
+        : [];
+      window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify(remaining));
+    } else {
+      window.localStorage.setItem(TRASH_STORAGE_KEY, JSON.stringify([]));
+    }
   } catch {}
   dispatchJournalUpdated();
 }

@@ -16,27 +16,11 @@ export const metadata: Metadata = {
     "A vintage, intimate sanctuary for personal journaling and keeping genuine memories.",
 };
 
-const themeInitScript = `(function() {
-  try {
-    var isHome = window.location.pathname === '/' || window.location.pathname === '';
-    if (isHome) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('entre-cartas:theme', 'dark');
-    } else {
-      var stored = localStorage.getItem('entre-cartas:theme');
-      var theme = stored || 'dark';
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-})();`;
-
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script src="/theme-init.js" />
       </head>
       <body>
         <ThemeProvider>

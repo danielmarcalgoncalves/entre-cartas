@@ -216,8 +216,29 @@ async function criarCarta(req, res) {
       favoritado = false
     } = req.body;
 
-    if (!titulo || !titulo.trim()) {
+    if (!titulo || typeof titulo !== 'string' || !titulo.trim()) {
       return res.status(400).json({ error: 'Letter title is required.' });
+    }
+    if (titulo.trim().length > 255) {
+      return res.status(400).json({ error: 'Letter title exceeds the 255 character limit.' });
+    }
+    if (remetente_anonimo && String(remetente_anonimo).length > 100) {
+      return res.status(400).json({ error: 'Sender name exceeds the 100 character limit.' });
+    }
+    if (destinatario_anonimo && String(destinatario_anonimo).length > 100) {
+      return res.status(400).json({ error: 'Recipient name exceeds the 100 character limit.' });
+    }
+    if (categoria && String(categoria).length > 50) {
+      return res.status(400).json({ error: 'Category exceeds the 50 character limit.' });
+    }
+    if (tipo_papel && String(tipo_papel).length > 50) {
+      return res.status(400).json({ error: 'Paper style exceeds the 50 character limit.' });
+    }
+    if (lacre_cera_cor && String(lacre_cera_cor).length > 30) {
+      return res.status(400).json({ error: 'Wax seal color exceeds the 30 character limit.' });
+    }
+    if (fonte && String(fonte).length > 50) {
+      return res.status(400).json({ error: 'Font name exceeds the 50 character limit.' });
     }
 
     const normalizedStatus = status_carta === 'draft' ? 'draft' : 'completed';
@@ -321,14 +342,20 @@ async function carimbarCarta(req, res) {
     const { id } = req.params;
     const { tipo_carimbo = 'LIDA' } = req.body;
 
+    const normalizedCarimbo = String(tipo_carimbo || 'LIDA').trim();
+    if (!normalizedCarimbo || normalizedCarimbo.length > 50) {
+      return res.status(400).json({ error: 'Stamp type must be between 1 and 50 characters.' });
+    }
+
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    const [userRows] = await connection.query(
-      'SELECT id, papel FROM usuarios WHERE id = ? FOR UPDATE',
+    await connection.query(
+      'SELECT id FROM usuarios WHERE id = ? FOR UPDATE',
       [usuarioId]
     );
-    const papelEfetivo = (userRows[0] && userRows[0].papel) || papelUsuario;
+    const entitlement = await evaluateUserEntitlement(connection, usuarioId);
+    const papelEfetivo = entitlement?.papel || 'usuario';
 
     const [cartaRows] = await connection.query(
       `SELECT c.id, c.titulo, c.categoria FROM cartas c WHERE c.id = ? AND ${ACCESSIBLE_LETTER_CONDITION}`,
@@ -340,13 +367,9 @@ async function carimbarCarta(req, res) {
     }
     const carta = cartaRows[0];
 
-    // Regra RBAC de Monetização do Entre Cartas:
-    // - Plano Leitor (Free / 'usuario'): máximo de 5 cartas guardadas
-    // - Clube do Remetente Pro ('premium' ou 'admin'): ILIMITADO
-    let limite = null;
-    if (papelEfetivo === 'usuario') {
-      limite = 5;
-    }
+    // Fail-closed RBAC quota: only explicit 'premium' or 'admin' gets unlimited stamped letters (SEC-15)
+    const isPro = papelEfetivo === 'premium' || papelEfetivo === 'admin';
+    const limite = isPro ? null : 5;
 
     if (limite !== null) {
       const [countRows] = await connection.query(
@@ -525,8 +548,11 @@ async function adicionarNotaCarta(req, res) {
     const { id } = req.params;
     const { texto } = req.body;
 
-    if (!texto || !texto.trim()) {
+    if (!texto || typeof texto !== 'string' || !texto.trim()) {
       return res.status(400).json({ error: 'Note text is required.' });
+    }
+    if (texto.trim().length > 800) {
+      return res.status(400).json({ error: 'Note text exceeds the 800 character limit.' });
     }
 
     const [cartaRows] = await pool.query(
@@ -604,11 +630,33 @@ async function atualizarMinhaCarta(req, res) {
       status_carta,
       tema_carta,
       favoritado,
-      na_lixeira
+      na_lixeira,
+      lacre_cera_cor
     } = req.body;
 
-    if (!titulo || !titulo.trim()) {
+    if (!titulo || typeof titulo !== 'string' || !titulo.trim()) {
       return res.status(400).json({ error: 'Letter title is required.' });
+    }
+    if (titulo.trim().length > 255) {
+      return res.status(400).json({ error: 'Letter title exceeds the 255 character limit.' });
+    }
+    if (remetente_anonimo && String(remetente_anonimo).length > 100) {
+      return res.status(400).json({ error: 'Sender name exceeds the 100 character limit.' });
+    }
+    if (destinatario_anonimo && String(destinatario_anonimo).length > 100) {
+      return res.status(400).json({ error: 'Recipient name exceeds the 100 character limit.' });
+    }
+    if (categoria && String(categoria).length > 50) {
+      return res.status(400).json({ error: 'Category exceeds the 50 character limit.' });
+    }
+    if (tipo_papel && String(tipo_papel).length > 50) {
+      return res.status(400).json({ error: 'Paper style exceeds the 50 character limit.' });
+    }
+    if (lacre_cera_cor && String(lacre_cera_cor).length > 30) {
+      return res.status(400).json({ error: 'Wax seal color exceeds the 30 character limit.' });
+    }
+    if (fonte && String(fonte).length > 50) {
+      return res.status(400).json({ error: 'Font name exceeds the 50 character limit.' });
     }
 
     connection = await pool.getConnection();

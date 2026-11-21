@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const cartasController = require('../controllers/cartasController');
 const { authMiddleware, optionalAuth } = require('../middlewares/auth');
+const { commentRateLimiter } = require('../middlewares/security');
 
 // 1. Listagem geral do acervo (pública, enriquecida se logado)
 router.get('/', optionalAuth, cartasController.listarCartas);
@@ -33,6 +34,6 @@ router.post('/:id/carimbar', authMiddleware, cartasController.carimbarCarta);
 router.delete('/:id/carimbar', authMiddleware, cartasController.descarimbarCarta);
 
 // 8. Anexar bilhete / nota marginal na carta
-router.post('/:id/notas', authMiddleware, cartasController.adicionarNotaCarta);
+router.post('/:id/notas', authMiddleware, commentRateLimiter, cartasController.adicionarNotaCarta);
 
 module.exports = router;
