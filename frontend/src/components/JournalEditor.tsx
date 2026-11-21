@@ -10,7 +10,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useGuestDemo } from "@/hooks/useGuestDemo";
 import { api } from "@/services/api";
 import GuestSavePromptModal, { type GuestPromptVariant } from "@/components/GuestSavePromptModal";
-import { registerJournalNavigationGuard } from "@/lib/journal-navigation-guard";
+import {
+  guardJournalNavigation,
+  registerJournalNavigationGuard,
+} from "@/lib/journal-navigation-guard";
 import {
   type JournalAttachment,
   type JournalSticker,
@@ -23,7 +26,10 @@ import { ScrapbookInspectorPanel } from "@/components/journal/ScrapbookInspector
 import { StickerCatalogDrawer } from "@/components/journal/StickerCatalogDrawer";
 import { PhotoUploadModal } from "@/components/journal/PhotoUploadModal";
 import PaperInkModal from "@/components/journal/PaperInkModal";
+import MobileJournalOverlays from "@/components/journal/MobileJournalOverlays";
+import { useMobileJournalGestures } from "@/components/journal/useMobileJournalGestures";
 import "./journal/journal-sidebar.css";
+import "./journal/mobile-journal.css";
 import { type StickerDefinition } from "@/lib/scrapbook-stickers";
 import {
   JOURNAL_MAX_CHARS_PER_PAGE,
@@ -409,7 +415,118 @@ export default function JournalEditor() {
 
   const menuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const newNotebookInputRef = useRef<HTMLInputElement>(null);
+
+  // Dedicated mobile-first Journal state (<= 768px only; desktop remains untouched)
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [mobileSheetMetrics, setMobileSheetMetrics] = useState({
+    scale: 0.65,
+    width: Math.round(JOURNAL_PAGE_WIDTH * 0.65),
+    height: Math.round(JOURNAL_PAGE_HEIGHT * 0.65),
+  });
+  const lockedMobileViewportRef = useRef<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+
+    const computeMobileMetrics = (forceResetHeight = false) => {
+      const matches = mq.matches;
+      setIsMobileViewport(matches);
+      if (!matches) return;
+
+      const vw = window.innerWidth;
+      const rawVh = window.innerHeight;
+      const prev = lockedMobileViewportRef.current;
+      const widthChanged = Math.abs(vw - prev.width) > 24;
+      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+      const isEditingText = activeTag === "textarea" || activeTag === "input";
+
+      // Lock layout height while virtual keyboard is open on the same orientation
+      // so the paper never shrinks or changes aspect ratio when typing
+      let effectiveVh = rawVh;
+      if (forceResetHeight || widthChanged || prev.height === 0) {
+        effectiveVh = rawVh;
+      } else if (isEditingText && rawVh < prev.height) {
+        effectiveVh = prev.height;
+      } else {
+        effectiveVh = Math.max(prev.height, rawVh);
+      }
+
+      lockedMobileViewportRef.current = {
+        width: vw,
+        height: effectiveVh,
+      };
+
+      // Reserve space for discreet bottom Previous/Next controls + breathing margins
+      const navControlsReserve = effectiveVh < 500 ? 34 : 42;
+      const verticalMargin = effectiveVh < 500 ? 10 : 16;
+      const horizontalMargin = vw < 360 ? 8 : 12;
+
+      const availW = Math.max(180, vw - horizontalMargin);
+      const availH = Math.max(200, effectiveVh - navControlsReserve - verticalMargin);
+
+      // Uniform proportional scale preserving exact 580:820 (29:41) 3D notebook paper ratio
+      const scaleW = availW / JOURNAL_PAGE_WIDTH;
+      const scaleH = availH / JOURNAL_PAGE_HEIGHT;
+      const uniformScale = Math.max(0.28, Math.min(scaleW, scaleH));
+
+      setMobileSheetMetrics({
+        scale: uniformScale,
+        width: Math.round(JOURNAL_PAGE_WIDTH * uniformScale),
+        height: Math.round(JOURNAL_PAGE_HEIGHT * uniformScale),
+      });
+    };
+
+    computeMobileMetrics(true);
+    const onResize = () => computeMobileMetrics(false);
+    const onOrientationChange = () => {
+      setTimeout(() => computeMobileMetrics(true), 80);
+    };
+
+    mq.addEventListener("change", onResize);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onOrientationChange);
+    return () => {
+      mq.removeEventListener("change", onResize);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onOrientationChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("mobile-journal-active", isMobileViewport);
+    return () => {
+      document.body.classList.remove("mobile-journal-active");
+    };
+  }, [isMobileViewport]);
+
+  const {
+    activeOverlay: mobileActiveOverlay,
+    closeOverlay: closeMobileOverlay,
+    cursorOffsetY: mobileCursorOffsetY,
+    syncCursorVisibility,
+    gestureHandlers: mobileGestureHandlers,
+  } = useMobileJournalGestures({
+    enabled: isMobileViewport && !modoFoco,
+    isMediaSelected: Boolean(selectedScrapbookItem),
+    textareaRef,
+    titleInputRef,
+  });
+
+  const handleMobileNavigate = useCallback(
+    (href: string) => {
+      void guardJournalNavigation(() => {
+        router.push(href);
+      });
+    },
+    [router]
+  );
   const hasInitialLoadedRef = useRef(false);
   const appliedUrlNotebookRef = useRef<string | null>(null);
   const activeNotebookIdRef = useRef(activeNotebookId);
@@ -1892,9 +2009,15 @@ export default function JournalEditor() {
 
     setCadernoConteudo(overflow.currentPageText);
     atualizarRascunhoCaderno(overflow.currentPageText);
+    if (isMobileViewport) {
+      requestAnimationFrame(() => syncCursorVisibility());
+    }
   };
 
   const handleKeyUp = () => {
+    if (isMobileViewport) {
+      requestAnimationFrame(() => syncCursorVisibility());
+    }
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -2416,7 +2539,9 @@ export default function JournalEditor() {
 
   return (
     <section
-      className={`writing-desk-wrap ${modoFoco ? "is-focus-mode" : ""}`}
+      className={`writing-desk-wrap ${modoFoco ? "is-focus-mode" : ""} ${
+        isMobileViewport ? "is-mobile-journal" : ""
+      }`}
       id="mesa-de-escrita"
       aria-label="Personal Journal Writing Desk"
     >
@@ -2603,7 +2728,10 @@ export default function JournalEditor() {
             </button>
           </div>
 
-          <div className="sheet-stage-wrapper">
+          <div
+            className="sheet-stage-wrapper"
+            {...(isMobileViewport && !modoFoco ? mobileGestureHandlers : {})}
+          >
             <button
               type="button"
               className="sheet-nav-arrow sheet-nav-arrow--left"
@@ -2629,7 +2757,18 @@ export default function JournalEditor() {
             <div
               className="caderno-sheet-viewport-box"
               style={
-                sheetScale < 1
+                isMobileViewport
+                  ? {
+                      width: `${mobileSheetMetrics.width}px`,
+                      height: `${mobileSheetMetrics.height}px`,
+                      position: "relative",
+                      flexShrink: 0,
+                      transform:
+                        mobileCursorOffsetY > 0
+                          ? `translateY(-${mobileCursorOffsetY}px)`
+                          : undefined,
+                    }
+                  : sheetScale < 1
                   ? {
                       width: `${Math.round(JOURNAL_PAGE_WIDTH * sheetScale)}px`,
                       height: `${Math.round(JOURNAL_PAGE_HEIGHT * sheetScale)}px`,
@@ -2641,7 +2780,14 @@ export default function JournalEditor() {
             >
               <div
                 style={
-                  sheetScale < 1
+                  isMobileViewport
+                    ? {
+                        width: `${JOURNAL_PAGE_WIDTH}px`,
+                        height: `${JOURNAL_PAGE_HEIGHT}px`,
+                        transform: `scale(${mobileSheetMetrics.scale})`,
+                        transformOrigin: "top left",
+                      }
+                    : sheetScale < 1
                     ? {
                         width: `${JOURNAL_PAGE_WIDTH}px`,
                         height: `${JOURNAL_PAGE_HEIGHT}px`,
@@ -2662,6 +2808,9 @@ export default function JournalEditor() {
                   onPointerDown={() => {
                     if (selectedScrapbookItem) {
                       setSelectedScrapbookItem(null);
+                    }
+                    if (isMobileViewport && mobileActiveOverlay !== "closed") {
+                      closeMobileOverlay();
                     }
                   }}
                   initial={{ opacity: 0.9, scale: 0.99 }}
@@ -2695,11 +2844,28 @@ export default function JournalEditor() {
                     </div>
 
                     <input
+                      ref={titleInputRef}
                       type="text"
                       className="caderno-title-input"
                       value={cadernoTitulo}
                       onChange={(e) => handleCadernoTituloChange(e.target.value)}
-                      placeholder="Entry title (optional)..."
+                      onFocus={() => {
+                        if (isMobileViewport) {
+                          requestAnimationFrame(() => syncCursorVisibility());
+                        }
+                      }}
+                      onClick={() => {
+                        if (isMobileViewport) {
+                          requestAnimationFrame(() => syncCursorVisibility());
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          textareaRef.current?.focus();
+                        }
+                      }}
+                      placeholder="Entry title..."
                       aria-label="Journal entry title"
                     />
 
@@ -2711,8 +2877,18 @@ export default function JournalEditor() {
                       onKeyDown={handleKeyDown}
                       onPaste={handlePaste}
                       onKeyUp={handleKeyUp}
+                      onFocus={() => {
+                        if (isMobileViewport) {
+                          requestAnimationFrame(() => syncCursorVisibility());
+                        }
+                      }}
                       onMouseDown={handleTextareaMouseDown}
-                      onClick={handleTextareaClick}
+                      onClick={(e) => {
+                        handleTextareaClick(e);
+                        if (isMobileViewport) {
+                          requestAnimationFrame(() => syncCursorVisibility());
+                        }
+                      }}
                       onBlur={handleTextareaBlur}
                       placeholder="Write your journal entry here..."
                       aria-label="Journal page content"
@@ -2737,7 +2913,7 @@ export default function JournalEditor() {
                     attachments={currentPageAttachments}
                     stickers={currentPageStickers}
                     readonly={false}
-                    sheetScale={sheetScale}
+                    sheetScale={isMobileViewport ? mobileSheetMetrics.scale : sheetScale}
                     selectedItem={selectedScrapbookItem}
                     onSelectItem={setSelectedScrapbookItem}
                     onChangeAttachments={handleChangePageAttachments}
@@ -2746,6 +2922,59 @@ export default function JournalEditor() {
                 </motion.div>
               </div>
             </div>
+
+            {isMobileViewport && !modoFoco && (
+              <nav
+                className="mobile-journal-bottom-nav"
+                aria-label="Journal page navigation"
+              >
+                <button
+                  type="button"
+                  className="mobile-journal-page-nav-btn"
+                  onClick={navegarAnterior}
+                  disabled={currentPageIndex === 0}
+                  aria-label="Previous page"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  <span>Previous</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="mobile-journal-page-nav-btn"
+                  onClick={navegarProximo}
+                  disabled={!podeAvancarPagina}
+                  aria-label="Next page"
+                >
+                  <span>Next</span>
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </nav>
+            )}
 
             <button
               type="button"
@@ -3669,6 +3898,45 @@ export default function JournalEditor() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile-First Contextual Overlays (<= 768px only) */}
+      {isMobileViewport && !modoFoco && (
+        <MobileJournalOverlays
+          activeOverlay={mobileActiveOverlay}
+          onCloseOverlay={closeMobileOverlay}
+          activeNotebookName={activeNotebook?.nome || "Personal Journal"}
+          currentPageIndex={currentPageIndex}
+          totalPages={cadernoPaginas.length}
+          canAdvancePage={podeAvancarPagina}
+          onPrevPage={navegarAnterior}
+          onNextPage={navegarProximo}
+          onOpenVolumes={() => {
+            if (isGuestMode) {
+              playPaperSound();
+              openGuestPrompt("notebook-open");
+              return;
+            }
+            setCadernoPromptNotice(null);
+            setNotebookDrawerOpen(true);
+            playPaperSound();
+          }}
+          onOpenPaperInk={() => {
+            playPaperSound();
+            setCustomMenuOpen(true);
+          }}
+          onOpenStickers={() => {
+            playPaperSound();
+            setStickerDrawerOpen(true);
+          }}
+          onOpenPhotos={() => {
+            handleOpenPhotoUpload();
+          }}
+          onSavePage={salvarPagina}
+          saving={salvando}
+          autosaveStatus={autosaveStatus}
+          onNavigate={handleMobileNavigate}
+        />
+      )}
 
       {/* Account Required Prompt for Guest Save & Notebook Restrictions */}
       <GuestSavePromptModal

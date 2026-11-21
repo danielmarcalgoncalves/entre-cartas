@@ -153,6 +153,8 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   const isMyDeskPage =
     pathname === "/my-desk" || pathname.startsWith("/my-desk/");
+  const isJournalPage =
+    pathname === "/journal" || pathname.startsWith("/journal/");
 
   const showAuthenticatedSidebar = Boolean(user);
   const isGuestPreview = !loading && !user && !isMyDeskPage;
@@ -162,6 +164,8 @@ export default function SiteShell({ children }: { children: ReactNode }) {
       className={`site-wrap ${
         showAuthenticatedSidebar ? "site-wrap--with-sidebar" : "site-wrap--guest"
       } ${isMyDeskPage ? "site-wrap--my-desk" : ""} ${
+        isJournalPage ? "site-wrap--journal-route" : ""
+      } ${
         showAuthenticatedSidebar
           ? isSidebarExpanded
             ? "sidebar-is-open"
