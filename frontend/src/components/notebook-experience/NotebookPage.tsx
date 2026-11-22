@@ -566,42 +566,38 @@ export function JournalUserPage({
     <div
       className="nb-user-entry-page"
       style={{
-        position: "relative",
+        position: "absolute",
+        inset: 0,
         width: `${JOURNAL_PAGE_LAYOUT.width}px`,
         height: `${JOURNAL_PAGE_LAYOUT.height}px`,
-        padding: `${JOURNAL_PAGE_LAYOUT.paddingTop}px ${JOURNAL_PAGE_LAYOUT.paddingRight}px ${JOURNAL_PAGE_LAYOUT.paddingBottom}px ${JOURNAL_PAGE_LAYOUT.paddingLeft}px`,
+        padding: 0,
         backgroundColor: paperColor,
         color: inkColor,
         fontFamily,
       }}
     >
       <div className="nb-user-entry-content">
-        {/* Line 1 (28px): Date, Favorite Stamp & Page Counter — matches .caderno-date-line */}
-        <div className="nb-user-entry-header">
-          <span className="nb-user-entry-date">
-            {page.dataFormatada || "Today"}
-          </span>
-          <div className="nb-user-entry-header-meta">
-            {page.favoritado && (
-              <span className="nb-user-favorite-stamp" title="Favorited entry in your archive">
-                FAVORITED ♥
-              </span>
-            )}
-            <small className="nb-user-page-counter">
-              page {Number(pageNumber) || 1}
-            </small>
-          </div>
+        {/* Top Decorative Notebook Border (32px, y = 0..32px) */}
+        <div className="journal-sheet-decorative-border is-top" aria-hidden="true">
+          <span className="journal-sheet-border-rule" />
+          <svg
+            className="journal-sheet-border-emblem"
+            width="14"
+            height="10"
+            viewBox="0 0 14 10"
+            fill="none"
+          >
+            <path
+              d="M7 1L10 5L7 9L4 5L7 1Z"
+              stroke="currentColor"
+              strokeWidth="1.1"
+            />
+            <path d="M0 5H3M11 5H14" stroke="currentColor" strokeWidth="1" />
+          </svg>
+          <span className="journal-sheet-border-rule" />
         </div>
 
-        {/* Line 2 (28px): Always reserves exact title line height so body begins at y=94px */}
-        <div
-          className={`nb-user-entry-title ${hasTitle ? "" : "is-empty"}`}
-          aria-hidden={!hasTitle}
-        >
-          {hasTitle ? page.titulo : "\u00A0"}
-        </div>
-
-        {/* Lines 3..25 (644px = 23 * 28px): Identical usable writing area, wrapping & typography */}
+        {/* Full 27-Line Ruled Writing Region (756px = 27 * 28px, y = 32..788px) */}
         <div className="nb-user-entry-body">
           {imageUrl && (
             <div className={`nb-user-polaroid-wrap ${side === "left" ? "nb-user-polaroid--left" : "nb-user-polaroid--right"}`}>
@@ -615,29 +611,113 @@ export function JournalUserPage({
             </div>
           )}
 
-          {hasContent ? (
-            cleanContent
-          ) : !hasScrapbookItems ? (
-            <em className="nb-user-entry-empty">
-              This page contains no written text yet.
-            </em>
-          ) : null}
+          {hasContent ? cleanContent : null}
         </div>
 
-        {/* Bottom 38px footer matching .caderno-bottom-corner height */}
-        <div className="nb-user-entry-footer">
-          <span className="nb-user-volume-tag">VOL · {notebookName}</span>
-          <span className="nb-user-page-folio">P. {pageNumber}</span>
+        {/* Bottom Decorative Notebook Border (32px, y = 788..820px) */}
+        <div className="journal-sheet-decorative-border is-bottom" aria-hidden="true">
+          <span className="journal-sheet-border-rule" />
+          <svg
+            className="journal-sheet-border-emblem"
+            width="14"
+            height="10"
+            viewBox="0 0 14 10"
+            fill="none"
+          >
+            <path
+              d="M7 1L10 5L7 9L4 5L7 1Z"
+              stroke="currentColor"
+              strokeWidth="1.1"
+            />
+            <path d="M0 5H3M11 5H14" stroke="currentColor" strokeWidth="1" />
+          </svg>
+          <span className="journal-sheet-border-rule" />
         </div>
       </div>
 
-      {/* Synchronized Scrapbook Layer on exact 580x820 coordinate system */}
+      {/* Synchronized Scrapbook Layer on exact 580x820 coordinate system (0,0 .. 580,820) */}
       <ScrapbookLayer
         attachments={page.attachments}
         stickers={page.stickers}
         readonly
         sheetScale={1}
       />
+    </div>
+  );
+}
+
+export interface JournalBlankContinuationPageProps {
+  tipoPapel?: string;
+}
+
+/**
+ * Visual-only blank continuation sheet rendered on the right side of the final
+ * Journal3D spread when the user's last written page lands on the left.
+ * Contains zero text, dates, titles, or placeholders and is never persisted.
+ */
+export function JournalBlankContinuationPage({
+  tipoPapel,
+}: JournalBlankContinuationPageProps) {
+  const paperColor = getPaperColorById(tipoPapel);
+
+  return (
+    <div
+      className="nb-blank-continuation-page"
+      data-blank-continuation="true"
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: `${JOURNAL_PAGE_LAYOUT.width}px`,
+        height: `${JOURNAL_PAGE_LAYOUT.height}px`,
+        padding: 0,
+        backgroundColor: paperColor,
+      }}
+    >
+      <div className="nb-user-entry-content">
+        {/* Top Decorative Notebook Border (32px, y = 0..32px) */}
+        <div className="journal-sheet-decorative-border is-top" aria-hidden="true">
+          <span className="journal-sheet-border-rule" />
+          <svg
+            className="journal-sheet-border-emblem"
+            width="14"
+            height="10"
+            viewBox="0 0 14 10"
+            fill="none"
+          >
+            <path
+              d="M7 1L10 5L7 9L4 5L7 1Z"
+              stroke="currentColor"
+              strokeWidth="1.1"
+            />
+            <path d="M0 5H3M11 5H14" stroke="currentColor" strokeWidth="1" />
+          </svg>
+          <span className="journal-sheet-border-rule" />
+        </div>
+
+        {/* Completely blank 27-line ruled writing area (756px, y = 32..788px) */}
+        <div className="nb-user-entry-body" />
+
+        {/* Bottom Decorative Notebook Border (32px, y = 788..820px) */}
+        <div className="journal-sheet-decorative-border is-bottom" aria-hidden="true">
+          <span className="journal-sheet-border-rule" />
+          <svg
+            className="journal-sheet-border-emblem"
+            width="14"
+            height="10"
+            viewBox="0 0 14 10"
+            fill="none"
+          >
+            <path
+              d="M7 1L10 5L7 9L4 5L7 1Z"
+              stroke="currentColor"
+              strokeWidth="1.1"
+            />
+            <path d="M0 5H3M11 5H14" stroke="currentColor" strokeWidth="1" />
+          </svg>
+          <span className="journal-sheet-border-rule" />
+        </div>
+      </div>
     </div>
   );
 }

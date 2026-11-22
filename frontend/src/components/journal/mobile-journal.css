@@ -144,7 +144,7 @@
     height: 820px !important;
     min-height: 820px !important;
     max-height: 820px !important;
-    padding: 38px 44px 30px 48px !important;
+    padding: 0 !important;
     border-radius: 3px !important;
     border: 1px solid rgba(135, 115, 90, 0.26) !important;
     box-shadow:
@@ -153,44 +153,13 @@
     box-sizing: border-box !important;
   }
 
-  /* ------------------------------------------------------------------------
-     SEPARATED TITLE AREA & BODY WRITING AREA (INSIDE CANONICAL 580x820 SHEET)
-     ------------------------------------------------------------------------ */
-  .writing-desk-wrap.is-mobile-journal .caderno-title-input {
-    display: block;
-    width: 100%;
-    height: 44px !important;
-    line-height: 40px !important;
-    margin: 0 0 12px 0 !important; /* 44px + 12px = 56px (exact 2 * 28px ruled lines) */
-    padding: 0 0 4px 0 !important;
-    box-sizing: border-box !important;
-    border: none !important;
-    border-bottom: 1.5px solid rgba(135, 110, 78, 0.36) !important;
-    border-radius: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    outline: none !important;
-    font-family: var(--serif-title, "Cormorant Garamond", Georgia, serif) !important;
-    font-size: 25px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.015em !important;
-    color: inherit;
-    flex-shrink: 0;
-  }
-
-  .writing-desk-wrap.is-mobile-journal .caderno-title-input::placeholder {
-    color: rgba(132, 116, 95, 0.72);
-    font-style: italic;
-    font-weight: 500;
-    font-size: 21px !important;
-    font-family: var(--serif, "EB Garamond", Georgia, serif);
-  }
-
   .writing-desk-wrap.is-mobile-journal .caderno-textarea-ruled {
     width: 100%;
-    flex: 1 1 auto !important;
-    min-height: 616px !important; /* 22 ruled lines * 28px = 616px */
-    height: 616px !important;
+    flex: 0 0 756px !important;
+    min-height: 756px !important; /* 27 ruled lines * 28px = 756px */
+    height: 756px !important;
+    max-height: 756px !important;
+    padding: 0 20px !important;
     font-size: 19px !important;
     line-height: 28px !important;
     resize: none;

@@ -12,20 +12,22 @@ export const JOURNAL_PAGE_LAYOUT = {
   width: 580,
   height: 820,
   borderWidth: 1,
-  paddingTop: 38,
-  paddingRight: 44,
-  paddingBottom: 30,
-  paddingLeft: 48,
-  headerHeight: 28,
-  titleHeight: 28,
-  bodyHeight: 644, // Exactly 23 ruled lines * 28px line-height
-  footerHeight: 38,
+  topBorderHeight: 32,
+  bottomBorderHeight: 32,
+  paddingTop: 32,
+  paddingRight: 20,
+  paddingBottom: 32,
+  paddingLeft: 20,
+  headerHeight: 0,
+  titleHeight: 0,
+  bodyHeight: 756, // Exactly 27 ruled lines * 28px line-height (32 + 756 + 32 = 820px)
+  footerHeight: 0,
   fontSize: 19,
   lineHeight: 28,
   titleFontSize: 17,
   dateFontSize: 14,
-  maxLinesPerPage: 23,
-  maxCharsPerPage: 1200,
+  maxLinesPerPage: 27,
+  maxCharsPerPage: 1450,
 } as const;
 
 export const JOURNAL_PAGE_WIDTH: number = JOURNAL_PAGE_LAYOUT.width;

@@ -1,19 +1,246 @@
 /* ==========================================================================
-   MY JOURNAL WEB/DESKTOP — DUAL EDITING MODES (EDIT MODE & WRITING MODE)
-   Strictly scoped to Web/Desktop (.writing-desk-wrap:not(.is-mobile-journal)).
-   Mobile experience (<= 768px) remains 100% untouched.
+   MY JOURNAL WEB/DESKTOP — EXACT 580x820 JOURNAL3D PAGE GEOMETRY,
+   FULL-SHEET 27-LINE WRITING AREA, DECORATIVE BORDERS & DUAL MODES
    ========================================================================== */
 
+/* 1. Desktop Workspace Grid & Natural Vertical Scrolling */
+@media (min-width: 769px) {
+  .site-wrap--journal-route .site-main {
+    max-width: 1220px;
+    width: 100%;
+  }
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) {
+  height: auto;
+  min-height: 100dvh;
+  overflow-x: visible;
+  overflow-y: visible;
+  padding: 16px 16px 68px;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .writing-desk-container {
+  display: grid;
+  grid-template-columns: 204px minmax(0, 580px) 190px;
+  justify-content: center;
+  align-items: start;
+  gap: 22px;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .desk-left-col,
+.writing-desk-wrap:not(.is-mobile-journal) .desk-right-col {
+  min-height: 0 !important;
+  height: auto !important;
+  padding-top: 0 !important;
+  margin-top: 46px !important;
+  align-self: start;
+  will-change: transform;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .desk-center-col {
+  width: 100%;
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .sheet-stage-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* 2. Canonical 580x820 Vertical Rectangular Sheet (Exact Journal3D Geometry) */
+.writing-sheet-card.mode-caderno {
+  position: relative;
+  width: 580px !important;
+  min-width: 580px !important;
+  max-width: 580px !important;
+  height: 820px !important;
+  min-height: 820px !important;
+  max-height: 820px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  border-radius: 3px !important;
+  border: none !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(135, 115, 90, 0.24),
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 8px 24px -4px rgba(0, 0, 0, 0.28),
+    0 24px 48px -12px rgba(0, 0, 0, 0.42) !important;
+  overflow: hidden !important;
+  background-image: none !important;
+}
+
+.writing-sheet-card.mode-caderno .caderno-content-inner {
+  position: relative;
+  z-index: 2;
+  width: 580px !important;
+  height: 820px !important;
+  min-height: 820px !important;
+  max-height: 820px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* 3. Top & Bottom Decorative Notebook Borders (32px each, part of the 580x820 sheet) */
+.writing-sheet-card.mode-caderno .journal-sheet-decorative-border {
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(132, 108, 76, 0.56);
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 3;
+}
+
+.writing-sheet-card.mode-caderno .journal-sheet-border-rule {
+  flex: 1;
+  height: 3px;
+  border-top: 1px solid rgba(132, 108, 76, 0.36);
+  border-bottom: 1px solid rgba(132, 108, 76, 0.2);
+}
+
+.writing-sheet-card.mode-caderno .journal-sheet-border-emblem {
+  flex-shrink: 0;
+  opacity: 0.78;
+}
+
+/* 4. Full-Sheet 27-Line Ruled Editable Writing Region (756px = 27 * 28px) */
+.writing-sheet-card.mode-caderno .caderno-textarea-ruled {
+  width: 100% !important;
+  flex: 0 0 756px !important;
+  height: 756px !important;
+  min-height: 756px !important;
+  max-height: 756px !important;
+  padding: 0 20px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  border: none !important;
+  outline: none !important;
+  resize: none !important;
+  font-size: 19px !important;
+  line-height: 28px !important;
+  overflow-y: hidden !important;
+  background-color: transparent !important;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 27px,
+    rgba(100, 120, 145, 0.16) 27px,
+    rgba(100, 120, 145, 0.16) 28px
+  ) !important;
+  background-position: 0 0 !important;
+}
+
+/* Narrower Desktop Breakpoint: keep 580x820 paper centered with intact proportions */
+@media (max-width: 1060px) and (min-width: 769px) {
+  .writing-desk-wrap:not(.is-mobile-journal) .writing-desk-container {
+    grid-template-columns: 1fr;
+    max-width: 640px;
+  }
+
+  .writing-desk-wrap:not(.is-mobile-journal) .desk-left-col,
+  .writing-desk-wrap:not(.is-mobile-journal) .desk-right-col {
+    min-height: auto;
+    padding-top: 0;
+  }
+}
+
+/* 5. Top Mode Selector Toolbar (Centered Edit Mode & Writing Mode Only) */
 .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
   width: 100%;
   max-width: 580px;
+  min-height: 34px;
   margin-bottom: 12px;
   position: relative;
   z-index: 4;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-view-journal-rail-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-secondary-tool-btn.is-liked {
+  border-color: rgba(173, 91, 48, 0.55);
+  background: rgba(173, 91, 48, 0.14);
+  color: #f3d2b8;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-secondary-tool-btn.is-liked {
+  border-color: rgba(173, 91, 48, 0.5);
+  background: rgba(173, 91, 48, 0.12);
+  color: #8c3f19;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-mode-toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-external-page-pill {
+  font-family: var(--sans, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(236, 225, 201, 0.72);
+  padding: 5px 8px;
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-external-page-pill {
+  color: rgba(62, 58, 47, 0.75);
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-external-fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(207, 169, 111, 0.28);
+  background: rgba(34, 26, 19, 0.78);
+  color: rgba(236, 225, 201, 0.75);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-external-fav-btn.is-favorited {
+  color: var(--color-red-sands, #ad5b30);
+  border-color: rgba(173, 91, 48, 0.55);
+  background: rgba(173, 91, 48, 0.14);
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-external-fav-btn {
+  background: rgba(250, 244, 232, 0.92);
+  border-color: rgba(138, 131, 95, 0.34);
+  color: #6b4c28;
 }
 
 .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-switcher {
@@ -41,16 +268,16 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 14px;
+  gap: 6px;
+  padding: 6px 12px;
   border-radius: 7px;
   border: none;
   background: transparent;
   color: rgba(236, 225, 201, 0.72);
   font-family: var(--sans, sans-serif);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   cursor: pointer;
   transition: color 0.18s ease;
   z-index: 1;
@@ -77,7 +304,9 @@
 }
 
 .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn:focus-visible,
-.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:focus-visible {
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:focus-visible,
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn:focus-visible,
+.writing-desk-wrap:not(.is-mobile-journal) .journal-external-fav-btn:focus-visible {
   outline: 2px solid var(--color-pollen, #cfa96f);
   outline-offset: 2px;
 }
@@ -96,21 +325,35 @@
   box-shadow: 0 2px 8px rgba(131, 64, 29, 0.28);
 }
 
-.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn,
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  max-width: 220px;
-  padding: 7px 12px;
-  border-radius: 9px;
-  border: 1px solid rgba(207, 169, 111, 0.26);
-  background: rgba(34, 26, 19, 0.78);
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(207, 169, 111, 0.28);
+  background: rgba(34, 26, 19, 0.8);
   color: var(--color-pollen, #cfa96f);
   font-family: var(--serif, "EB Garamond", Georgia, serif);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
+  max-width: 145px;
+}
+
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn {
+  background: rgba(173, 91, 48, 0.16);
+  border-color: rgba(207, 169, 111, 0.42);
+  color: #f3dfb9;
+  font-family: var(--sans, sans-serif);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 [data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
@@ -119,14 +362,22 @@
   color: #6b4c28;
 }
 
-.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:hover {
-  border-color: rgba(207, 169, 111, 0.55);
-  background: rgba(46, 35, 25, 0.9);
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn {
+  background: rgba(140, 72, 36, 0.1);
+  border-color: rgba(140, 72, 36, 0.38);
+  color: #7b3b18;
 }
 
-[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:hover {
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:hover,
+.writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn:hover {
+  border-color: rgba(207, 169, 111, 0.65);
+  background: rgba(46, 35, 25, 0.92);
+}
+
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn:hover,
+[data-theme="light"] .writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn:hover {
   background: #f5ecdb;
-  border-color: rgba(140, 72, 36, 0.45);
+  border-color: rgba(140, 72, 36, 0.55);
 }
 
 .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-name {
@@ -135,35 +386,99 @@
   white-space: nowrap;
 }
 
-/* ==========================================================================
-   SMOOTH TRANSITIONS BETWEEN EDIT MODE AND WRITING MODE
-   Keeps the central sheet anchored in place with zero layout jump.
-   ========================================================================== */
+/* 6. Compact Writing Mode Customization Controls (Paper Color, Font, Text Color) */
+.journal-writing-custom-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(34, 26, 19, 0.72);
+  border: 1px solid rgba(207, 169, 111, 0.22);
+}
 
+[data-theme="light"] .journal-writing-custom-panel {
+  background: rgba(250, 244, 232, 0.9);
+  border-color: rgba(138, 131, 95, 0.3);
+}
+
+.journal-writing-custom-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.journal-writing-custom-title {
+  font-family: var(--sans, sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9c8e76);
+}
+
+.journal-writing-swatch-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.journal-writing-swatch-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(207, 169, 111, 0.35);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.journal-writing-swatch-btn:hover {
+  transform: scale(1.1);
+}
+
+.journal-writing-swatch-btn.is-selected {
+  border-color: var(--color-pollen, #cfa96f);
+  box-shadow: 0 0 0 2px rgba(207, 169, 111, 0.45);
+  transform: scale(1.08);
+}
+
+.journal-writing-font-select {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(207, 169, 111, 0.28);
+  background: rgba(24, 18, 13, 0.85);
+  color: #ece1c9;
+  font-family: var(--sans, sans-serif);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+[data-theme="light"] .journal-writing-font-select {
+  background: #fdfaf3;
+  border-color: rgba(138, 131, 95, 0.38);
+  color: #3e3a2f;
+}
+
+/* 7. Smooth Transitions Between Edit Mode and Writing Mode */
 .writing-desk-wrap:not(.is-mobile-journal) .desk-left-col {
-  transition:
-    opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .desk-left-col {
   opacity: 0;
-  transform: translateX(-14px);
   pointer-events: none;
   visibility: hidden;
 }
 
-/* In Writing Mode, decorative elements stay visible on the sheet but cannot be
-   selected, dragged, resized, or rotated */
 .writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .scrapbook-layer {
   pointer-events: none !important;
   user-select: none;
 }
 
-.writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .writing-sheet-card.mode-caderno {
-  cursor: text;
-}
-
+.writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .writing-sheet-card.mode-caderno,
 .writing-desk-wrap.is-desktop-writing-mode:not(.is-mobile-journal) .caderno-textarea-ruled {
   cursor: text;
 }
@@ -171,7 +486,8 @@
 @media (prefers-reduced-motion: reduce) {
   .writing-desk-wrap:not(.is-mobile-journal) .desk-left-col,
   .writing-desk-wrap:not(.is-mobile-journal) .journal-mode-btn,
-  .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn {
+  .writing-desk-wrap:not(.is-mobile-journal) .journal-top-volume-btn,
+  .writing-desk-wrap:not(.is-mobile-journal) .journal-top-view-btn {
     transition-duration: 0.01ms !important;
   }
 }

@@ -122,13 +122,13 @@ export function ScrapbookLayer({
         if (mode === "move") {
           return {
             ...att,
-            x: Math.round(clamp(origX + dx, 4, JOURNAL_PAGE_WIDTH - att.width - 4)),
-            y: Math.round(clamp(origY + dy, 4, JOURNAL_PAGE_HEIGHT - att.height - 4)),
+            x: Math.round(clamp(origX + dx, 0, JOURNAL_PAGE_WIDTH - att.width)),
+            y: Math.round(clamp(origY + dy, 0, JOURNAL_PAGE_HEIGHT - att.height)),
           };
         }
         if (mode === "resize") {
-          const nextW = Math.round(clamp(origW + dx, 64, JOURNAL_PAGE_WIDTH - origX - 8));
-          const nextH = Math.round(clamp(nextW / aspect, 56, JOURNAL_PAGE_HEIGHT - origY - 8));
+          const nextW = Math.round(clamp(origW + dx, 64, JOURNAL_PAGE_WIDTH - origX));
+          const nextH = Math.round(clamp(nextW / aspect, 56, JOURNAL_PAGE_HEIGHT - origY));
           return {
             ...att,
             width: nextW,
@@ -267,8 +267,8 @@ export function ScrapbookLayer({
             a.id === id
               ? {
                   ...a,
-                  x: Math.round(clamp(a.x + dx, 4, JOURNAL_PAGE_WIDTH - a.width - 4)),
-                  y: Math.round(clamp(a.y + dy, 4, JOURNAL_PAGE_HEIGHT - a.height - 4)),
+                  x: Math.round(clamp(a.x + dx, 0, JOURNAL_PAGE_WIDTH - a.width)),
+                  y: Math.round(clamp(a.y + dy, 0, JOURNAL_PAGE_HEIGHT - a.height)),
                 }
               : a
           ),

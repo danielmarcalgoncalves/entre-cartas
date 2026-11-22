@@ -399,8 +399,9 @@ export default function JournalEditor() {
   const [inkColor, setInkColor] = useState("#262626");
   const [fontFamilyId, setFontFamilyId] = useState("caveat");
 
-  // Inspiration
+  // Inspiration & Like Modals
   const [inspiracaoModal, setInspiracaoModal] = useState(false);
+  const [likeModalOpen, setLikeModalOpen] = useState(false);
   const [cartaInspiracao, setCartaInspiracao] = useState<Letter | null>(null);
   const [promptTexto, setPromptTexto] = useState("");
 
@@ -418,6 +419,9 @@ export default function JournalEditor() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const newNotebookInputRef = useRef<HTMLInputElement>(null);
+  const leftColRef = useRef<HTMLDivElement>(null);
+  const rightColRef = useRef<HTMLElement>(null);
+  const sheetCardRef = useRef<HTMLDivElement>(null);
 
   // Dedicated mobile-first Journal state (<= 768px only; desktop remains untouched)
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -439,6 +443,62 @@ export default function JournalEditor() {
     },
     [desktopEditorMode]
   );
+
+  const handleViewJournal3D = useCallback(() => {
+    playPaperSound();
+    if (activeNotebookId) {
+      try {
+        window.localStorage.setItem(ACTIVE_NOTEBOOK_ID_KEY, activeNotebookId);
+      } catch {}
+    }
+    const target = activeNotebookId
+      ? `/notebook?id=${encodeURIComponent(activeNotebookId)}`
+      : "/notebook";
+    void guardJournalNavigation(() => {
+      router.push(target);
+    });
+  }, [activeNotebookId, router]);
+
+  // Desktop scroll-following for Left and Right side elements, clamped strictly to the 580x820 sheet bottom boundary
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncSideRailsWithScroll = () => {
+      const leftEl = leftColRef.current;
+      const rightEl = rightColRef.current;
+      const sheetEl = sheetCardRef.current;
+      if (!leftEl || !rightEl || !sheetEl) return;
+
+      if (isMobileViewport || modoFoco || window.innerWidth <= 1060) {
+        leftEl.style.transform = "";
+        rightEl.style.transform = "";
+        return;
+      }
+
+      const sheetRect = sheetEl.getBoundingClientRect();
+      const stickyTop = 20;
+      const desiredOffset = Math.max(0, stickyTop - sheetRect.top);
+
+      const leftMax = Math.max(0, sheetRect.height - leftEl.offsetHeight);
+      const rightMax = Math.max(0, sheetRect.height - rightEl.offsetHeight);
+
+      const leftY = Math.round(Math.min(leftMax, desiredOffset));
+      const rightY = Math.round(Math.min(rightMax, desiredOffset));
+
+      leftEl.style.transform = isWritingMode
+        ? `translate3d(-14px, ${leftY}px, 0)`
+        : `translate3d(0, ${leftY}px, 0)`;
+      rightEl.style.transform = `translate3d(0, ${rightY}px, 0)`;
+    };
+
+    syncSideRailsWithScroll();
+    window.addEventListener("scroll", syncSideRailsWithScroll, { passive: true });
+    window.addEventListener("resize", syncSideRailsWithScroll);
+    return () => {
+      window.removeEventListener("scroll", syncSideRailsWithScroll);
+      window.removeEventListener("resize", syncSideRailsWithScroll);
+    };
+  }, [isMobileViewport, modoFoco, isWritingMode, selectedScrapbookItem, currentPageIndex]);
   const [mobileSheetMetrics, setMobileSheetMetrics] = useState({
     scale: 0.65,
     width: Math.round(JOURNAL_PAGE_WIDTH * 0.65),
@@ -2642,7 +2702,7 @@ export default function JournalEditor() {
 
       <div className="writing-desk-container">
         {/* Left Column: Creative Tools & Element Studio */}
-        <div className="desk-left-col">
+        <div ref={leftColRef} className="desk-left-col">
           {/* Creative Tools Section (directly above Element Studio) */}
           <section
             className="scrapbook-creative-panel"
@@ -2821,41 +2881,6 @@ export default function JournalEditor() {
                   <span>Writing Mode</span>
                 </button>
               </div>
-
-              <button
-                type="button"
-                className="journal-top-volume-btn"
-                onClick={() => {
-                  if (isGuestMode) {
-                    playPaperSound();
-                    openGuestPrompt("notebook-open");
-                    return;
-                  }
-                  setCadernoPromptNotice(null);
-                  setNotebookDrawerOpen(true);
-                  playPaperSound();
-                }}
-                title="Switch or create a journal volume"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-                <span className="journal-top-volume-name">
-                  {activeNotebook ? activeNotebook.nome : "Personal Journal"}
-                </span>
-                <span aria-hidden="true">▾</span>
-              </button>
             </div>
           )}
 
@@ -2886,6 +2911,7 @@ export default function JournalEditor() {
             </button>
 
             <div
+              ref={sheetCardRef}
               className="caderno-sheet-viewport-box"
               style={
                 isMobileViewport
@@ -2966,57 +2992,27 @@ export default function JournalEditor() {
                   transition={{ duration: 0.22 }}
                 >
                   <div className="caderno-content-inner">
-                    <div className="caderno-date-line">
-                      <span>
-                        {cadernoPaginas[currentPageIndex]?.dataFormatada ||
-                          dataFormatada ||
-                          "Today"}
-                      </span>
-                      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        {isSheetFull(cadernoConteudo, textareaRef.current) && (
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              color: "var(--color-red-sands, #ad5b30)",
-                              fontWeight: 700,
-                              letterSpacing: "0.08em",
-                            }}
-                          >
-                            SHEET FULL
-                          </span>
-                        )}
-                        <small className="caderno-page-counter">
-                          page {currentPageIndex + 1} of {Math.max(cadernoPaginas.length, 1)}
-                        </small>
-                      </div>
+                    {/* Top Decorative Notebook Border (32px, y = 0..32px) */}
+                    <div className="journal-sheet-decorative-border is-top" aria-hidden="true">
+                      <span className="journal-sheet-border-rule" />
+                      <svg
+                        className="journal-sheet-border-emblem"
+                        width="14"
+                        height="10"
+                        viewBox="0 0 14 10"
+                        fill="none"
+                      >
+                        <path
+                          d="M7 1L10 5L7 9L4 5L7 1Z"
+                          stroke="currentColor"
+                          strokeWidth="1.1"
+                        />
+                        <path d="M0 5H3M11 5H14" stroke="currentColor" strokeWidth="1" />
+                      </svg>
+                      <span className="journal-sheet-border-rule" />
                     </div>
 
-                    <input
-                      ref={titleInputRef}
-                      type="text"
-                      className="caderno-title-input"
-                      value={cadernoTitulo}
-                      onChange={(e) => handleCadernoTituloChange(e.target.value)}
-                      onFocus={() => {
-                        if (isMobileViewport) {
-                          requestAnimationFrame(() => syncCursorVisibility());
-                        }
-                      }}
-                      onClick={() => {
-                        if (isMobileViewport) {
-                          requestAnimationFrame(() => syncCursorVisibility());
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          textareaRef.current?.focus();
-                        }
-                      }}
-                      placeholder="Entry title..."
-                      aria-label="Journal entry title"
-                    />
-
+                    {/* Full-Sheet 27-Line Ruled Editable Writing Area (756px = 27 * 28px, y = 32..788px) */}
                     <textarea
                       ref={textareaRef}
                       className="caderno-textarea-ruled"
@@ -3043,18 +3039,24 @@ export default function JournalEditor() {
                       rows={MAX_LINES_PER_PAGE}
                     />
 
-                    <div className="caderno-bottom-corner">
-                      <motion.button
-                        type="button"
-                        className={`classic-stamp-favorite ${
-                          cadernoFavoritado ? "is-favorited" : ""
-                        }`}
-                        onClick={toggleFavoritoCaderno}
-                        whileTap={{ scale: 0.95 }}
-                        title="Stamp page as favorite"
+                    {/* Bottom Decorative Notebook Border (32px, y = 788..820px) */}
+                    <div className="journal-sheet-decorative-border is-bottom" aria-hidden="true">
+                      <span className="journal-sheet-border-rule" />
+                      <svg
+                        className="journal-sheet-border-emblem"
+                        width="14"
+                        height="10"
+                        viewBox="0 0 14 10"
+                        fill="none"
                       >
-                        {cadernoFavoritado ? "FAVORITED ♥" : "FAVORITE ♥"}
-                      </motion.button>
+                        <path
+                          d="M7 1L10 5L7 9L4 5L7 1Z"
+                          stroke="currentColor"
+                          strokeWidth="1.1"
+                        />
+                        <path d="M0 5H3M11 5H14" stroke="currentColor" strokeWidth="1" />
+                      </svg>
+                      <span className="journal-sheet-border-rule" />
                     </div>
                   </div>
                   <ScrapbookLayer
@@ -3153,7 +3155,11 @@ export default function JournalEditor() {
         </div>
 
         {/* Right Column: Reorganized Journal Identity, Writing Tools & Session Actions */}
-        <aside className="desk-right-col journal-right-rail" aria-label="Journal controls">
+        <aside
+          ref={rightColRef}
+          className="desk-right-col journal-right-rail"
+          aria-label="Journal controls"
+        >
           <div className="journal-rail-stack">
             {/* Group 1: Journal Identity */}
             <div className="journal-rail-group">
@@ -3250,21 +3256,109 @@ export default function JournalEditor() {
                   </div>
                 </div>
               )}
+
+              <button
+                type="button"
+                className="journal-secondary-tool-btn journal-view-journal-rail-btn"
+                onClick={handleViewJournal3D}
+                title="Open this journal in the 3D notebook viewer"
+              >
+                <span className="journal-secondary-tool-icon" aria-hidden="true">
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                  </svg>
+                </span>
+                <span>View Journal</span>
+              </button>
+
+              <div className="journal-tools-pair">
+                <button
+                  type="button"
+                  className="journal-secondary-tool-btn"
+                  onClick={sortearInspiracao}
+                  title="Pull an inspiring writing prompt from the archive"
+                >
+                  <span className="journal-secondary-tool-icon" aria-hidden="true">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 3v3" />
+                      <path d="M12 18v3" />
+                      <path d="m4.9 4.9 2.1 2.1" />
+                      <path d="m17 17 2.1 2.1" />
+                      <path d="M3 12h3" />
+                      <path d="M18 12h3" />
+                      <path d="m4.9 19.1 2.1-2.1" />
+                      <path d="m17 7 2.1-2.1" />
+                    </svg>
+                  </span>
+                  <span>Pull Inspiration</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`journal-secondary-tool-btn ${
+                    cadernoFavoritado ? "is-liked" : ""
+                  }`}
+                  onClick={() => {
+                    playPaperSound();
+                    setLikeModalOpen(true);
+                  }}
+                  title={
+                    cadernoFavoritado
+                      ? "This page is liked — click to view or update"
+                      : "Like this journal page"
+                  }
+                >
+                  <span className="journal-secondary-tool-icon" aria-hidden="true">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill={cadernoFavoritado ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                    </svg>
+                  </span>
+                  <span>{cadernoFavoritado ? "Liked" : "Like"}</span>
+                </button>
+              </div>
             </div>
 
-            {/* Group 2: Writing & Customization Tools (hidden in Writing Mode) */}
-            <AnimatePresence initial={false}>
-              {!isWritingMode && (
+            {/* Group 2: Writing & Customization Tools */}
+            <AnimatePresence mode="wait" initial={false}>
+              {!isWritingMode ? (
                 <motion.div
-                  key="journal-rail-customization-group"
+                  key="journal-rail-edit-tools"
                   className="journal-rail-group"
-                  initial={{ opacity: 0, y: -6 }}
+                  initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
+                  exit={{ opacity: 0, y: -4 }}
                   transition={
                     prefersReducedMotion
                       ? { duration: 0.01 }
-                      : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
+                      : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }
                   }
                 >
                   <span className="journal-rail-group-label">Writing Tools</span>
@@ -3317,60 +3411,6 @@ export default function JournalEditor() {
                 </button>
               )}
 
-              <div className="journal-tools-pair">
-                <button
-                  type="button"
-                  className="journal-secondary-tool-btn"
-                  onClick={sortearInspiracao}
-                  title="Pull an inspiring writing prompt from the archive"
-                >
-                  <span className="journal-secondary-tool-icon" aria-hidden="true">
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 3v3" />
-                      <path d="M12 18v3" />
-                      <path d="m4.9 4.9 2.1 2.1" />
-                      <path d="m17 17 2.1 2.1" />
-                      <path d="M3 12h3" />
-                      <path d="M18 12h3" />
-                      <path d="m4.9 19.1 2.1-2.1" />
-                      <path d="m17 7 2.1-2.1" />
-                    </svg>
-                  </span>
-                  <span>Pull Inspiration</span>
-                </button>
-
-                <Link
-                  href="/my-shelf?section=journals"
-                  className="journal-secondary-tool-btn"
-                  title="Browse all your saved journals on My Shelf"
-                >
-                  <span className="journal-secondary-tool-icon" aria-hidden="true">
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19v20H6.5a2.5 2.5 0 0 1 0-5H19" />
-                    </svg>
-                  </span>
-                  <span>My Shelf ↗</span>
-                </Link>
-              </div>
-
               {temaSalvo && (
                 <div className="pinned-theme-box">
                   <div className="pinned-theme-top">
@@ -3397,6 +3437,101 @@ export default function JournalEditor() {
                   <p className="pinned-theme-phrase">“{temaSalvo}”</p>
                 </div>
               )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="journal-rail-writing-custom"
+                  className="journal-rail-group"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={
+                    prefersReducedMotion
+                      ? { duration: 0.01 }
+                      : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }
+                  }
+                >
+                  <span className="journal-rail-group-label">Writing Style</span>
+                  <div className="journal-writing-custom-panel" aria-label="Writing customization">
+                    <div className="journal-writing-custom-row">
+                      <span className="journal-writing-custom-title">Paper Color</span>
+                      <div className="journal-writing-swatch-list" role="group" aria-label="Paper color">
+                        {PAPER_OPTIONS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className={`journal-writing-swatch-btn ${
+                              sheetBgId === p.id ? "is-selected" : ""
+                            }`}
+                            style={{ backgroundColor: p.color }}
+                            title={p.name}
+                            aria-label={`Paper color: ${p.name}`}
+                            aria-pressed={sheetBgId === p.id}
+                            onClick={() => {
+                              playPaperSound();
+                              setSheetBgId(p.id);
+                              setSheetBgColor(p.color);
+                              atualizarRascunhoCaderno(undefined, undefined, undefined, {
+                                tipoPapel: p.id,
+                              });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="journal-writing-custom-row">
+                      <span className="journal-writing-custom-title">Text Color</span>
+                      <div className="journal-writing-swatch-list" role="group" aria-label="Text color">
+                        {INK_OPTIONS.map((ink) => (
+                          <button
+                            key={ink.id}
+                            type="button"
+                            className={`journal-writing-swatch-btn ${
+                              inkColorId === ink.id ? "is-selected" : ""
+                            }`}
+                            style={{ backgroundColor: ink.color }}
+                            title={ink.name}
+                            aria-label={`Text color: ${ink.name}`}
+                            aria-pressed={inkColorId === ink.id}
+                            onClick={() => {
+                              playPaperSound();
+                              setInkColorId(ink.id);
+                              setInkColor(ink.color);
+                              atualizarRascunhoCaderno(undefined, undefined, undefined, {
+                                corTinta: ink.id,
+                              });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="journal-writing-custom-row">
+                      <label htmlFor="writing-mode-font-select" className="journal-writing-custom-title">
+                        Font
+                      </label>
+                      <select
+                        id="writing-mode-font-select"
+                        className="journal-writing-font-select"
+                        value={fontFamilyId}
+                        onChange={(e) => {
+                          const nextFont = e.target.value;
+                          playPaperSound();
+                          setFontFamilyId(nextFont);
+                          atualizarRascunhoCaderno(undefined, undefined, undefined, {
+                            fonte: nextFont,
+                          });
+                        }}
+                      >
+                        {FONT_OPTIONS.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -3863,6 +3998,87 @@ export default function JournalEditor() {
                   onClick={aplicarInspiracao}
                 >
                   <span>Pin this theme</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Like Page Modal (Same interaction and visual style as Pull Inspiration) */}
+      <AnimatePresence>
+        {likeModalOpen && (
+          <div
+            className="inspiration-modal-backdrop"
+            onClick={() => setLikeModalOpen(false)}
+          >
+            <motion.div
+              className="inspiration-modal-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Like journal page"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            >
+              <Tape className="modal-tape" />
+              <div className="modal-top">
+                <span className="modal-kicker">AFFECTIVE PAGE KEEP</span>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={() => setLikeModalOpen(false)}
+                  aria-label="Close like dialog"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="inspiration-prompt-box">
+                <small className="prompt-label">
+                  {activeNotebook ? activeNotebook.nome.toUpperCase() : "PERSONAL JOURNAL"} · PAGE{" "}
+                  {currentPageIndex + 1} OF {Math.max(cadernoPaginas.length, 1)}
+                </small>
+                <p className="prompt-text">
+                  {cadernoFavoritado
+                    ? "This page carries your personal Like seal."
+                    : "Mark this page with a personal Like seal to treasure it in your journal."}
+                </p>
+              </div>
+
+              <div className="inspiration-letter-excerpt">
+                <span className="excerpt-label">Volume Keepsakes:</span>
+                <blockquote>
+                  {(() => {
+                    const likedCount = cadernoPaginas.filter((p, idx) =>
+                      idx === currentPageIndex ? cadernoFavoritado : Boolean(p.favoritado)
+                    ).length;
+                    return `${likedCount} ${
+                      likedCount === 1 ? "liked page" : "liked pages"
+                    } recorded in this volume.`;
+                  })()}
+                </blockquote>
+              </div>
+
+              <div className="inspiration-modal-actions">
+                <button
+                  type="button"
+                  className="btn-shuffle-inspire"
+                  onClick={() => setLikeModalOpen(false)}
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  className="primary-cta"
+                  onClick={() => {
+                    toggleFavoritoCaderno();
+                    setLikeModalOpen(false);
+                  }}
+                >
+                  <span>{cadernoFavoritado ? "Remove Like" : "Like this page"}</span>
                 </button>
               </div>
             </motion.div>

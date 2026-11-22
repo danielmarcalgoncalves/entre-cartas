@@ -53,6 +53,22 @@ export function PhotoUploadModal({
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +139,7 @@ export function PhotoUploadModal({
       role="dialog"
       aria-modal="true"
       aria-label="Add Photograph to Journal Page"
+      className="photo-upload-modal-backdrop"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -133,23 +150,39 @@ export function PhotoUploadModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "20px",
+        padding: "16px",
+        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
       <div
+        className="photo-upload-modal-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: "460px",
+          maxHeight: "calc(100dvh - 32px)",
           backgroundColor: "#f8f1e4",
           color: "#2c1e14",
           borderRadius: "10px",
           border: "1px solid #cbb695",
           boxShadow: "0 20px 50px rgba(10, 6, 3, 0.45)",
-          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+        <div
+          className="photo-upload-modal-header"
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "20px 24px 12px",
+            borderBottom: "1px solid rgba(203, 182, 149, 0.55)",
+          }}
+        >
           <div>
             <span style={{ fontSize: "10px", letterSpacing: "0.16em", textTransform: "uppercase", color: "#7a5e42", fontWeight: 700 }}>
               Scrapbook Darkroom
@@ -170,120 +203,105 @@ export function PhotoUploadModal({
               height: "30px",
               cursor: "pointer",
               color: "#4d3826",
+              flexShrink: 0,
             }}
           >
             ✕
           </button>
         </div>
 
-        <label
+        <div
+          className="photo-upload-modal-body"
           style={{
-            display: "block",
-            padding: "16px",
-            border: "1.5px dashed #b9a17f",
-            borderRadius: "8px",
-            backgroundColor: "#fbf6ec",
-            textAlign: "center",
-            cursor: "pointer",
-            marginBottom: "14px",
+            flex: "1 1 auto",
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+            padding: "16px 24px",
           }}
         >
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleFileChange}
-            style={{ display: "none" }}
-          />
-          <span style={{ display: "block", fontWeight: 600, fontSize: "13.5px", color: "#4a3423" }}>
-            {selectedFile ? selectedFile.name : "Choose a photograph (JPEG, PNG, or WebP · max 5 MB)"}
-          </span>
-        </label>
-
-        <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
-          <defs>
-            <filter id="modal-paper-contour" x="-20%" y="-20%" width="140%" height="140%">
-              <feMorphology in="SourceAlpha" operator="dilate" radius="4" result="dilated" />
-              <feFlood floodColor="#fbf8f1" result="paperColor" />
-              <feComposite in="paperColor" in2="dilated" operator="in" result="paperBorder" />
-              <feMerge>
-                <feMergeNode in="paperBorder" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-        </svg>
-
-        {previewUrl && (
-          <div style={{ marginBottom: "14px", textAlign: "center" }}>
-            <img
-              src={previewUrl}
-              alt="Selected photograph preview"
-              style={
-                style === "plain"
-                  ? {
-                      maxHeight: "170px",
-                      maxWidth: "100%",
-                      objectFit: "contain",
-                      filter:
-                        borderlessContour === "paper"
-                          ? "url(#modal-paper-contour) drop-shadow(0 4px 10px rgba(24, 15, 8, 0.22))"
-                          : "none",
-                    }
-                  : {
-                      maxHeight: "170px",
-                      maxWidth: "100%",
-                      borderRadius: "4px",
-                      border: "4px solid #fbf8f1",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
-                    }
-              }
+          <label
+            style={{
+              display: "block",
+              padding: "16px",
+              border: "1.5px dashed #b9a17f",
+              borderRadius: "8px",
+              backgroundColor: "#fbf6ec",
+              textAlign: "center",
+              cursor: "pointer",
+              marginBottom: "14px",
+            }}
+          >
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
             />
-          </div>
-        )}
+            <span style={{ display: "block", fontWeight: 600, fontSize: "13.5px", color: "#4a3423", wordBreak: "break-word" }}>
+              {selectedFile ? selectedFile.name : "Choose a photograph (JPEG, PNG, or WebP · max 5 MB)"}
+            </span>
+          </label>
 
-        <div style={{ marginBottom: "14px" }}>
-          <span style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "6px" }}>
-            Presentation Style
-          </span>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
-            {STYLE_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setStyle(opt.id)}
-                style={{
-                  textAlign: "left",
-                  padding: "8px 10px",
-                  borderRadius: "6px",
-                  border: style === opt.id ? "1.5px solid #6b4423" : "1px solid #d5c3a7",
-                  backgroundColor: style === opt.id ? "#efe2cc" : "#fbf6ec",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#362417" }}>{opt.label}</div>
-                <div style={{ fontSize: "11px", color: "#6d5742" }}>{opt.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
+          <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+            <defs>
+              <filter id="modal-paper-contour" x="-20%" y="-20%" width="140%" height="140%">
+                <feMorphology in="SourceAlpha" operator="dilate" radius="4" result="dilated" />
+                <feFlood floodColor="#fbf8f1" result="paperColor" />
+                <feComposite in="paperColor" in2="dilated" operator="in" result="paperBorder" />
+                <feMerge>
+                  <feMergeNode in="paperBorder" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+          </svg>
 
-        {style === "plain" && (
+          {previewUrl && (
+            <div style={{ marginBottom: "14px", textAlign: "center" }}>
+              <img
+                src={previewUrl}
+                alt="Selected photograph preview"
+                style={
+                  style === "plain"
+                    ? {
+                        maxHeight: "170px",
+                        maxWidth: "100%",
+                        objectFit: "contain",
+                        filter:
+                          borderlessContour === "paper"
+                            ? "url(#modal-paper-contour) drop-shadow(0 4px 10px rgba(24, 15, 8, 0.22))"
+                            : "none",
+                      }
+                    : {
+                        maxHeight: "170px",
+                        maxWidth: "100%",
+                        borderRadius: "4px",
+                        border: "4px solid #fbf8f1",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+                      }
+                }
+              />
+            </div>
+          )}
+
           <div style={{ marginBottom: "14px" }}>
             <span style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "6px" }}>
-              Borderless Edge
+              Presentation Style
             </span>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
-              {BORDERLESS_CONTOUR_OPTIONS.map((opt) => (
+              {STYLE_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setBorderlessContour(opt.id)}
+                  onClick={() => setStyle(opt.id)}
                   style={{
                     textAlign: "left",
                     padding: "8px 10px",
                     borderRadius: "6px",
-                    border: borderlessContour === opt.id ? "1.5px solid #6b4423" : "1px solid #d5c3a7",
-                    backgroundColor: borderlessContour === opt.id ? "#efe2cc" : "#fbf6ec",
+                    border: style === opt.id ? "1.5px solid #6b4423" : "1px solid #d5c3a7",
+                    backgroundColor: style === opt.id ? "#efe2cc" : "#fbf6ec",
                     cursor: "pointer",
                   }}
                 >
@@ -293,37 +311,77 @@ export function PhotoUploadModal({
               ))}
             </div>
           </div>
-        )}
 
-        <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "5px" }}>
-            Caption (Optional)
-          </label>
-          <input
-            type="text"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            maxLength={80}
-            placeholder="e.g., Autumn afternoon by the window"
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              borderRadius: "6px",
-              border: "1px solid #cbb695",
-              backgroundColor: "#fffdf8",
-              color: "#2c1e14",
-              fontSize: "13px",
-            }}
-          />
+          {style === "plain" && (
+            <div style={{ marginBottom: "14px" }}>
+              <span style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "6px" }}>
+                Borderless Edge
+              </span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" }}>
+                {BORDERLESS_CONTOUR_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setBorderlessContour(opt.id)}
+                    style={{
+                      textAlign: "left",
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      border: borderlessContour === opt.id ? "1.5px solid #6b4423" : "1px solid #d5c3a7",
+                      backgroundColor: borderlessContour === opt.id ? "#efe2cc" : "#fbf6ec",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div style={{ fontSize: "12.5px", fontWeight: 600, color: "#362417" }}>{opt.label}</div>
+                    <div style={{ fontSize: "11px", color: "#6d5742" }}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginBottom: error ? "14px" : "0" }}>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6e563d", marginBottom: "5px" }}>
+              Caption (Optional)
+            </label>
+            <input
+              type="text"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              maxLength={80}
+              placeholder="e.g., Autumn afternoon by the window"
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: "6px",
+                border: "1px solid #cbb695",
+                backgroundColor: "#fffdf8",
+                color: "#2c1e14",
+                fontSize: "13px",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {error && (
+            <div role="alert" style={{ padding: "8px 10px", borderRadius: "6px", backgroundColor: "#fbeaea", color: "#8c2626", fontSize: "12.5px" }}>
+              {error}
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div role="alert" style={{ marginBottom: "12px", padding: "8px 10px", borderRadius: "6px", backgroundColor: "#fbeaea", color: "#8c2626", fontSize: "12.5px" }}>
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+        <div
+          className="photo-upload-modal-footer"
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "10px",
+            padding: "14px 24px 18px",
+            borderTop: "1px solid rgba(203, 182, 149, 0.55)",
+            backgroundColor: "#f8f1e4",
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
