@@ -2,19 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import type { LetterFolder, LetterTheme, Notebook } from "@/lib/journal-storage";
-
-export interface GuestDraftLetterState {
-  titulo: string;
-  destinatario: string;
-  conteudo: string;
-  assinatura: string;
-  favoritado: boolean;
-  letterTheme: LetterTheme;
-  sheetBgId: string;
-  sheetBgColor: string;
-  fontFamilyId: string;
-}
+import type { Notebook } from "@/lib/journal-storage";
 
 interface GuestDemoContextType {
   guestNotebooks: Notebook[];
@@ -23,12 +11,6 @@ interface GuestDemoContextType {
   setGuestActiveNotebookId: React.Dispatch<React.SetStateAction<string>>;
   guestPinnedTheme: string;
   setGuestPinnedTheme: React.Dispatch<React.SetStateAction<string>>;
-  guestLetterFolders: LetterFolder[];
-  setGuestLetterFolders: React.Dispatch<React.SetStateAction<LetterFolder[]>>;
-  guestSelectedFolderId: string;
-  setGuestSelectedFolderId: React.Dispatch<React.SetStateAction<string>>;
-  guestDraftLetter: GuestDraftLetterState;
-  setGuestDraftLetter: React.Dispatch<React.SetStateAction<GuestDraftLetterState>>;
   resetGuestDemo: () => void;
 }
 
@@ -65,29 +47,6 @@ function createInitialGuestNotebooks(): Notebook[] {
   ];
 }
 
-function createInitialGuestFolders(): LetterFolder[] {
-  return [
-    {
-      id: "guest-folder-1",
-      nome: "Personal Notes",
-      cor: "marrom",
-      criadoEm: new Date().toISOString(),
-    },
-  ];
-}
-
-const INITIAL_GUEST_LETTER: GuestDraftLetterState = {
-  titulo: "",
-  destinatario: "",
-  conteudo: "",
-  assinatura: "",
-  favoritado: false,
-  letterTheme: "Love",
-  sheetBgId: "ivory",
-  sheetBgColor: "#FCFBF7",
-  fontFamilyId: "caveat",
-};
-
 const GuestDemoContext = createContext<GuestDemoContextType | null>(null);
 
 export function GuestDemoProvider({ children }: { children: ReactNode }) {
@@ -95,20 +54,11 @@ export function GuestDemoProvider({ children }: { children: ReactNode }) {
   const [guestNotebooks, setGuestNotebooks] = useState<Notebook[]>(createInitialGuestNotebooks);
   const [guestActiveNotebookId, setGuestActiveNotebookId] = useState<string>("guest-preview-journal");
   const [guestPinnedTheme, setGuestPinnedTheme] = useState<string>("");
-  const [guestLetterFolders, setGuestLetterFolders] = useState<LetterFolder[]>(
-    createInitialGuestFolders
-  );
-  const [guestSelectedFolderId, setGuestSelectedFolderId] = useState<string>("guest-folder-1");
-  const [guestDraftLetter, setGuestDraftLetter] =
-    useState<GuestDraftLetterState>(INITIAL_GUEST_LETTER);
 
   const resetGuestDemo = useCallback(() => {
     setGuestNotebooks(createInitialGuestNotebooks());
     setGuestActiveNotebookId("guest-preview-journal");
     setGuestPinnedTheme("");
-    setGuestLetterFolders(createInitialGuestFolders());
-    setGuestSelectedFolderId("guest-folder-1");
-    setGuestDraftLetter(INITIAL_GUEST_LETTER);
   }, []);
 
   // Ensure guest demonstration memory clears cleanly when a real user signs in
@@ -127,12 +77,6 @@ export function GuestDemoProvider({ children }: { children: ReactNode }) {
         setGuestActiveNotebookId,
         guestPinnedTheme,
         setGuestPinnedTheme,
-        guestLetterFolders,
-        setGuestLetterFolders,
-        guestSelectedFolderId,
-        setGuestSelectedFolderId,
-        guestDraftLetter,
-        setGuestDraftLetter,
         resetGuestDemo,
       }}
     >

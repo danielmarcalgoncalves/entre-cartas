@@ -7,7 +7,6 @@ const fs = require('fs');
 const { initDb } = require('./src/config/database');
 
 const authRoutes = require('./src/routes/authRoutes');
-const cartasRoutes = require('./src/routes/cartasRoutes');
 const moviesRoutes = require('./src/routes/moviesRoutes');
 const favoritesRoutes = require('./src/routes/favoritesRoutes');
 const commentsRoutes = require('./src/routes/commentsRoutes');
@@ -73,7 +72,6 @@ app.use('/api/stripe', stripeRoutes);
 app.use(express.json({ limit: '1mb' }));
 
 // Rotas da API
-app.use('/api/cartas', cartasRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/movies', moviesRoutes);
 app.use('/api/favorites', favoritesRoutes);
@@ -94,7 +92,7 @@ app.get('/api/admin/logs', authMiddleware, requireAdmin, adminController.getLogs
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    app: 'Entre Cartas — Arquivo Epistolar',
+    app: 'Between Letters — Personal Digital Journal',
     discipline: 'Computação em Nuvem / Professor @siriani',
     timestamp: new Date().toISOString()
   });
@@ -117,6 +115,16 @@ if (fs.existsSync(path.join(publicPath, 'index.html'))) {
 if (staticPath) {
   // Never expose predictable /admin or /admin.html path
   app.get(['/admin', '/admin.html', '/admin/*'], (req, res) => {
+    const notFoundHtml = path.join(staticPath, '404.html');
+    res.status(404);
+    if (fs.existsSync(notFoundHtml)) {
+      return res.sendFile(notFoundHtml);
+    }
+    return res.send('Not Found');
+  });
+
+  // Decommissioned Letters routes must return 404 instead of falling back to index.html
+  app.get(['/letters', '/letters.html', '/letters/*'], (req, res) => {
     const notFoundHtml = path.join(staticPath, '404.html');
     res.status(404);
     if (fs.existsSync(notFoundHtml)) {
@@ -149,15 +157,14 @@ if (staticPath) {
 } else {
   app.get('/', (req, res) => {
     res.json({
-      message: 'API do Entre Cartas está rodando!',
+      message: 'API do Between Letters está rodando!',
       endpoints: {
-        cartas: '/api/cartas',
-        categorias: '/api/cartas/categorias',
+        journal: '/api/journal/notebooks',
         auth: '/api/auth',
         stripe: '/api/stripe',
         health: '/api/health'
       },
-      note: 'Frontend disponível em ambiente de desenvolvimento via Vite ou em produção após build.'
+      note: 'Frontend disponível em ambiente de desenvolvimento via Next.js ou em produção após build.'
     });
   });
 }
@@ -167,7 +174,7 @@ const PORT = process.env.PORT || process.env.RESERVED_PORT || 3000;
 function startServer() {
   app.listen(PORT, () => {
     console.log('====================================================');
-    console.log(`💌 Entre Cartas — Arquivo Epistolar & Scrapbook`);
+    console.log(`📓 Between Letters — Personal Digital Journal`);
     console.log(`👨‍🏫 Disciplina do Professor: @siriani`);
     console.log(`🚀 Servidor rodando na porta: ${PORT}`);
     console.log(`🌐 Acesse em: http://localhost:${PORT}`);

@@ -30,6 +30,10 @@ function handleJournalPhotoUploadMiddleware(req, res, next) {
   });
 }
 
+router.all(['/folders', '/folders/*'], (_req, res) => {
+  res.status(404).json({ error: 'API route not found' });
+});
+
 router.use(authMiddleware);
 
 router.get('/notebooks', journalController.listNotebooks);
@@ -37,9 +41,5 @@ router.put('/notebooks/:clientId', journalController.upsertNotebook);
 router.delete('/notebooks/:clientId', journalController.deleteNotebook);
 router.post('/notebooks/:clientId/media', uploadRateLimiter, handleJournalPhotoUploadMiddleware, journalController.uploadJournalPhoto);
 router.get('/media/:usuarioId/:notebookId/:filename', journalController.getJournalMedia);
-
-router.get('/folders', journalController.listFolders);
-router.put('/folders/:clientId', journalController.upsertFolder);
-router.delete('/folders/:clientId', journalController.deleteFolder);
 
 module.exports = router;

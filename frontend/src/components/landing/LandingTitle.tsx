@@ -60,7 +60,7 @@ export const LandingTitle = forwardRef<HTMLElement, LandingTitleProps>(
         </div>
 
         {/* Sketched Hand-Drawn Title */}
-        <div className="sketch-title-wrapper" title="Between Letters — Arquivo Epistolar">
+        <div className="sketch-title-wrapper" title="Between Letters — Personal Digital Journal">
           <h1 className="sketch-title" data-text={title}>
             {title.split("").map((char, idx) => (
               <span

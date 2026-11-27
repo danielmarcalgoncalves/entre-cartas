@@ -433,16 +433,16 @@ export function ScrapbookLayer({
                   onPointerDown={(e) => startDragAttachment(e, att, "rotate")}
                   style={{
                     position: "absolute",
-                    top: "-26px",
+                    top: "-28px",
                     left: "50%",
                     transform: "translateX(-50%)",
-                    width: "20px",
-                    height: "20px",
+                    width: "24px",
+                    height: "24px",
                     borderRadius: "999px",
                     backgroundColor: "#fdf7eb",
                     border: "1.5px solid #6b4423",
                     color: "#6b4423",
-                    fontSize: "11px",
+                    fontSize: "12px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -454,16 +454,50 @@ export function ScrapbookLayer({
                 </button>
                 <button
                   type="button"
+                  aria-label="Remove photograph"
+                  title="Remove photograph"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChangeAttachments?.(
+                      attachments.filter((a) => a.id !== att.id),
+                      true
+                    );
+                    onSelectItem?.(null);
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: "-11px",
+                    right: "-11px",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "999px",
+                    backgroundColor: "#8c2626",
+                    border: "1.5px solid #fdf7eb",
+                    color: "#fdf7eb",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    touchAction: "none",
+                  }}
+                >
+                  ✕
+                </button>
+                <button
+                  type="button"
                   aria-label="Resize photograph"
                   title="Drag to resize"
                   onPointerDown={(e) => startDragAttachment(e, att, "resize")}
                   style={{
                     position: "absolute",
-                    right: "-9px",
-                    bottom: "-9px",
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "4px",
+                    right: "-10px",
+                    bottom: "-10px",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "5px",
                     backgroundColor: "#fdf7eb",
                     border: "1.5px solid #6b4423",
                     cursor: "nwse-resize",
@@ -526,16 +560,16 @@ export function ScrapbookLayer({
                   onPointerDown={(e) => startDragSticker(e, stk, "rotate")}
                   style={{
                     position: "absolute",
-                    top: "-26px",
+                    top: "-28px",
                     left: "50%",
                     transform: "translateX(-50%)",
-                    width: "20px",
-                    height: "20px",
+                    width: "24px",
+                    height: "24px",
                     borderRadius: "999px",
                     backgroundColor: "#fdf7eb",
                     border: "1.5px solid #6b4423",
                     color: "#6b4423",
-                    fontSize: "11px",
+                    fontSize: "12px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -547,16 +581,50 @@ export function ScrapbookLayer({
                 </button>
                 <button
                   type="button"
+                  aria-label="Remove sticker"
+                  title="Remove sticker"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChangeStickers?.(
+                      stickers.filter((s) => s.id !== stk.id),
+                      true
+                    );
+                    onSelectItem?.(null);
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: "-11px",
+                    right: "-11px",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "999px",
+                    backgroundColor: "#8c2626",
+                    border: "1.5px solid #fdf7eb",
+                    color: "#fdf7eb",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    touchAction: "none",
+                  }}
+                >
+                  ✕
+                </button>
+                <button
+                  type="button"
                   aria-label="Resize sticker"
                   title="Drag to resize"
                   onPointerDown={(e) => startDragSticker(e, stk, "resize")}
                   style={{
                     position: "absolute",
-                    right: "-9px",
-                    bottom: "-9px",
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "4px",
+                    right: "-10px",
+                    bottom: "-10px",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "5px",
                     backgroundColor: "#fdf7eb",
                     border: "1.5px solid #6b4423",
                     cursor: "nwse-resize",

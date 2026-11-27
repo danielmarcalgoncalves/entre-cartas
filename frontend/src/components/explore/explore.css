@@ -1,6 +1,6 @@
 /* ============================================================================
-   BETWEEN LETTERS — JOURNAL & LETTERS INTRODUCTION EXPERIENCE (/explore)
-   Lightweight, pure-CSS editorial showcase & authentic interface previews
+   BETWEEN LETTERS — JOURNAL INTRODUCTION EXPERIENCE (/explore)
+   Lightweight, pure-CSS editorial showcase & authentic interface preview
    ============================================================================ */
 
 .explore-page-wrap {
@@ -221,7 +221,7 @@
 }
 
 /* --------------------------------------------------------------------------
-   3. FEATURE SECTIONS (MY JOURNAL & MY LETTERS)
+   3. FEATURE SECTION (MY JOURNAL)
    -------------------------------------------------------------------------- */
 .explore-feature-section {
   max-width: 1160px;
@@ -520,133 +520,6 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   border-radius: 2px;
-}
-
-/* Letters Mock Preview */
-.preview-letter-desk {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.preview-letter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 5px;
-  background: rgba(255, 248, 234, 0.05);
-  border: 1px solid rgba(207, 169, 111, 0.22);
-}
-
-.preview-letter-bar-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--sans, sans-serif);
-  font-size: 9.5px;
-  color: #dfd0b4;
-}
-
-.preview-letter-chip {
-  padding: 3px 8px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(207, 169, 111, 0.26);
-  color: #efe4cf;
-}
-
-.preview-letter-seal-btn {
-  padding: 4px 10px;
-  border-radius: 3px;
-  background: #8b2620;
-  color: #fcf3e4;
-  font-family: var(--sans, sans-serif);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.preview-stationery-sheet {
-  position: relative;
-  background: #fcfbf7;
-  border-radius: 3px;
-  padding: 20px 22px;
-  color: #262626;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
-}
-
-.preview-stationery-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 10px;
-}
-
-.preview-stationery-date {
-  font-family: var(--sans, sans-serif);
-  font-size: 10px;
-  color: #8b7961;
-}
-
-.preview-postmark-box {
-  width: 58px;
-  padding: 4px;
-  border: 1.5px solid #962b24;
-  color: #962b24;
-  text-align: center;
-  font-family: var(--sans, monospace);
-  transform: rotate(3deg);
-}
-
-.preview-postmark-box span {
-  display: block;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-}
-
-.preview-postmark-box strong {
-  display: block;
-  font-size: 8.5px;
-  margin: 2px 0;
-}
-
-.preview-stationery-subject {
-  font-family: var(--serif, "Playfair Display", Georgia, serif);
-  font-size: 17px;
-  font-weight: 600;
-  color: #22160c;
-  margin-bottom: 6px;
-}
-
-.preview-stationery-to {
-  font-family: var(--serif, Georgia, serif);
-  font-size: 13.5px;
-  font-style: italic;
-  color: #6b533b;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px dashed rgba(135, 108, 76, 0.3);
-}
-
-.preview-stationery-body {
-  font-family: "Caveat", cursive, var(--serif, Georgia, serif);
-  font-size: 17px;
-  line-height: 1.5;
-  color: #2c241c;
-  margin-bottom: 12px;
-}
-
-.preview-stationery-sign {
-  text-align: right;
-  font-family: var(--serif, Georgia, serif);
-  font-size: 13.5px;
-  font-style: italic;
-  color: #5d452e;
 }
 
 /* --------------------------------------------------------------------------

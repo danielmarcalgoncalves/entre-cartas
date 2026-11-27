@@ -6,8 +6,8 @@
 /* 1. Desktop Workspace Grid & Natural Vertical Scrolling */
 @media (min-width: 769px) {
   .site-wrap--journal-route .site-main {
-    max-width: 1220px;
-    width: 100%;
+    width: calc(100% - clamp(28px, 3.6vw, 68px));
+    max-width: 1380px;
   }
 }
 
@@ -16,22 +16,40 @@
   min-height: 100dvh;
   overflow-x: visible;
   overflow-y: visible;
-  padding: 16px 16px 68px;
+  padding: clamp(12px, 1.8vh, 20px) clamp(12px, 1.8vw, 24px) 68px;
 }
 
 .writing-desk-wrap:not(.is-mobile-journal) .writing-desk-container {
   display: grid;
-  grid-template-columns: 204px minmax(0, 580px) 190px;
+  grid-template-columns: minmax(196px, 1fr) minmax(0, 580px) minmax(196px, 1fr);
   justify-content: center;
   align-items: start;
-  gap: 22px;
-  max-width: 1120px;
+  gap: clamp(28px, 2.6vw, 44px);
+  max-width: 1320px;
   width: 100%;
   margin: 0 auto;
 }
 
-.writing-desk-wrap:not(.is-mobile-journal) .desk-left-col,
+.writing-desk-wrap:not(.is-mobile-journal) .desk-left-col {
+  width: 100%;
+  max-width: 310px;
+  min-width: 0;
+  justify-self: end;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: calc(100dvh - 40px);
+  padding-top: 0 !important;
+  margin-top: 46px !important;
+  gap: clamp(10px, 1.6vh, 16px);
+  align-self: start;
+  will-change: transform;
+}
+
 .writing-desk-wrap:not(.is-mobile-journal) .desk-right-col {
+  width: 100%;
+  max-width: 240px;
+  min-width: 0;
+  justify-self: start;
   min-height: 0 !important;
   height: auto !important;
   padding-top: 0 !important;
@@ -152,17 +170,41 @@
   background-position: 0 0 !important;
 }
 
-/* Narrower Desktop Breakpoint: keep 580x820 paper centered with intact proportions */
-@media (max-width: 1060px) and (min-width: 769px) {
+/* Narrower Desktop & Tablet Breakpoint (769px..1210px):
+   Keep the centered Mode Toolbar + 580x820 paper first, with the two side studios organized below it */
+@media (max-width: 1210px) and (min-width: 769px) {
   .writing-desk-wrap:not(.is-mobile-journal) .writing-desk-container {
-    grid-template-columns: 1fr;
-    max-width: 640px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-width: 700px;
+    gap: 18px;
   }
 
-  .writing-desk-wrap:not(.is-mobile-journal) .desk-left-col,
+  .writing-desk-wrap:not(.is-mobile-journal) .desk-center-col {
+    grid-column: 1 / -1;
+    order: 1;
+    margin: 0 auto;
+  }
+
+  .writing-desk-wrap:not(.is-mobile-journal) .desk-left-col {
+    order: 2;
+    max-width: 100%;
+    max-height: none;
+    justify-self: stretch;
+    min-height: auto !important;
+    padding-top: 0 !important;
+    margin-top: 8px !important;
+    transform: none !important;
+  }
+
   .writing-desk-wrap:not(.is-mobile-journal) .desk-right-col {
-    min-height: auto;
-    padding-top: 0;
+    order: 3;
+    max-width: 100%;
+    max-height: none;
+    justify-self: stretch;
+    min-height: auto !important;
+    padding-top: 0 !important;
+    margin-top: 8px !important;
+    transform: none !important;
   }
 }
 

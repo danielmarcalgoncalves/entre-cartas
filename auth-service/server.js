@@ -406,7 +406,7 @@ function buildStationeryEmailLayout({ preheader, bodyHtml }) {
             <td>
               <div style="text-align: center; margin-bottom: 32px; border-bottom: 1px solid #e5dac6; padding-bottom: 18px;">
                 <span style="font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #8c775c; display: block; margin-bottom: 6px;">
-                  ✦ EPISTOLARY ARCHIVE ✦
+                  ✦ PERSONAL JOURNAL SANCTUARY ✦
                 </span>
                 <span style="font-size: 22px; font-weight: normal; letter-spacing: 1.5px; color: #2d2319; font-family: Georgia, 'Times New Roman', serif;">
                   BETWEEN LETTERS
@@ -443,7 +443,7 @@ async function sendWelcomeEmail(email, nome) {
       Some thoughts deserve a place to stay.
     </p>
     <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 18px 0;">
-      Welcome to <strong>Between Letters</strong> — a quiet space created for your memories, reflections, letters, and stories.
+      Welcome to <strong>Between Letters</strong> — a quiet space created for your memories, reflections, journals, and stories.
     </p>
     <p style="font-size: 15px; line-height: 1.75; color: #433526; margin: 0 0 18px 0;">
       Your personal journal is ready whenever you are.
@@ -462,7 +462,7 @@ async function sendWelcomeEmail(email, nome) {
     </p>
   `;
 
-  const textContent = `Dear ${safeName},\n\nSome thoughts deserve a place to stay.\n\nWelcome to Between Letters — a quiet space created for your memories, reflections, letters, and stories.\n\nYour personal journal is ready whenever you are.\n\nTake your time. Write freely. Keep what matters.\n\nOpen your desk: ${deskUrl}\n\nWith warmth,\nBetween Letters`;
+  const textContent = `Dear ${safeName},\n\nSome thoughts deserve a place to stay.\n\nWelcome to Between Letters — a quiet space created for your memories, reflections, journals, and stories.\n\nYour personal journal is ready whenever you are.\n\nTake your time. Write freely. Keep what matters.\n\nOpen your desk: ${deskUrl}\n\nWith warmth,\nBetween Letters`;
 
   return sendTransactionalEmail({
     toEmail: email,
@@ -545,7 +545,7 @@ async function sendVerificationEmail(email, nome, codigo) {
       </p>
     </div>
     <p style="font-size: 13px; line-height: 1.6; color: #6e5c46; margin: 0 0 18px 0;">
-      If you did not request this code, you may safely disregard this letter.
+      If you did not request this code, you may safely disregard this message.
     </p>
     <p style="font-size: 15px; line-height: 1.7; color: #2d2319; margin: 24px 0 0 0;">
       With warmth,<br />

@@ -184,6 +184,7 @@ export function InteractiveNotebook() {
 
   const [bookState, setBookState] = useState<BookState>("closed");
   const [spreadIndex, setSpreadIndex] = useState(0);
+  const [mobileSpreadSide, setMobileSpreadSide] = useState<"left" | "right">("left");
   const [isAnimating, setIsAnimating] = useState(false);
   const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -194,6 +195,7 @@ export function InteractiveNotebook() {
     pageHeight: CANONICAL_PAGE_HEIGHT,
     scale: 1,
     closedScale: 1,
+    isSinglePageView: false,
     ready: false,
   });
 
@@ -201,6 +203,7 @@ export function InteractiveNotebook() {
   const videoBusyRef = useRef(false);
   const busyCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spreadIndexRef = useRef(0);
+  const mobileSpreadSideRef = useRef<"left" | "right">("left");
   const bookStateRef = useRef<BookState>("closed");
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -239,6 +242,10 @@ export function InteractiveNotebook() {
   }, [spreadIndex]);
 
   useEffect(() => {
+    mobileSpreadSideRef.current = mobileSpreadSide;
+  }, [mobileSpreadSide]);
+
+  useEffect(() => {
     bookStateRef.current = bookState;
   }, [bookState]);
 
@@ -274,12 +281,15 @@ export function InteractiveNotebook() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const aspect = CANONICAL_PAGE_WIDTH / CANONICAL_PAGE_HEIGHT;
+      const isSinglePageView = vw < 640;
 
-      const controlsReserve = vh < 660 ? 110 : 146;
-      const verticalBreathing = vh < 660 ? 28 : 56;
-      const horizontalMargin = vw < 520 ? 22 : vw < 900 ? 48 : 112;
+      const controlsReserve = vh < 660 ? 116 : 146;
+      const verticalBreathing = vh < 660 ? 24 : 52;
+      const horizontalMargin = isSinglePageView ? 28 : vw < 900 ? 48 : 112;
 
-      const maxSingleWidth = (vw - horizontalMargin) / 2;
+      const maxSingleWidth = isSinglePageView
+        ? vw - horizontalMargin
+        : (vw - horizontalMargin) / 2;
       const maxBookHeight = vh - controlsReserve - verticalBreathing;
 
       let pageHeight = Math.min(640, maxBookHeight, maxSingleWidth / aspect);
@@ -288,13 +298,18 @@ export function InteractiveNotebook() {
       pageHeight = Math.round(pageHeight);
 
       const scale = pageWidth / CANONICAL_PAGE_WIDTH;
-      const closedScale = vw < 580 ? Math.min(1.26, Math.max(1, (vw - 68) / pageWidth)) : 1;
+      const closedScale = isSinglePageView
+        ? Math.min(1.04, Math.max(0.92, (vw - 36) / Math.max(1, pageWidth)))
+        : vw < 768
+        ? Math.min(1.16, Math.max(1, (vw - 68) / Math.max(1, pageWidth)))
+        : 1;
 
       setMetrics({
         pageWidth,
         pageHeight,
         scale,
         closedScale,
+        isSinglePageView,
         ready: true,
       });
     };
@@ -303,6 +318,12 @@ export function InteractiveNotebook() {
     window.addEventListener("resize", computeSize);
     return () => window.removeEventListener("resize", computeSize);
   }, []);
+
+  const openShiftX = metrics.isSinglePageView
+    ? mobileSpreadSide === "left"
+      ? metrics.pageWidth
+      : 0
+    : metrics.pageWidth / 2;
 
   const {
     applyPostureImmediate,
@@ -321,6 +342,8 @@ export function InteractiveNotebook() {
     pageWidth: metrics.pageWidth,
     closedScale: metrics.closedScale,
     prefersReducedMotion,
+    openShiftX,
+    isSinglePageView: metrics.isSinglePageView,
   });
 
   // Sync resting transforms when metrics update
@@ -356,6 +379,8 @@ export function InteractiveNotebook() {
     isAnimatingRef.current = true;
     setVideoBusy(true);
     setIsAnimating(true);
+    mobileSpreadSideRef.current = "left";
+    setMobileSpreadSide("left");
     setBookState("opening");
 
     runOpeningSequence(() => {
@@ -398,6 +423,8 @@ export function InteractiveNotebook() {
     runClosingSequence(() => {
       spreadIndexRef.current = 0;
       setSpreadIndex(0);
+      mobileSpreadSideRef.current = "left";
+      setMobileSpreadSide("left");
       setBookState("closed");
       isAnimatingRef.current = false;
       setIsAnimating(false);
@@ -499,19 +526,83 @@ export function InteractiveNotebook() {
     [prefersReducedMotion, setVideoBusy, getRightZ, getLeftZ]
   );
 
+  const glideMobileRigSide = useCallback(
+    (targetSide: "left" | "right") => {
+      mobileSpreadSideRef.current = targetSide;
+      setMobileSpreadSide(targetSide);
+      if (bookRigRef.current) {
+        gsap.to(bookRigRef.current, {
+          x: targetSide === "left" ? metrics.pageWidth : 0,
+          duration: prefersReducedMotion ? 0.14 : 0.42,
+          ease: "power2.inOut",
+        });
+      }
+    },
+    [metrics.pageWidth, prefersReducedMotion]
+  );
+
   const handleTurnNext = useCallback(() => {
+    if (bookStateRef.current !== "open" || isAnimatingRef.current) return;
+
+    if (metrics.isSinglePageView) {
+      if (mobileSpreadSideRef.current === "left") {
+        const hasRightPageOnCurrentSpread =
+          spreadIndexRef.current < totalSpreads - 1 ||
+          Boolean(finalRightPage) ||
+          showBlankContinuationPage;
+        if (hasRightPageOnCurrentSpread) {
+          playPaperSound();
+          glideMobileRigSide("right");
+          return;
+        }
+        handleCloseNotebook();
+        return;
+      }
+
+      if (spreadIndexRef.current < totalSpreads - 1) {
+        glideMobileRigSide("left");
+        animateLeafTurn(spreadIndexRef.current, "forward");
+      } else {
+        handleCloseNotebook();
+      }
+      return;
+    }
+
     if (spreadIndexRef.current < totalSpreads - 1) {
       animateLeafTurn(spreadIndexRef.current, "forward");
     } else if (bookStateRef.current === "open") {
       handleCloseNotebook();
     }
-  }, [animateLeafTurn, totalSpreads, handleCloseNotebook]);
+  }, [
+    metrics.isSinglePageView,
+    totalSpreads,
+    finalRightPage,
+    showBlankContinuationPage,
+    glideMobileRigSide,
+    animateLeafTurn,
+    handleCloseNotebook,
+  ]);
 
   const handleTurnPrev = useCallback(() => {
+    if (bookStateRef.current !== "open" || isAnimatingRef.current) return;
+
+    if (metrics.isSinglePageView) {
+      if (mobileSpreadSideRef.current === "right") {
+        playPaperSound();
+        glideMobileRigSide("left");
+        return;
+      }
+      if (spreadIndexRef.current > 0) {
+        glideMobileRigSide("right");
+        animateLeafTurn(spreadIndexRef.current - 1, "backward");
+      }
+      return;
+    }
+
     if (spreadIndexRef.current > 0) {
       animateLeafTurn(spreadIndexRef.current - 1, "backward");
     }
-  }, [animateLeafTurn]);
+  }, [metrics.isSinglePageView, glideMobileRigSide, animateLeafTurn]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -576,8 +667,15 @@ export function InteractiveNotebook() {
     }
   };
 
-  const canGoPrev = bookState === "open" && spreadIndex > 0;
-  const canGoNext = bookState === "open" && spreadIndex < totalSpreads - 1;
+  const canGoPrev =
+    bookState === "open" &&
+    (spreadIndex > 0 || (metrics.isSinglePageView && mobileSpreadSide === "right"));
+  const canGoNext =
+    bookState === "open" &&
+    (spreadIndex < totalSpreads - 1 ||
+      (metrics.isSinglePageView &&
+        mobileSpreadSide === "left" &&
+        (Boolean(finalRightPage) || showBlankContinuationPage)));
 
   const navigateToEditor = () => {
     try {
@@ -865,6 +963,13 @@ export function InteractiveNotebook() {
                   className={`nb-hit-zone nb-hit-zone--left ${
                     canGoPrev ? "nb-hit-zone--active" : "nb-hit-zone--bound"
                   }`}
+                  style={
+                    metrics.isSinglePageView
+                      ? mobileSpreadSide === "left"
+                        ? { left: "-100%", width: "42%" }
+                        : { left: "0%", width: "42%" }
+                      : undefined
+                  }
                   onClick={handleTurnPrev}
                   onMouseEnter={() => canGoPrev && setHoverSide("left")}
                   onMouseLeave={() => setHoverSide(null)}
@@ -882,6 +987,13 @@ export function InteractiveNotebook() {
                 <button
                   type="button"
                   className="nb-hit-zone nb-hit-zone--right nb-hit-zone--active"
+                  style={
+                    metrics.isSinglePageView
+                      ? mobileSpreadSide === "left"
+                        ? { left: "-58%", width: "58%" }
+                        : { left: "42%", width: "58%" }
+                      : undefined
+                  }
                   onClick={handleTurnNext}
                   onMouseEnter={() => setHoverSide("right")}
                   onMouseLeave={() => setHoverSide(null)}

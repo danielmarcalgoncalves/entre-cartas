@@ -414,7 +414,7 @@ export default function AuthCard({
               <p className="bl-auth-subtitle">
                 {mode === "login" && "\u201CYour stories are waiting for you.\u201D"}
                 {mode === "register" &&
-                  "\u201CCreate a space for your thoughts, memories, and letters.\u201D"}
+                  "\u201CCreate a space for your thoughts, memories, and journals.\u201D"}
                 {mode === "forgot" &&
                   "\u201CLeave us your email address and we'll send you a link to create a new password.\u201D"}
                 {mode === "reset" &&
@@ -684,7 +684,7 @@ export default function AuthCard({
                     {showTermsNote && (
                       <div className="bl-auth-terms-box">
                         <strong>Privacy &amp; Sanctuary Pledge:</strong> Your journals,
-                        letters, and personal reflections belong solely to you. Passwords
+                        journals, and personal reflections belong solely to you. Passwords
                         are hashed with bcrypt, sessions are protected with encrypted
                         tokens, and your private entries are never shared or sold.
                       </div>

@@ -113,62 +113,6 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}, 
 }
 
 export const api = {
-  cartas: {
-    listar: (params?: { categoria?: string; tipo_papel?: string; q?: string; ordem?: string; page?: number; limit?: number }) => {
-      const searchParams = new URLSearchParams();
-      if (params?.categoria && params.categoria !== 'todas' && params.categoria !== 'all') {
-        searchParams.append('categoria', params.categoria);
-      }
-      if (params?.tipo_papel && params.tipo_papel !== 'todos') {
-        searchParams.append('tipo_papel', params.tipo_papel);
-      }
-      if (params?.q) searchParams.append('q', params.q);
-      if (params?.ordem) searchParams.append('ordem', params.ordem);
-      if (params?.page) searchParams.append('page', String(params.page));
-      if (params?.limit) searchParams.append('limit', String(params.limit));
-
-      const qs = searchParams.toString();
-      return apiRequest(`/cartas${qs ? `?${qs}` : ''}`);
-    },
-    obter: (id: string | number) => apiRequest(`/cartas/${id}`),
-    carimbar: (id: string | number, tipo_carimbo = 'LIDA') =>
-      apiRequest(`/cartas/${id}/carimbar`, {
-        method: 'POST',
-        body: JSON.stringify({ tipo_carimbo }),
-      }),
-    descarimbar: (id: string | number) =>
-      apiRequest(`/cartas/${id}/carimbar`, {
-        method: 'DELETE',
-      }),
-    guardadas: () => apiRequest('/cartas/guardadas'),
-    minhas: () => apiRequest('/cartas/minhas'),
-    categorias: () => apiRequest('/cartas/categorias'),
-    enviar: (dados: any) =>
-      apiRequest('/cartas', {
-        method: 'POST',
-        body: JSON.stringify(dados),
-      }),
-    atualizar: (id: string | number, dados: any) =>
-      apiRequest(`/cartas/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(dados),
-      }),
-    excluir: (id: string | number) =>
-      apiRequest(`/cartas/${id}`, {
-        method: 'DELETE',
-      }),
-    setTrash: (id: string | number, na_lixeira: boolean) =>
-      apiRequest(`/cartas/${id}/trash`, {
-        method: 'PATCH',
-        body: JSON.stringify({ na_lixeira }),
-      }),
-    adicionarNota: (id: string | number, texto: string) =>
-      apiRequest(`/cartas/${id}/notas`, {
-        method: 'POST',
-        body: JSON.stringify({ texto }),
-      }),
-  },
-
   journal: {
     listNotebooks: () => apiRequest('/journal/notebooks'),
     upsertNotebook: (clientId: string, dados: { nome: string; corCapa: string; paginas: any[] }) =>
@@ -216,16 +160,6 @@ export const api = {
       }
       return data;
     },
-    listFolders: () => apiRequest('/journal/folders'),
-    upsertFolder: (clientId: string, dados: { nome: string; cor?: string }) =>
-      apiRequest(`/journal/folders/${encodeURIComponent(clientId)}`, {
-        method: 'PUT',
-        body: JSON.stringify(dados),
-      }),
-    deleteFolder: (clientId: string) =>
-      apiRequest(`/journal/folders/${encodeURIComponent(clientId)}`, {
-        method: 'DELETE',
-      }),
   },
 
   auth: {

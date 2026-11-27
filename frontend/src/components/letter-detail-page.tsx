@@ -128,11 +128,11 @@ export function LetterDetailPage({ id }: { id: string }) {
         </button>
 
         <Link
-          href="/#journal-main-heading"
+          href="/journal"
           className="primary-cta"
           style={{ background: "#223a70", boxShadow: "0 3px 0 #142447, 0 8px 18px rgba(34,58,112,.2)" }}
         >
-          <span>Write in my journal from this letter</span>
+          <span>Write in my journal from this inspiration</span>
           <span className="cta-arrow" aria-hidden="true">↗</span>
         </Link>
 

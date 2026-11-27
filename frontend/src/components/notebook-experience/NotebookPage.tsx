@@ -284,7 +284,7 @@ export function PressedBotanicalsPage() {
 }
 
 /**
- * Spread 1 · Right Page (Page 03 — Secret Correspondence & Leather Folders)
+ * Spread 1 · Right Page (Page 03 — Tactile Paper & Leather Volumes)
  */
 export function SecretCorrespondencePage() {
   return (
@@ -300,27 +300,21 @@ export function SecretCorrespondencePage() {
         </svg>
       </div>
 
-      <span className="nb-kicker">EPISTOLARY ARCHIVE · SEALED LETTERS</span>
-      <h3 className="nb-serif-page-title">Words Meant for Envelopes</h3>
+      <span className="nb-kicker">PERSONAL ARCHIVE · HANDWRITTEN VOLUMES</span>
+      <h3 className="nb-serif-page-title">Pages Bound in Quietude</h3>
 
-      {/* Miniature tactile envelope illustration */}
       <div className="nb-mini-envelope-card">
-        <div className="nb-mini-envelope">
-          <div className="nb-mini-envelope__flap" />
-          <span className="nb-mini-envelope__seal">✦</span>
-          <span className="nb-mini-envelope__postmark">SLOW MAIL</span>
-        </div>
         <div className="nb-mini-envelope-caption">
           <p className="nb-typewriter-quote">
-            “Some confessions belong in a sealed envelope, shielded from the
+            “Some thoughts belong on ruled cotton paper, shielded from the
             rush of timelines.”
           </p>
         </div>
       </div>
 
       <p className="nb-hand-paragraph">
-        Letters written here can be folded, stamped with affective postmarks,
-        and organized inside three-dimensional correspondence folders:
+        Every volume pairs ink tones, photographic cutouts, and keepsake stamps
+        inside handcrafted leather bindings:
       </p>
 
       {/* Three allowed leather color swatches matching AGENTS.md */}
@@ -503,8 +497,8 @@ export function ColophonSanctuaryPage() {
             <span>Pure artisan covers embossed in gold with silk ribbons.</span>
           </li>
           <li>
-            <strong>II. Sealed Correspondence</strong>
-            <span>Fold personal letters into 3D leather folders.</span>
+            <strong>II. Dual Creative &amp; Writing Modes</strong>
+            <span>Switch effortlessly between layered collage and pure prose.</span>
           </li>
           <li>
             <strong>III. Unhurried Privacy</strong>

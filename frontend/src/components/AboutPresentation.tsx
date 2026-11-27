@@ -55,13 +55,13 @@ export default function AboutPresentation() {
           </p>
 
           <p className="about-paragraph">
-            Personal letters can be folded, sealed, and grouped into{" "}
+            Switch seamlessly between{" "}
             <TextHighlight variant="olive">
-              three-dimensional correspondence folders
+              creative scrapbook editing and distraction-free writing
             </TextHighlight>
-            . And should you ever change your mind, our vintage postal discard receptacle keeps
-            discarded pages safe in soft deletion — ready to be restored to their original folder
-            or gently laid to rest.
+            . Place keepsake photographs, botanical stickers, and marginal notes on every sheet,
+            then open your bound volume in interactive 3D whenever you wish to turn through
+            what you&apos;ve kept.
           </p>
         </div>
 
@@ -91,37 +91,37 @@ export default function AboutPresentation() {
               </div>
             </div>
 
-            {/* Feature 2: Epistolary Folders */}
+            {/* Feature 2: Dual Editing & Scrapbook Modes */}
             <div className="feature-item">
               <div className="feature-icon-badge" aria-hidden="true">
                 <span>02</span>
               </div>
-              <h4 className="feature-heading">Correspondence Folders</h4>
+              <h4 className="feature-heading">Dual Edit &amp; Writing Modes</h4>
               <p className="feature-description">
-                Organize letters into physical 3D archival folders. Fold, wax-seal,
-                and browse letters with smooth tactile transitions and drag-and-drop actions.
+                Write naturally line-by-line in distraction-free Writing Mode, or switch to
+                Edit Mode on the exact same sheet to place keepsake photos and stickers.
               </p>
               <div className="feature-meta">
-                <span>3 Folders (Free) / 10 (Pro)</span>
+                <span>Shared 2D sheet geometry</span>
                 <span className="feature-bullet">•</span>
-                <span>3D opened desk view</span>
+                <span>Focus Mode ready</span>
               </div>
             </div>
 
-            {/* Feature 3: Postal Discard Bin */}
+            {/* Feature 3: Interactive 3D Reading */}
             <div className="feature-item">
               <div className="feature-icon-badge" aria-hidden="true">
                 <span>03</span>
               </div>
-              <h4 className="feature-heading">Postal Discard Receptacle</h4>
+              <h4 className="feature-heading">3D Interactive Journal View</h4>
               <p className="feature-description">
-                A metal postal bin reflecting real discard volume across 3 visual states.
-                Letters are soft-deleted and can be read, restored, or permanently removed at will.
+                Reopen any leather-bound journal volume as a tactile 3D book with realistic
+                page turning, preserved photography, and faithful ink rendering.
               </p>
               <div className="feature-meta">
-                <span>Dynamic fullness states</span>
+                <span>Real page-turn physics</span>
                 <span className="feature-bullet">•</span>
-                <span>Complete recovery</span>
+                <span>Scrapbook preservation</span>
               </div>
             </div>
 
@@ -132,23 +132,23 @@ export default function AboutPresentation() {
               </div>
               <h4 className="feature-heading">Archival Papers & Prompts</h4>
               <p className="feature-description">
-                Choose between four tactile paper textures and classical ink tones,
+                Choose between tactile paper textures and classical ink tones,
                 complemented by an archive of contemplative writing prompts whenever words pause.
               </p>
               <div className="feature-meta">
-                <span>4 paper styles</span>
+                <span>Fine paper styles</span>
                 <span className="feature-bullet">•</span>
-                <span>Curated epistolary prompts</span>
+                <span>Curated writing prompts</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Final Epistolary Invitation (Call to Action) */}
+        {/* Final Journal Sanctuary Invitation (Call to Action) */}
         <div className="about-invitation" aria-label="Enter Between Letters">
           <div className="about-invitation-badge">
             <span className="brand-seal-mini">BL</span>
-            <span>EPISTOLARY SANCTUARY</span>
+            <span>JOURNAL SANCTUARY</span>
           </div>
 
           <h3 className="about-invitation-title">
@@ -156,8 +156,8 @@ export default function AboutPresentation() {
           </h3>
 
           <p className="about-invitation-sub">
-            Step inside your personal digital desk. Write your day or read letters
-            preserved from the quietest corners of the human heart.
+            Step inside your personal digital desk. Write your day in your journal
+            or browse curated inspirations gathered from quiet corners of the human heart.
           </p>
 
           <div className="about-invitation-actions">
@@ -169,16 +169,16 @@ export default function AboutPresentation() {
               Open Journal ↗
             </Link>
             <Link
-              href="/letters"
-              className="about-btn-secondary"
-            >
-              Write a Letter ✉
-            </Link>
-            <Link
               href="/my-shelf"
               className="about-btn-secondary"
             >
               Visit My Shelf ✦
+            </Link>
+            <Link
+              href="/discover"
+              className="about-btn-secondary"
+            >
+              Browse Inspirations ❧
             </Link>
           </div>
         </div>

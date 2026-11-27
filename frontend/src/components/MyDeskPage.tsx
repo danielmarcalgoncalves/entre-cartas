@@ -67,9 +67,6 @@ export default function MyDeskPage() {
   const journalObjectRef = useRef<HTMLAnchorElement>(null);
   const journalVisualRef = useRef<HTMLDivElement>(null);
   const journalShadowRef = useRef<HTMLDivElement>(null);
-  const envelopeObjectRef = useRef<HTMLAnchorElement>(null);
-  const envelopeVisualRef = useRef<HTMLDivElement>(null);
-  const envelopeShadowRef = useRef<HTMLDivElement>(null);
   const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Active Notebook metadata for personalized cover display
@@ -252,20 +249,6 @@ export default function MyDeskPage() {
           transformOrigin: "50% 50%",
         });
       }
-      if (envelopeVisualRef.current) {
-        gsap.set(envelopeVisualRef.current, {
-          rotation: 2.6,
-          transformOrigin: "50% 50%",
-        });
-      }
-      if (envelopeShadowRef.current) {
-        gsap.set(envelopeShadowRef.current, {
-          rotation: 2.6,
-          x: 6,
-          y: 12,
-          transformOrigin: "50% 50%",
-        });
-      }
 
       if (prefersReducedMotion) return;
 
@@ -285,14 +268,6 @@ export default function MyDeskPage() {
           { opacity: 0, y: 22, scale: 0.96 },
           { opacity: 1, y: 0, scale: 1, duration: 0.72 },
           0.16
-        );
-      }
-      if (envelopeObjectRef.current) {
-        tl.fromTo(
-          envelopeObjectRef.current,
-          { opacity: 0, y: 20, x: 12, scale: 0.96 },
-          { opacity: 1, y: 0, x: 0, scale: 1, duration: 0.68 },
-          0.24
         );
       }
     }, stageRef);
@@ -352,62 +327,6 @@ export default function MyDeskPage() {
       opacity: 0.82,
       filter: "blur(16px)",
       duration: 0.44,
-      ease: "power2.out",
-    });
-  };
-
-  // ==========================================================================
-  // GSAP Physical Hover Handlers: Vintage Sealed Correspondence Envelope
-  // ==========================================================================
-  const handleEnvelopeMouseEnter = () => {
-    if (!envelopeVisualRef.current || !envelopeShadowRef.current) return;
-    gsap.killTweensOf([envelopeVisualRef.current, envelopeShadowRef.current]);
-
-    gsap.to(envelopeVisualRef.current, {
-      y: -12,
-      scale: 1.036,
-      rotation: 1.2,
-      rotationX: 4,
-      rotationY: 3.5,
-      transformPerspective: 1100,
-      duration: 0.36,
-      ease: "power2.out",
-    });
-
-    gsap.to(envelopeShadowRef.current, {
-      x: 12,
-      y: 22,
-      scale: 1.05,
-      rotation: 1.2,
-      opacity: 0.86,
-      filter: "blur(20px)",
-      duration: 0.36,
-      ease: "power2.out",
-    });
-  };
-
-  const handleEnvelopeMouseLeave = () => {
-    if (!envelopeVisualRef.current || !envelopeShadowRef.current) return;
-    gsap.killTweensOf([envelopeVisualRef.current, envelopeShadowRef.current]);
-
-    gsap.to(envelopeVisualRef.current, {
-      y: 0,
-      scale: 1,
-      rotation: 2.6,
-      rotationX: 0,
-      rotationY: 0,
-      duration: 0.42,
-      ease: "power2.out",
-    });
-
-    gsap.to(envelopeShadowRef.current, {
-      x: 6,
-      y: 12,
-      scale: 1,
-      rotation: 2.6,
-      opacity: 0.74,
-      filter: "blur(14px)",
-      duration: 0.42,
       ease: "power2.out",
     });
   };
@@ -1250,93 +1169,6 @@ export default function MyDeskPage() {
                 <span className="desk-book__clasp-lock" />
                 <span className="desk-book__clasp-rivet" />
               </span>
-            </div>
-          </div>
-        </Link>
-
-        {/* ================================================================
-            ZONE 3 (RIGHT): VINTAGE WAX-SEALED CORRESPONDENCE -> /letters
-            Cohesive handcrafted postal parcel with parchment stationery,
-            illustrated postage stamp, postmark, calligraphy & wax seal
-            ================================================================ */}
-        <Link
-          ref={envelopeObjectRef}
-          href="/letters"
-          className="desk-envelope-object"
-          aria-label="Open Letters — Write and seal personal correspondence"
-          onMouseEnter={handleEnvelopeMouseEnter}
-          onMouseLeave={handleEnvelopeMouseLeave}
-          onFocus={handleEnvelopeMouseEnter}
-          onBlur={handleEnvelopeMouseLeave}
-        >
-          <div ref={envelopeShadowRef} className="desk-envelope-shadow" aria-hidden="true" />
-          <div ref={envelopeVisualRef} className="desk-envelope-visual">
-            {/* Underlying Second Stationery Sheet for Layered Tactile Depth */}
-            <div className="desk-parcel-under-sheet" aria-hidden="true">
-              <span className="desk-parcel-under-lines" />
-            </div>
-
-            {/* Main Vintage Parchment Correspondence Envelope */}
-            <div className="desk-parcel-envelope">
-              <span className="desk-parcel-envelope__border" aria-hidden="true" />
-              <span className="desk-parcel-envelope__flap-lines" aria-hidden="true" />
-
-              {/* Top Row: Postal Markings & Perforated Vintage Stamp */}
-              <div className="desk-parcel-top-row">
-                <div className="desk-parcel-postmark" aria-hidden="true">
-                  <svg className="desk-parcel-postmark__svg" viewBox="0 0 130 56" fill="none">
-                    <circle cx="28" cy="28" r="22" stroke="currentColor" strokeWidth="1.4" opacity="0.72" />
-                    <circle cx="28" cy="28" r="17" stroke="currentColor" strokeWidth="0.9" strokeDasharray="2 2" opacity="0.6" />
-                    <text x="28" y="25" textAnchor="middle" fill="currentColor" fontSize="6.5" fontWeight="700" letterSpacing="1.2">
-                      BETWEEN LETTERS
-                    </text>
-                    <text x="28" y="34" textAnchor="middle" fill="currentColor" fontSize="5.8" letterSpacing="1">
-                      ARCHIVE POST
-                    </text>
-                    <path d="M54 19C66 15 78 23 90 19C102 15 114 23 126 19" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
-                    <path d="M54 28C66 24 78 32 90 28C102 24 114 32 126 28" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
-                    <path d="M54 37C66 33 78 41 90 37C102 33 114 41 126 37" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />
-                  </svg>
-                </div>
-
-                {/* Perforated Vintage Postage Stamp */}
-                <div className="desk-parcel-stamp" aria-hidden="true">
-                  <div className="desk-parcel-stamp__inner">
-                    <span className="desk-parcel-stamp__price">1924</span>
-                    <svg className="desk-parcel-stamp__art" viewBox="0 0 36 36" fill="none">
-                      <path d="M8 26C13 19 20 13 28 9C26 17 21 23 13 26" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <circle cx="18" cy="18" r="14" stroke="currentColor" strokeWidth="0.8" opacity="0.5" />
-                    </svg>
-                    <span className="desk-parcel-stamp__label">POSTAGE</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Center Calligraphic Recipient Inscription */}
-              <div className="desk-parcel-address">
-                <span className="desk-parcel-address__kicker">PERSONAL CORRESPONDENCE</span>
-                <span className="desk-parcel-address__recipient">
-                  For the Words Worth Keeping
-                </span>
-                <span className="desk-parcel-address__line" />
-                <span className="desk-parcel-address__sub">
-                  Folded Stationery &amp; Wax-Sealed Letters
-                </span>
-              </div>
-
-              {/* Embossed Crimson Wax Seal + Action Cue */}
-              <div className="desk-parcel-bottom-row">
-                <span className="desk-parcel-cta">WRITE A LETTER →</span>
-
-                <div className="desk-parcel-wax-seal" aria-hidden="true">
-                  <div className="desk-parcel-wax-seal__inner">
-                    <svg viewBox="0 0 40 40" width="22" height="22" fill="none">
-                      <circle cx="20" cy="20" r="16" stroke="rgba(244, 212, 156, 0.75)" strokeWidth="1" strokeDasharray="2 2" />
-                      <path d="M13 26C17 20 22 15 28 11C26 18 22 23 16 26" stroke="rgba(248, 222, 172, 0.92)" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </Link>

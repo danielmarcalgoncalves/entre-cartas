@@ -17,6 +17,8 @@ export interface UseNotebookOpeningOptions {
   pageWidth: number;
   closedScale: number;
   prefersReducedMotion: boolean;
+  openShiftX?: number;
+  isSinglePageView?: boolean;
 }
 
 export const CLOSED_REST_ROT_X = 7.5;
@@ -39,7 +41,12 @@ export function useNotebookOpening({
   pageWidth,
   closedScale,
   prefersReducedMotion,
+  openShiftX,
+  isSinglePageView = false,
 }: UseNotebookOpeningOptions) {
+  const resolvedOpenShiftX = openShiftX ?? pageWidth / 2;
+  const openShadowWidth = isSinglePageView ? pageWidth * 1.12 : pageWidth * 2.04;
+
   const applyPostureImmediate = useCallback(
     (isOpen: boolean) => {
       const {
@@ -86,7 +93,7 @@ export function useNotebookOpening({
         }
       } else {
         gsap.set(bookRigRef.current, {
-          x: pageWidth / 2,
+          x: resolvedOpenShiftX,
           y: 0,
           z: 0,
           rotationX: OPEN_REST_ROT_X,
@@ -109,7 +116,7 @@ export function useNotebookOpening({
         }
         if (deskShadowRef.current) {
           gsap.set(deskShadowRef.current, {
-            width: pageWidth * 2.04,
+            width: openShadowWidth,
             x: 0,
             scale: 1,
             opacity: 0.9,
@@ -117,7 +124,7 @@ export function useNotebookOpening({
         }
       }
     },
-    [refs, pageWidth, closedScale]
+    [refs, pageWidth, closedScale, resolvedOpenShiftX, openShadowWidth]
   );
 
   const animateClosedHover = useCallback(
@@ -177,11 +184,11 @@ export function useNotebookOpening({
         },
       });
 
-      // 1. Center the spine & settle 3D perspective into an open two-page spread
+      // 1. Center the spine & settle 3D perspective into an open spread (or single focused page on narrow mobile)
       tl.to(
         bookRigRef.current,
         {
-          x: pageWidth / 2,
+          x: resolvedOpenShiftX,
           y: 0,
           z: 0,
           rotationX: OPEN_REST_ROT_X,
@@ -199,7 +206,7 @@ export function useNotebookOpening({
         tl.to(
           deskShadowRef.current,
           {
-            width: pageWidth * 2.04,
+            width: openShadowWidth,
             x: 0,
             scale: 1,
             opacity: 0.9,

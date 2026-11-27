@@ -120,7 +120,7 @@ export default function AvatarPickerModal({
                 <p className="avatar-picker-subtitle">
                   {step === "choice"
                     ? "Upload a personal photograph or select a keepsake portrait."
-                    : "A little portrait for your letters."}
+                    : "A little portrait for your journal."}
                 </p>
               </div>
               <button

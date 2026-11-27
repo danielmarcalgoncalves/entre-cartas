@@ -1,7 +1,7 @@
 /**
  * journalController.js
  * Manages authenticated personal journals (cadernos + pages JSON) and
- * correspondence folders (pastas_cartas) in MariaDB.
+ * journal photograph uploads (MinIO) in MariaDB.
  *
  * Security & Isolation:
  *   All queries strictly filter by req.usuarioId injected from authMiddleware.
@@ -294,147 +294,7 @@ async function deleteNotebook(req, res) {
 }
 
 // =========================================================================
-// 4. LIST USER LETTER FOLDERS (GET /api/journal/folders)
-// =========================================================================
-async function listFolders(req, res) {
-  try {
-    const usuarioId = req.usuarioId;
-    const [rows] = await pool.query(
-      `SELECT id, client_id, nome, cor, criado_em
-       FROM pastas_cartas
-       WHERE usuario_id = ?
-       ORDER BY criado_em ASC`,
-      [usuarioId]
-    );
-
-    const folders = rows.map((r) => ({
-      id: r.client_id,
-      remote_db_id: r.id,
-      nome: r.nome,
-      cor: r.cor || 'marrom',
-      criadoEm: r.criado_em ? new Date(r.criado_em).toISOString() : new Date().toISOString(),
-      ownerId: usuarioId,
-    }));
-
-    return res.json({ folders });
-  } catch (err) {
-    console.error('[journalController] listFolders error:', err.message);
-    return res.status(500).json({ error: 'Unable to load correspondence folders.' });
-  }
-}
-
-// =========================================================================
-// 5. UPSERT LETTER FOLDER (PUT /api/journal/folders/:clientId)
-// =========================================================================
-async function upsertFolder(req, res) {
-  try {
-    const usuarioId = req.usuarioId;
-    const papelUsuario = req.usuarioPapel || 'usuario';
-    const clientId = String(req.params.clientId || '').trim().slice(0, 120);
-    const { nome, cor = 'marrom' } = req.body;
-
-    if (!clientId) {
-      return res.status(400).json({ error: 'Folder identifier is required.' });
-    }
-    if (!nome || !String(nome).trim()) {
-      return res.status(400).json({ error: 'Folder name is required.' });
-    }
-
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      const [userRows] = await conn.query('SELECT id, papel FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
-      const papelEfetivo = (userRows[0] && userRows[0].papel) || papelUsuario;
-
-      const [existing] = await conn.query(
-        'SELECT id FROM pastas_cartas WHERE usuario_id = ? AND client_id = ? FOR UPDATE',
-        [usuarioId, clientId]
-      );
-
-      if (existing.length === 0) {
-        const entitlement = await evaluateUserEntitlement(conn, usuarioId);
-        const isPro = entitlement ? entitlement.isPro : (papelEfetivo === 'premium' || papelEfetivo === 'admin');
-        const limit = isPro ? 10 : 3;
-        const [countRows] = await conn.query(
-          'SELECT COUNT(*) as total FROM pastas_cartas WHERE usuario_id = ?',
-          [usuarioId]
-        );
-        const total = countRows[0] ? Number(countRows[0].total) : 0;
-        if (total >= limit) {
-          await conn.rollback();
-          sendLog('BLOQUEIO_LIMITE_PASTAS_403', req, {
-            usuario_id: usuarioId,
-            total,
-            limite: limit,
-            papel: entitlement?.papel || papelEfetivo,
-          });
-          return res.status(403).json(
-            buildPlanLimitError({
-              feature: 'letter_folders',
-              resourceLabel: 'correspondence folders',
-              currentUsage: total,
-              freePlanLimit: 3,
-              proPlanLimit: 10,
-              isPremium: isPro,
-            })
-          );
-        }
-
-        await conn.query(
-          `INSERT INTO pastas_cartas (client_id, usuario_id, nome, cor) VALUES (?, ?, ?, ?)`,
-          [clientId, usuarioId, String(nome).trim().slice(0, 120), String(cor).slice(0, 30)]
-        );
-      } else {
-        await conn.query(
-          `UPDATE pastas_cartas SET nome = ?, cor = ? WHERE usuario_id = ? AND client_id = ?`,
-          [String(nome).trim().slice(0, 120), String(cor).slice(0, 30), usuarioId, clientId]
-        );
-        await conn.query(
-          `UPDATE cartas SET pasta_nome = ? WHERE usuario_id = ? AND pasta_client_id = ?`,
-          [String(nome).trim().slice(0, 120), usuarioId, clientId]
-        );
-      }
-
-      await conn.commit();
-      return res.json({ message: 'Folder saved.', id: clientId });
-    } catch (txErr) {
-      await conn.rollback();
-      throw txErr;
-    } finally {
-      conn.release();
-    }
-  } catch (err) {
-    console.error('[journalController] upsertFolder error:', err.message);
-    return res.status(500).json({ error: 'Failed to save folder.' });
-  }
-}
-
-// =========================================================================
-// 6. DELETE LETTER FOLDER (DELETE /api/journal/folders/:clientId)
-// =========================================================================
-async function deleteFolder(req, res) {
-  try {
-    const usuarioId = req.usuarioId;
-    const clientId = String(req.params.clientId || '').trim();
-
-    await pool.query(
-      'DELETE FROM pastas_cartas WHERE usuario_id = ? AND client_id = ?',
-      [usuarioId, clientId]
-    );
-    await pool.query(
-      'UPDATE cartas SET pasta_client_id = NULL, pasta_nome = NULL WHERE usuario_id = ? AND pasta_client_id = ?',
-      [usuarioId, clientId]
-    );
-
-    return res.json({ message: 'Folder removed.' });
-  } catch (err) {
-    console.error('[journalController] deleteFolder error:', err.message);
-    return res.status(500).json({ error: 'Failed to delete folder.' });
-  }
-}
-
-// =========================================================================
-// 7. UPLOAD JOURNAL PHOTOGRAPH (POST /api/journal/notebooks/:clientId/media)
+// 4. UPLOAD JOURNAL PHOTOGRAPH (POST /api/journal/notebooks/:clientId/media)
 // =========================================================================
 async function uploadJournalPhoto(req, res) {
   const usuarioId = req.usuarioId;
@@ -536,7 +396,7 @@ async function uploadJournalPhoto(req, res) {
 }
 
 // =========================================================================
-// 8. STREAM PRIVATE JOURNAL PHOTOGRAPH (GET /api/journal/media/:usuarioId/:notebookId/:filename)
+// 5. STREAM PRIVATE JOURNAL PHOTOGRAPH (GET /api/journal/media/:usuarioId/:notebookId/:filename)
 // =========================================================================
 async function getJournalMedia(req, res) {
   try {
@@ -585,7 +445,4 @@ module.exports = {
   deleteNotebook,
   uploadJournalPhoto,
   getJournalMedia,
-  listFolders,
-  upsertFolder,
-  deleteFolder,
 };

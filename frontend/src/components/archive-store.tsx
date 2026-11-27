@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
 import { SESSION_CLEARED_EVENT } from "@/lib/journal-storage";
 
@@ -50,7 +49,6 @@ export function ArchiveProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    let cancelled = false;
     try {
       const stored = window.localStorage.getItem(storageKey);
       if (stored) {
@@ -67,21 +65,6 @@ export function ArchiveProvider({ children }: { children: React.ReactNode }) {
       setFolderById({});
     }
     setReady(true);
-
-    // Sync with MariaDB strictly for authenticated account
-    api.cartas.guardadas()
-      .then((res: any) => {
-        if (cancelled) return;
-        if (res && res.cartas_guardadas && Array.isArray(res.cartas_guardadas)) {
-          const remoteIds = res.cartas_guardadas.map((c: any) => String(c.id));
-          setSavedIds((current) => Array.from(new Set([...current, ...remoteIds])));
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
   }, [loading, storageKey, userId]);
 
   useEffect(() => {
@@ -103,17 +86,11 @@ export function ArchiveProvider({ children }: { children: React.ReactNode }) {
         delete next[stringId];
         return next;
       });
-      api.cartas.descarimbar(stringId).catch(() => {});
       return;
     }
 
     setSavedIds((current) => current.includes(stringId) ? current : [...current, stringId]);
     setFolderById((current) => ({ ...current, [stringId]: current[stringId] ?? DEFAULT_FOLDER }));
-    api.cartas.carimbar(stringId, "GUARDADA").catch((err: any) => {
-      if (err?.isLimitReached) {
-        alert("Your box has reached the limit of 5 saved letters on the Standard Plan. Join Pro Club to save unlimited memories!");
-      }
-    });
   }, [savedIds, userId]);
 
   const moveToFolder = useCallback((id: string, folderId: string) => {

@@ -22,9 +22,6 @@ export default function ExploreExperience() {
           <a href="#intro-journal" className="explore-nav-link">
             My Journal
           </a>
-          <a href="#intro-letters" className="explore-nav-link">
-            My Letters
-          </a>
           {isAuthenticated ? (
             <Link href="/my-desk" className="explore-auth-pill">
               Open My Desk →
@@ -50,8 +47,8 @@ export default function ExploreExperience() {
           </h1>
 
           <p className="explore-hero-lead">
-            Create a place for your thoughts, preserve moments that matter, and write letters
-            that hold meaning. Explore the two ways to express yourself inside Between Letters.
+            Create a quiet sanctuary for your daily thoughts, preserve moments that matter,
+            and keep hardbound memories inside Between Letters.
           </p>
 
           <div className="explore-hero-actions">
@@ -59,10 +56,10 @@ export default function ExploreExperience() {
               <span>Explore My Journal</span>
               <span aria-hidden="true">↓</span>
             </a>
-            <a href="#intro-letters" className="explore-jump-btn explore-jump-btn--secondary">
-              <span>Explore My Letters</span>
-              <span aria-hidden="true">↓</span>
-            </a>
+            <Link href="/journal" className="explore-jump-btn explore-jump-btn--secondary">
+              <span>Try My Journal</span>
+              <span aria-hidden="true">→</span>
+            </Link>
           </div>
         </div>
 
@@ -86,7 +83,7 @@ export default function ExploreExperience() {
       >
         <div className="explore-feature-grid">
           <div className="explore-feature-copy">
-            <span className="explore-section-kicker">EXPERIENCE ONE · PERSONAL VOLUMES</span>
+            <span className="explore-section-kicker">PERSONAL VOLUMES · LEATHER-BOUND SANCTUARY</span>
             <h2 id="intro-journal-title" className="explore-section-title">
               My Journal — A place for your thoughts.
             </h2>
@@ -186,106 +183,7 @@ export default function ExploreExperience() {
         </div>
       </section>
 
-      {/* 4. My Letters Introduction & Live Interface Preview */}
-      <section
-        id="intro-letters"
-        className="explore-feature-section"
-        aria-labelledby="intro-letters-title"
-      >
-        <div className="explore-feature-grid explore-feature-grid--reversed">
-          <div className="explore-feature-copy">
-            <span className="explore-section-kicker">EXPERIENCE TWO · PERSONAL CORRESPONDENCE</span>
-            <h2 id="intro-letters-title" className="explore-section-title">
-              My Letters — Words meant to be kept.
-            </h2>
-            <p className="explore-section-desc">
-              Some words are easier to express when they become a letter. Write messages,
-              preserve meaningful thoughts, and organize them in your own personal collection.
-            </p>
-
-            <ul className="explore-capabilities-list">
-              <li>
-                <span className="explore-cap-bullet" aria-hidden="true">✦</span>
-                <span>Write personal letters with custom titles, recipients, and signatures.</span>
-              </li>
-              <li>
-                <span className="explore-cap-bullet" aria-hidden="true">✦</span>
-                <span>Customize stationery paper tones and expressive calligraphy typography.</span>
-              </li>
-              <li>
-                <span className="explore-cap-bullet" aria-hidden="true">✦</span>
-                <span>Organize your correspondence into personal folders with meaningful names.</span>
-              </li>
-              <li>
-                <span className="explore-cap-bullet" aria-hidden="true">✦</span>
-                <span>Choose themes and matching postage seals for each letter you write.</span>
-              </li>
-              <li>
-                <span className="explore-cap-bullet" aria-hidden="true">✦</span>
-                <span>Save works in progress as drafts or seal finished letters to revisit anytime.</span>
-              </li>
-              <li>
-                <span className="explore-cap-bullet" aria-hidden="true">✦</span>
-                <span>Edit and refine your writing whenever inspiration returns.</span>
-              </li>
-            </ul>
-
-            <Link href="/letters" className="explore-try-cta">
-              <span>Try My Letters</span>
-              <span aria-hidden="true">→</span>
-            </Link>
-            {!isAuthenticated && (
-              <span className="explore-try-note">
-                No account required — try composing a letter in preview mode.
-              </span>
-            )}
-          </div>
-
-          {/* Authentic Interface Preview of My Letters */}
-          <div className="explore-feature-preview">
-            <div className="explore-preview-frame" aria-label="Preview of My Letters interface">
-              <span className="explore-preview-badge">
-                <span aria-hidden="true">✉</span>
-                <span>My Letters Desk</span>
-              </span>
-
-              <div className="preview-letter-desk">
-                <div className="preview-letter-bar">
-                  <div className="preview-letter-bar-group">
-                    <span>Paper:</span>
-                    <span className="preview-swatch-dot" style={{ background: "#FCFBF7" }} />
-                    <span className="preview-swatch-dot" style={{ background: "#F5EAD6" }} />
-                    <span className="preview-letter-chip">Caveat ▾</span>
-                    <span className="preview-letter-chip">📁 Family Notes</span>
-                  </div>
-                  <span className="preview-letter-seal-btn">Save &amp; Seal Letter</span>
-                </div>
-
-                <div className="preview-stationery-sheet">
-                  <div className="preview-stationery-top">
-                    <span className="preview-stationery-date">Autumn Correspondence · Unsealed</span>
-                    <div className="preview-postmark-box">
-                      <span>LOVE</span>
-                      <strong>POSTMARK</strong>
-                      <span>LETTER · 01</span>
-                    </div>
-                  </div>
-
-                  <div className="preview-stationery-subject">For a quieter morning</div>
-                  <div className="preview-stationery-to">To: Dear Eleanor,</div>
-                  <div className="preview-stationery-body">
-                    I kept the pressed chamomile flower inside my coat pocket all week. Some
-                    conversations stay warm long after the room goes dark...
-                  </div>
-                  <div className="preview-stationery-sign">Signed: Always yours</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Gentle Invitation Footer */}
+      {/* 4. Gentle Invitation Footer */}
       <section className="explore-closing" aria-label="Account invitation">
         <h2 className="explore-closing-title">
           {isAuthenticated
@@ -294,8 +192,8 @@ export default function ExploreExperience() {
         </h2>
         <p className="explore-closing-text">
           {isAuthenticated
-            ? "Return to your personal desk anytime to open your leather volumes, sort correspondence, and revisit your shelf."
-            : "Explore both My Journal and My Letters right away in temporary preview mode. When you want to preserve your writing and organize your personal shelf, creating an account takes only a moment."}
+            ? "Return to your personal desk anytime to open your leather volumes, craft scrapbook pages, and revisit your shelf."
+            : "Explore My Journal right away in temporary preview mode. When you want to preserve your writing, photos, and volumes on your personal shelf, creating an account takes only a moment."}
         </p>
 
         <div className="explore-closing-actions">

@@ -40,16 +40,6 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    href: "/letters",
-    label: "Letters",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="4" width="20" height="16" rx="2" />
-        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-      </svg>
-    ),
-  },
-  {
     href: "/my-shelf",
     label: "My Shelf",
     icon: (
@@ -196,14 +186,6 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                 Journal
               </Link>
               <Link
-                href="/letters"
-                className={`guest-preview-topbar__link ${
-                  pathname.startsWith("/letters") ? "is-active" : ""
-                }`}
-              >
-                Letters
-              </Link>
-              <Link
                 href="/explore"
                 className={`guest-preview-topbar__link ${
                   pathname.startsWith("/explore") ? "is-active" : ""
@@ -232,6 +214,68 @@ export default function SiteShell({ children }: { children: ReactNode }) {
             )}
           </div>
         ) : null)}
+
+      {showAuthenticatedSidebar && !isJournalPage && (
+        <div className="mobile-auth-topbar" role="navigation" aria-label="Mobile top bar">
+          <Link href="/my-desk" className="mobile-auth-topbar__brand">
+            <span className="mobile-auth-topbar__seal" aria-hidden="true">✦</span>
+            <span>Between Letters</span>
+          </Link>
+
+          <div className="mobile-auth-topbar__actions">
+            <Link
+              href="/journal"
+              className={`mobile-auth-topbar__quick ${pathname.startsWith("/journal") ? "is-active" : ""}`}
+            >
+              Journal
+            </Link>
+            <button
+              type="button"
+              className="mobile-auth-topbar__menu-btn"
+              onClick={() => setIsPinnedOpen((prev) => !prev)}
+              aria-expanded={isSidebarExpanded}
+              aria-label={isSidebarExpanded ? "Close navigation menu" : "Open navigation menu"}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {isSidebarExpanded ? (
+                  <>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </>
+                ) : (
+                  <>
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </>
+                )}
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showAuthenticatedSidebar && isSidebarExpanded && !isJournalPage && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => {
+            setIsPinnedOpen(false);
+            setIsHovered(false);
+            setIsFocusedInside(false);
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {showAuthenticatedSidebar && (
         <header
@@ -476,7 +520,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
               <input
                 ref={searchInputRef}
                 name="q"
-                aria-label="Search letters"
+                aria-label="Search inspirations"
                 placeholder="search archive..."
                 className="sidebar-collapsible-content"
               />

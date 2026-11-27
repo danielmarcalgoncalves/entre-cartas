@@ -46,27 +46,19 @@ import {
   splitJournalPagesRecursive,
 } from "@/lib/journal-page-layout";
 import {
-  ACTIVE_LETTER_EDIT_ID_KEY,
-  ACTIVE_LETTER_FOLDER_ID_KEY,
   ACTIVE_NOTEBOOK_ID_KEY,
   ACTIVE_NOTEBOOK_PAGE_KEY,
-  FOLDER_COLOR_OPTIONS,
   FONT_OPTIONS,
   INK_OPTIONS,
   JOURNAL_UPDATED_EVENT,
-  LETTER_FOLDERS_STORAGE_KEY,
   NOTEBOOK_COLOR_OPTIONS,
   NOTEBOOKS_STORAGE_KEY,
   PAPER_OPTIONS,
   PINNED_THEME_STORAGE_KEY,
   PROMPTS,
-  SAVED_ENTRIES_KEY,
-  SEAL_OPTIONS,
   SESSION_CLEARED_EVENT,
-  TRASH_STORAGE_KEY,
   filterWrittenPages,
   getFontFamilyById,
-  getFolderTheme,
   getInkColorById,
   getNotebookDates,
   getNotebookTheme,
@@ -77,44 +69,28 @@ import {
   renameUserNotebook,
   saveAllNotebooks,
   loadAllRawNotebooks,
-  type FolderColorOption,
-  type JournalEntry,
-  type LetterFolder,
   type Notebook,
   type NotebookColorOption,
   type NotebookCoverColor,
   type NotebookPage,
-  type PostalSeal,
 } from "@/lib/journal-storage";
 
 export {
-  ACTIVE_LETTER_EDIT_ID_KEY,
-  ACTIVE_LETTER_FOLDER_ID_KEY,
   ACTIVE_NOTEBOOK_ID_KEY,
   ACTIVE_NOTEBOOK_PAGE_KEY,
-  FOLDER_COLOR_OPTIONS,
   FONT_OPTIONS,
   INK_OPTIONS,
   JOURNAL_UPDATED_EVENT,
-  LETTER_FOLDERS_STORAGE_KEY,
   NOTEBOOK_COLOR_OPTIONS,
   NOTEBOOKS_STORAGE_KEY,
   PAPER_OPTIONS,
   PINNED_THEME_STORAGE_KEY,
   PROMPTS,
-  SAVED_ENTRIES_KEY,
-  SEAL_OPTIONS,
-  TRASH_STORAGE_KEY,
-  getFolderTheme,
   getNotebookTheme,
-  type FolderColorOption,
-  type JournalEntry,
-  type LetterFolder,
   type Notebook,
   type NotebookColorOption,
   type NotebookCoverColor,
   type NotebookPage,
-  type PostalSeal,
 };
 
 // Exact line count & char capacity shared with the cinematic 3D viewer
@@ -423,11 +399,11 @@ export default function JournalEditor() {
   const rightColRef = useRef<HTMLElement>(null);
   const sheetCardRef = useRef<HTMLDivElement>(null);
 
-  // Dedicated mobile-first Journal state (<= 768px only; desktop remains untouched)
+  // Dedicated mobile-first Journal state (<= 768px) and unified Edit / Writing Mode
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [desktopEditorMode, setDesktopEditorMode] = useState<"edit" | "writing">("edit");
   const prefersReducedMotion = useReducedMotion();
-  const isWritingMode = !isMobileViewport && desktopEditorMode === "writing";
+  const isWritingMode = desktopEditorMode === "writing";
 
   const handleSwitchDesktopMode = useCallback(
     (nextMode: "edit" | "writing") => {
@@ -469,7 +445,7 @@ export default function JournalEditor() {
       const sheetEl = sheetCardRef.current;
       if (!leftEl || !rightEl || !sheetEl) return;
 
-      if (isMobileViewport || modoFoco || window.innerWidth <= 1060) {
+      if (isMobileViewport || modoFoco || window.innerWidth <= 1210) {
         leftEl.style.transform = "";
         rightEl.style.transform = "";
         return;
@@ -494,9 +470,17 @@ export default function JournalEditor() {
     syncSideRailsWithScroll();
     window.addEventListener("scroll", syncSideRailsWithScroll, { passive: true });
     window.addEventListener("resize", syncSideRailsWithScroll);
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(syncSideRailsWithScroll);
+      if (leftColRef.current) resizeObserver.observe(leftColRef.current);
+      if (rightColRef.current) resizeObserver.observe(rightColRef.current);
+      if (sheetCardRef.current) resizeObserver.observe(sheetCardRef.current);
+    }
     return () => {
       window.removeEventListener("scroll", syncSideRailsWithScroll);
       window.removeEventListener("resize", syncSideRailsWithScroll);
+      resizeObserver?.disconnect();
     };
   }, [isMobileViewport, modoFoco, isWritingMode, selectedScrapbookItem, currentPageIndex]);
   const [mobileSheetMetrics, setMobileSheetMetrics] = useState({
@@ -541,18 +525,13 @@ export default function JournalEditor() {
         height: effectiveVh,
       };
 
-      // Reserve space for discreet bottom Previous/Next controls + breathing margins
-      const navControlsReserve = effectiveVh < 500 ? 34 : 42;
-      const verticalMargin = effectiveVh < 500 ? 10 : 16;
-      const horizontalMargin = vw < 360 ? 8 : 12;
+      const horizontalMargin = vw < 360 ? 12 : vw < 480 ? 16 : 24;
+      const availW = Math.max(220, vw - horizontalMargin);
 
-      const availW = Math.max(180, vw - horizontalMargin);
-      const availH = Math.max(200, effectiveVh - navControlsReserve - verticalMargin);
-
-      // Uniform proportional scale preserving exact 580:820 (29:41) 3D notebook paper ratio
+      // Use available screen width while preserving exact 580:820 (29:41) physical aspect ratio;
+      // when scaled height exceeds viewport height, the mobile container scrolls vertically.
       const scaleW = availW / JOURNAL_PAGE_WIDTH;
-      const scaleH = availH / JOURNAL_PAGE_HEIGHT;
-      const uniformScale = Math.max(0.28, Math.min(scaleW, scaleH));
+      const uniformScale = Math.min(1, Math.max(0.46, Number(scaleW.toFixed(4))));
 
       setMobileSheetMetrics({
         scale: uniformScale,
@@ -2705,7 +2684,7 @@ export default function JournalEditor() {
         <div ref={leftColRef} className="desk-left-col">
           {/* Creative Tools Section (directly above Element Studio) */}
           <section
-            className="scrapbook-creative-panel"
+            className={`scrapbook-creative-panel ${isGuestMode ? "is-guest-view" : ""}`}
             role="toolbar"
             aria-label="Scrapbook creative tools"
           >
@@ -2718,7 +2697,11 @@ export default function JournalEditor() {
               </span>
             </div>
 
-            <div className="scrapbook-creative-primary-grid">
+            <div
+              className={`scrapbook-creative-primary-grid ${
+                isGuestMode ? "has-guest-account" : ""
+              }`}
+            >
               <button
                 type="button"
                 className={`scrapbook-creative-btn is-primary ${isGuestMode ? "is-guest-locked" : ""}`}
@@ -2729,21 +2712,23 @@ export default function JournalEditor() {
                     : "Upload a photograph to this page"
                 }
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-                <span>Add Photo</span>
+                <span className="scrapbook-creative-btn-main">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  <span className="scrapbook-creative-btn-label">Add Photo</span>
+                </span>
                 {isGuestMode && <span className="scrapbook-creative-badge">Account</span>}
               </button>
 
@@ -2757,8 +2742,10 @@ export default function JournalEditor() {
                 }}
                 title="Open vintage sticker & pressed botanical catalog"
               >
-                <span aria-hidden="true">✦</span>
-                <span>Stickers</span>
+                <span className="scrapbook-creative-btn-main">
+                  <span aria-hidden="true">✦</span>
+                  <span className="scrapbook-creative-btn-label">Stickers</span>
+                </span>
               </button>
             </div>
 
@@ -4284,6 +4271,10 @@ export default function JournalEditor() {
           activeOverlay={mobileActiveOverlay}
           onCloseOverlay={closeMobileOverlay}
           activeNotebookName={activeNotebook?.nome || "Personal Journal"}
+          activeNotebookColor={activeNotebook?.corCapa}
+          activeNotebookUpdated={
+            activeNotebook ? getNotebookDates(activeNotebook).updated : "Active Volume"
+          }
           currentPageIndex={currentPageIndex}
           totalPages={cadernoPaginas.length}
           canAdvancePage={podeAvancarPagina}
@@ -4314,6 +4305,15 @@ export default function JournalEditor() {
           saving={salvando}
           autosaveStatus={autosaveStatus}
           onNavigate={handleMobileNavigate}
+          editorMode={desktopEditorMode}
+          onSwitchEditorMode={handleSwitchDesktopMode}
+          onViewJournal3D={handleViewJournal3D}
+          onPullInspiration={sortearInspiracao}
+          onOpenLikeModal={() => {
+            playPaperSound();
+            setLikeModalOpen(true);
+          }}
+          isPageLiked={cadernoFavoritado}
         />
       )}
 

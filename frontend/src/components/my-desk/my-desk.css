@@ -2,8 +2,7 @@
    BETWEEN LETTERS — MY DESK (COHESIVE ART-DIRECTED COMPOSITION)
    1. Left Column: Polaroid Portrait + "About Me" Note & Sliding Biography Page
       positioned directly underneath the Polaroid.
-   2. Center Stage: Handcrafted Heirloom Leather Notebook (/journal).
-   3. Right Column: Vintage Wax-Sealed Correspondence Parcel (/letters).
+   2. Right Stage: Handcrafted Heirloom Leather Notebook (/journal).
    ============================================================================ */
 
 .desk-page-container {
@@ -42,21 +41,21 @@
 }
 
 /* ============================================================================
-   MASTER THREE-ZONE DESK COMPOSITION STAGE
-   Balanced spatial arrangement with zero camera clutter or empty corners
+   MASTER TWO-ZONE DESK COMPOSITION STAGE
+   Balanced spatial arrangement with Polaroid + Biography & Heirloom Journal
    ============================================================================ */
 .desk-composition-stage {
   position: relative;
   width: 100%;
-  max-width: 1380px;
+  max-width: 980px;
   min-height: min(86vh, 780px);
   margin: 0 auto;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(260px, 315px) minmax(300px, 390px) minmax(270px, 355px);
+  grid-template-columns: minmax(260px, 320px) minmax(310px, 400px);
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(24px, 3.5vw, 56px);
+  justify-content: center;
+  gap: clamp(40px, 6vw, 96px);
   perspective: 1400px;
 }
 
@@ -1236,326 +1235,6 @@
 }
 
 /* ============================================================================
-   ZONE 3 (RIGHT COLUMN): VINTAGE WAX-SEALED CORRESPONDENCE (-> /letters)
-   Handcrafted postal parcel with parchment texture, postage stamp,
-   circular postmark cancellation, sepia calligraphy & crimson wax seal
-   ============================================================================ */
-.desk-envelope-object {
-  position: relative;
-  justify-self: end;
-  width: clamp(255px, 23.5vw, 345px);
-  aspect-ratio: 350 / 260;
-  z-index: 16;
-  cursor: pointer;
-  text-decoration: none;
-  outline: none;
-  isolation: isolate;
-  perspective: 1100px;
-  display: block;
-}
-
-.desk-envelope-object:focus-visible {
-  outline: 2px solid #d4af72;
-  outline-offset: 8px;
-  border-radius: 6px;
-}
-
-/* Separate physical cast shadow strictly beneath/behind the correspondence parcel */
-.desk-envelope-shadow {
-  position: absolute;
-  inset: 6% 3% -5% 5%;
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    rgba(6, 2, 0, 0.74) 0%,
-    rgba(6, 2, 0, 0.5) 65%,
-    rgba(6, 2, 0, 0) 100%
-  );
-  filter: blur(15px);
-  border-radius: 8px;
-  z-index: 0;
-  pointer-events: none;
-  transform: translate(6px, 12px);
-  will-change: transform, filter, opacity;
-}
-
-.desk-envelope-visual {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  z-index: 2;
-  transform-style: flat;
-  will-change: transform;
-}
-
-/* Underlying Second Stationery Sheet Peeking Out Behind the Envelope */
-.desk-parcel-under-sheet {
-  position: absolute;
-  inset: -6px 6px 8px -8px;
-  z-index: 1;
-  background-color: #e9dac1;
-  background-image:
-    linear-gradient(180deg, rgba(255, 250, 240, 0.5) 0%, rgba(216, 196, 168, 0.65) 100%),
-    url("/images/nova-ui/auth-paper-texture.jpg");
-  background-size: cover;
-  border: 1px solid rgba(142, 112, 76, 0.62);
-  border-radius: 3px;
-  transform: rotate(-4.2deg);
-  box-shadow: 0 6px 16px rgba(8, 3, 1, 0.46);
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.desk-parcel-under-lines {
-  position: absolute;
-  inset: 14px;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 19px,
-    rgba(135, 104, 70, 0.18) 20px
-  );
-}
-
-/* Main Vintage Parchment Envelope */
-.desk-parcel-envelope {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  background-color: #f3e7d2;
-  background-image:
-    radial-gradient(
-      ellipse 85% 80% at 50% 48%,
-      rgba(255, 251, 242, 0.68) 0%,
-      rgba(238, 224, 200, 0.42) 65%,
-      rgba(206, 184, 152, 0.72) 100%
-    ),
-    url("/images/nova-ui/auth-paper-texture.jpg");
-  background-size: cover;
-  border: 1px solid rgba(138, 106, 70, 0.82);
-  border-radius: 4px;
-  box-shadow:
-    0 10px 26px rgba(8, 3, 1, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    inset 0 0 28px rgba(166, 134, 92, 0.25);
-  padding: 16px 18px 14px;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
-}
-
-/* Vintage Inner Postal Frame */
-.desk-parcel-envelope__border {
-  position: absolute;
-  inset: 6px;
-  border: 1px solid rgba(145, 110, 72, 0.36);
-  border-radius: 2px;
-  pointer-events: none;
-}
-
-/* Subtle Envelope Flap Crease Lines */
-.desk-parcel-envelope__flap-lines {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(
-      32deg,
-      transparent 49.4%,
-      rgba(136, 102, 66, 0.16) 49.8%,
-      rgba(255, 250, 240, 0.45) 50.3%,
-      transparent 50.8%
-    ),
-    linear-gradient(
-      -32deg,
-      transparent 49.4%,
-      rgba(136, 102, 66, 0.16) 49.8%,
-      rgba(255, 250, 240, 0.45) 50.3%,
-      transparent 50.8%
-    );
-  pointer-events: none;
-}
-
-/* Top Row: Circular Postmark Cancellation & Perforated Stamp */
-.desk-parcel-top-row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  z-index: 2;
-}
-
-.desk-parcel-postmark {
-  color: rgba(78, 48, 24, 0.68);
-  transform: rotate(-3deg);
-}
-
-.desk-parcel-postmark__svg {
-  width: clamp(104px, 9.5vw, 128px);
-  height: auto;
-  display: block;
-}
-
-/* Perforated Vintage Postage Stamp */
-.desk-parcel-stamp {
-  width: 52px;
-  height: 62px;
-  padding: 4px;
-  background:
-    radial-gradient(circle at 0 6px, transparent 2.5px, #f7efe0 2.8px) 0 0 / 8px 8px repeat-y,
-    radial-gradient(circle at 100% 6px, transparent 2.5px, #f7efe0 2.8px) 100% 0 / 8px 8px repeat-y,
-    #f7efe0;
-  border: 1px dotted rgba(126, 94, 60, 0.65);
-  box-shadow: 0 2px 6px rgba(24, 12, 4, 0.28);
-  transform: rotate(2.5deg);
-  box-sizing: border-box;
-}
-
-.desk-parcel-stamp__inner {
-  width: 100%;
-  height: 100%;
-  border: 1px solid #7c2d26;
-  background: linear-gradient(180deg, #8b332b 0%, #68211b 100%);
-  color: #f6e7ce;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 3px 2px;
-  box-sizing: border-box;
-}
-
-.desk-parcel-stamp__price {
-  font-family: var(--serif, Georgia, serif);
-  font-size: 7.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.desk-parcel-stamp__art {
-  width: 22px;
-  height: 22px;
-  color: #f4dfbe;
-}
-
-.desk-parcel-stamp__label {
-  font-family: var(--sans, sans-serif);
-  font-size: 6px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-/* Center Calligraphic Recipient Inscription */
-.desk-parcel-address {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 4px 6px;
-}
-
-.desk-parcel-address__kicker {
-  font-family: var(--sans, sans-serif);
-  font-size: 8.5px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #7c5632;
-}
-
-.desk-parcel-address__recipient {
-  font-family: var(--serif, "Playfair Display", "Cormorant Garamond", Georgia, serif);
-  font-size: clamp(16px, 1.55vw, 20px);
-  font-style: italic;
-  font-weight: 600;
-  color: #25150a;
-  line-height: 1.2;
-}
-
-.desk-parcel-address__line {
-  width: 78%;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(114, 80, 46, 0.55) 0%, transparent 100%);
-  margin: 1px 0;
-}
-
-.desk-parcel-address__sub {
-  font-family: var(--serif, Georgia, serif);
-  font-size: 11.5px;
-  color: #5c3e22;
-}
-
-/* Bottom Row: Action Cue & 3D Crimson Wax Seal */
-.desk-parcel-bottom-row {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-}
-
-.desk-parcel-cta {
-  padding: 4px 10px;
-  border: 1px solid rgba(118, 82, 46, 0.48);
-  border-radius: 2px;
-  background: rgba(74, 46, 20, 0.08);
-  font-family: var(--sans, sans-serif);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #3d2410;
-  transition: background-color 0.22s ease, color 0.22s ease;
-}
-
-.desk-envelope-object:hover .desk-parcel-cta {
-  background: #3d2410;
-  color: #f7ecda;
-}
-
-/* Embossed 3D Crimson Wax Seal */
-.desk-parcel-wax-seal {
-  width: 44px;
-  height: 44px;
-  border-radius: 50% 47% 52% 48% / 48% 52% 47% 50%;
-  background: radial-gradient(
-    circle at 35% 32%,
-    #b5302a 0%,
-    #881b18 52%,
-    #520d0b 100%
-  );
-  box-shadow:
-    0 4px 9px rgba(18, 5, 2, 0.58),
-    inset 0 2px 3px rgba(255, 175, 165, 0.36),
-    inset 0 -3px 5px rgba(38, 4, 3, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(-6deg);
-  transition: transform 0.3s ease;
-}
-
-.desk-envelope-object:hover .desk-parcel-wax-seal {
-  transform: rotate(0deg) scale(1.06);
-}
-
-.desk-parcel-wax-seal__inner {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid rgba(64, 8, 6, 0.7);
-  box-shadow:
-    inset 0 2px 4px rgba(34, 4, 3, 0.78),
-    0 1px 1px rgba(255, 180, 170, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ============================================================================
    VINTAGE TOAST FEEDBACK & FIRST-LOGIN ONBOARDING
    ============================================================================ */
 .desk-toast-banner {
@@ -1600,8 +1279,9 @@
   }
 
   .desk-composition-stage {
-    grid-template-columns: minmax(235px, 285px) minmax(255px, 330px) minmax(235px, 300px);
-    gap: 20px;
+    grid-template-columns: minmax(240px, 300px) minmax(280px, 360px);
+    justify-content: center;
+    gap: clamp(28px, 4vw, 56px);
   }
 
   .polaroid-crop-toolbar {
@@ -1642,10 +1322,5 @@
   .desk-journal-object {
     justify-self: center;
     width: min(78vw, 310px);
-  }
-
-  .desk-envelope-object {
-    justify-self: center;
-    width: min(84vw, 325px);
   }
 }

@@ -200,7 +200,7 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
                           handleOpenNotebookExperience();
                         }
                       }}
-                      title="Explore My Journal & My Letters preview experience"
+                      title="Explore My Journal preview experience"
                     />
                   </div>
                 );
@@ -212,9 +212,9 @@ export const NotebookDisplay = forwardRef<HTMLDivElement, NotebookDisplayProps>(
               type="button"
               className="notebook-inspect-btn"
               onClick={handleOpenNotebookExperience}
-              aria-label="Explore My Journal and My Letters experience"
+              aria-label="Explore My Journal experience"
             >
-              <span>Explore Journal &amp; Letters →</span>
+              <span>Explore My Journal →</span>
             </button>
           </div>
 

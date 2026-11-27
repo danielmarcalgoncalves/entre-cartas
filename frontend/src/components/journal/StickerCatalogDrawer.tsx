@@ -48,9 +48,10 @@ export function StickerCatalogDrawer({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "100%",
+          width: "min(92vw, 400px)",
           maxWidth: "400px",
-          height: "100%",
+          height: "100dvh",
+          maxHeight: "100dvh",
           backgroundColor: "#f7f0e2",
           color: "#2c1e14",
           borderLeft: "1px solid #cdb898",

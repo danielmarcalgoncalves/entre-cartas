@@ -5,9 +5,9 @@ import InteractiveGallery from "@/components/InteractiveGallery";
 import AboutPresentation from "@/components/AboutPresentation";
 
 export const metadata: Metadata = {
-  title: "Between Letters — Archive of Sentiments & Digital Journal",
+  title: "Between Letters — Digital Journal & Archive of Sentiments",
   description:
-    "An intimate, contemplative haven for slow writing, hardbound leather journals, tactile correspondence, and preserving genuine memories.",
+    "An intimate, contemplative haven for slow writing, hardbound leather journals, handcrafted scrapbook pages, and preserving genuine memories.",
 };
 
 export default function RootEntryPage() {

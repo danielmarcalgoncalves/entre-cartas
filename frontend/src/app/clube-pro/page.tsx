@@ -110,8 +110,8 @@ export default function ClubeProPage() {
         <span className="eyebrow">Literary subscription · support the analog refuge</span>
         <h1 className="display-title">Pro Sender Club</h1>
         <p className="page-intro">
-          For those who love collecting letters without rush, extending memory folders to infinity, and preserving rare words
-          in high resolution.
+          For those who love writing slowly, keeping multiple themed leather journals, and preserving rare memories
+          with photographs and scrapbook elements.
         </p>
       </header>
 
@@ -130,7 +130,7 @@ export default function ClubeProPage() {
             Welcome to the Sender Club!
           </h2>
           <p className="page-intro" style={{ margin: "8px auto 0", color: "#ece1c9" }}>
-            Your Pro sender seal has been activated. Your folders and archived letters are now unlimited.
+            Your Pro Club seal has been activated. Up to 10 themed writing journals and 150 journal photographs are now unlocked.
           </p>
         </div>
       )}
@@ -221,10 +221,10 @@ export default function ClubeProPage() {
           </span>
           <span className="eyebrow">You are an honored member</span>
           <h2 className="display-title" style={{ fontSize: "36px", margin: "10px 0" }}>
-            Your memory box knows no bounds
+            Your writing shelf knows no rush
           </h2>
           <p className="page-intro" style={{ margin: "0 auto 24px" }}>
-            Thank you for supporting the preservation of this epistolary archive free of advertisements and algorithmic noise.
+            Thank you for supporting the preservation of this personal journal sanctuary free of advertisements and algorithmic noise.
           </p>
           <button
             type="button"
@@ -236,7 +236,7 @@ export default function ClubeProPage() {
           </button>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "28px", marginBottom: "48px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: "24px", marginBottom: "48px" }}>
           {/* Card Standard Plan (Free) */}
           <div className="letter-object" style={{ padding: "32px 28px" }}>
             <span className="object-kind">Standard Plan · Free</span>
@@ -244,16 +244,16 @@ export default function ClubeProPage() {
               $0.00 <span style={{ fontSize: "14px", color: "#776e5f" }}>/ month</span>
             </h3>
             <p className="page-intro" style={{ margin: "12px 0 24px", minHeight: "44px" }}>
-              Your daily writing sanctuary, with personal journal and essential reflective letters.
+              Your daily writing sanctuary, with personal leather journals and inspiration prompts.
             </p>
 
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ <strong>Up to 3 writing journals</strong></li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ <strong>Up to 10 written and sealed letters</strong></li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ <strong>Up to 30 journal photographs</strong></li>
               <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Unlimited inspiration prompts from archive</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Continuous pagination & local auto-save</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✓ Continuous pagination &amp; local auto-save</li>
               <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Up to 10 journals (Premium Exclusive)</li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Up to 30 letters (Premium Exclusive)</li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.5 }}>✕ Up to 150 journal photographs (Premium Exclusive)</li>
             </ul>
 
             <button type="button" disabled className="stamp-button" style={{ width: "100%", opacity: 0.8 }}>
@@ -290,7 +290,7 @@ export default function ClubeProPage() {
 
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Up to 10 themed writing journals</strong></li>
-              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Up to 30 written and archived letters</strong></li>
+              <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ <strong>Up to 150 journal photographs</strong></li>
               <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ All fine papers and archival inks</li>
               <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Exclusive FAVORITED ♥ stamp</li>
               <li style={{ display: "flex", alignItems: "center", gap: "8px" }}>✦ Exclusive Premium Author profile badge</li>

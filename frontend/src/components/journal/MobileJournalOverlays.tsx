@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { getNotebookTheme } from "@/lib/journal-storage";
 import type { MobileOverlayState } from "./useMobileJournalGestures";
 
 export type MobileAutosaveStatus = "idle" | "saving" | "saved" | "error";
@@ -10,6 +11,8 @@ interface MobileJournalOverlaysProps {
   activeOverlay: MobileOverlayState;
   onCloseOverlay: () => void;
   activeNotebookName: string;
+  activeNotebookColor?: string;
+  activeNotebookUpdated?: string;
   currentPageIndex: number;
   totalPages: number;
   canAdvancePage: boolean;
@@ -23,12 +26,17 @@ interface MobileJournalOverlaysProps {
   saving: boolean;
   autosaveStatus: MobileAutosaveStatus;
   onNavigate: (href: string) => void;
+  editorMode?: "edit" | "writing";
+  onSwitchEditorMode?: (mode: "edit" | "writing") => void;
+  onViewJournal3D?: () => void;
+  onPullInspiration?: () => void;
+  onOpenLikeModal?: () => void;
+  isPageLiked?: boolean;
 }
 
 const NAV_ITEMS = [
   { href: "/my-desk", label: "My Desk" },
   { href: "/journal", label: "Journal", active: true },
-  { href: "/letters", label: "Letters" },
   { href: "/my-shelf", label: "My Shelf" },
   { href: "/discover", label: "Inspirations" },
 ];
@@ -37,6 +45,8 @@ export default function MobileJournalOverlays({
   activeOverlay,
   onCloseOverlay,
   activeNotebookName,
+  activeNotebookColor,
+  activeNotebookUpdated = "Active Volume",
   currentPageIndex,
   totalPages,
   canAdvancePage,
@@ -50,9 +60,16 @@ export default function MobileJournalOverlays({
   saving,
   autosaveStatus,
   onNavigate,
+  editorMode = "edit",
+  onSwitchEditorMode,
+  onViewJournal3D,
+  onPullInspiration,
+  onOpenLikeModal,
+  isPageLiked = false,
 }: MobileJournalOverlaysProps) {
   const prefersReducedMotion = useReducedMotion();
   const drawerTouchRef = useRef<{ x: number; y: number } | null>(null);
+  const volumeTheme = getNotebookTheme(activeNotebookColor);
 
   const handleOverlayTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
@@ -168,30 +185,117 @@ export default function MobileJournalOverlays({
 
               <div className="mobile-nav-section-divider" />
 
-              <button
-                type="button"
-                className="mobile-nav-item"
+              {/* Mini Leather Notebook Volume Card (Switch Volume) */}
+              <div
+                className={`journal-volume-card mobile-mini-volume-card leather-notebook-color--${volumeTheme.id}`}
+                style={
+                  {
+                    background: volumeTheme.cardGradient,
+                    "--volume-spine": volumeTheme.shelfSpine2,
+                  } as React.CSSProperties
+                }
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   onCloseOverlay();
                   onOpenVolumes();
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onCloseOverlay();
+                    onOpenVolumes();
+                  }
+                }}
+                title="Switch, rename, or create a journal volume"
               >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <div
+                  className="journal-volume-ribbon"
                   aria-hidden="true"
+                  style={{ backgroundColor: volumeTheme.ribbonColor }}
+                />
+                <span className="journal-volume-kicker">ACTIVE JOURNAL</span>
+                <span className="journal-volume-title">{activeNotebookName}</span>
+                <div className="journal-volume-meta">
+                  <span>{activeNotebookUpdated}</span>
+                  <span className="journal-volume-switch-cue">Switch ▾</span>
+                </div>
+              </div>
+
+              {onSwitchEditorMode && (
+                <div
+                  className="mobile-overlay-mode-switcher"
+                  role="tablist"
+                  aria-label="Journal editor mode"
                 >
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-                <span>Switch Volume</span>
-              </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editorMode === "edit"}
+                    className={`mobile-overlay-mode-btn ${editorMode === "edit" ? "is-active" : ""}`}
+                    onClick={() => {
+                      onSwitchEditorMode("edit");
+                      onCloseOverlay();
+                    }}
+                  >
+                    Edit Mode
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editorMode === "writing"}
+                    className={`mobile-overlay-mode-btn ${editorMode === "writing" ? "is-active" : ""}`}
+                    onClick={() => {
+                      onSwitchEditorMode("writing");
+                      onCloseOverlay();
+                    }}
+                  >
+                    Writing Mode
+                  </button>
+                </div>
+              )}
+
+              <div className="mobile-overlay-secondary-actions">
+                {onViewJournal3D && (
+                  <button
+                    type="button"
+                    className="mobile-nav-item"
+                    onClick={() => {
+                      onCloseOverlay();
+                      onViewJournal3D();
+                    }}
+                  >
+                    <span>View Journal</span>
+                  </button>
+                )}
+
+                <div className="mobile-overlay-pair-row">
+                  {onPullInspiration && (
+                    <button
+                      type="button"
+                      className="mobile-overlay-pair-btn"
+                      onClick={() => {
+                        onCloseOverlay();
+                        onPullInspiration();
+                      }}
+                    >
+                      Pull Inspiration
+                    </button>
+                  )}
+                  {onOpenLikeModal && (
+                    <button
+                      type="button"
+                      className={`mobile-overlay-pair-btn ${isPageLiked ? "is-liked" : ""}`}
+                      onClick={() => {
+                        onCloseOverlay();
+                        onOpenLikeModal();
+                      }}
+                    >
+                      {isPageLiked ? "♥ Liked" : "♡ Like"}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="mobile-nav-page-controls" aria-label="Page navigation">
@@ -239,6 +343,39 @@ export default function MobileJournalOverlays({
             exit={{ y: "-100%" }}
             transition={springTransition}
           >
+            {onSwitchEditorMode && (
+              <div
+                className="mobile-overlay-mode-switcher is-tray"
+                role="tablist"
+                aria-label="Journal editor mode"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={editorMode === "edit"}
+                  className={`mobile-overlay-mode-btn ${editorMode === "edit" ? "is-active" : ""}`}
+                  onClick={() => {
+                    onSwitchEditorMode("edit");
+                    onCloseOverlay();
+                  }}
+                >
+                  Edit Mode
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={editorMode === "writing"}
+                  className={`mobile-overlay-mode-btn ${editorMode === "writing" ? "is-active" : ""}`}
+                  onClick={() => {
+                    onSwitchEditorMode("writing");
+                    onCloseOverlay();
+                  }}
+                >
+                  Writing Mode
+                </button>
+              </div>
+            )}
+
             <div className="mobile-tools-grid">
               <button
                 type="button"

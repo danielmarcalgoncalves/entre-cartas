@@ -94,19 +94,11 @@ function describeLogEvent(log) {
       return `Pro subscription ended or canceled (${det.motivo || 'canceled'}).`;
     case 'STRIPE_PORTAL_CRIADO':
       return 'Opened Stripe Billing Portal session.';
-    case 'CARTA_ENVIADA':
-      return `Created letter "${det.titulo || 'Untitled'}" (${det.categoria || 'personal'}).`;
-    case 'CARTA_DESLACRADA':
-      return `Opened archive letter "${det.titulo || `#${det.carta_id || ''}`}".`;
-    case 'CARIMBO_APLICADO':
-      return `Stamped letter "${det.titulo || `#${det.carta_id || ''}`}" as ${det.tipo_carimbo || 'READ'}.`;
     case 'CADERNO_EXCLUIDO':
       return `Deleted journal volume (${det.client_id || 'notebook'}).`;
     case 'JOURNAL_MEDIA_UPLOADED':
       return `Uploaded photograph to journal (${det.notebook_id || 'notebook'}).`;
-    case 'BLOQUEIO_LIMITE_CARTAS_403':
     case 'BLOQUEIO_LIMITE_CADERNOS_403':
-    case 'BLOQUEIO_LIMITE_PASTAS_403':
     case 'BLOQUEIO_LIMITE_FAVORITOS_403':
       return det.motivo || 'Reached Free plan usage quota limit.';
     case 'BLOQUEIO_RBAC_ADMIN_403':
@@ -225,20 +217,9 @@ async function getMetrics(req, res) {
     // 3. Estimated MRR (activeSubscriptions * 14.90)
     const estimatedTestMrr = Number((totalActive * PRO_MONTHLY_PRICE).toFixed(2));
 
-    // 4. Real database content counts
-    const [[letterStats]] = await pool.query(`
-      SELECT
-        COUNT(*) AS totalLetters,
-        SUM(CASE WHEN usuario_id IS NOT NULL AND (na_lixeira IS NULL OR na_lixeira = FALSE) THEN 1 ELSE 0 END) AS userAuthoredLetters,
-        SUM(CASE WHEN usuario_id IS NOT NULL AND status_carta = 'draft' AND (na_lixeira IS NULL OR na_lixeira = FALSE) THEN 1 ELSE 0 END) AS draftLetters,
-        SUM(CASE WHEN usuario_id IS NULL AND is_public = TRUE THEN 1 ELSE 0 END) AS curatedPublicLetters,
-        SUM(CASE WHEN na_lixeira = TRUE THEN 1 ELSE 0 END) AS trashedLetters
-      FROM cartas
-    `);
-
+    // 4. Real database content counts (Journal-only architecture)
     const [[notebookStats]] = await pool.query(`SELECT COUNT(*) AS totalNotebooks FROM cadernos`);
-    const [[folderStats]] = await pool.query(`SELECT COUNT(*) AS totalFolders FROM pastas_cartas`);
-    const [[savedLetterStats]] = await pool.query(`SELECT COUNT(*) AS totalSaved FROM carta_favoritos`);
+    const totalJournalsCount = Number(notebookStats?.totalNotebooks || 0);
 
     // 5. Recent application events from log-service (non-blocking fallback if log-service is unreachable)
     let recentEvents = [];
@@ -285,23 +266,13 @@ async function getMetrics(req, res) {
           'Estimated test MRR calculated as active subscriptions (active + trialing) × $14.90/month. Canceled, unpaid, and past-due subscriptions are not counted as active revenue.',
       },
       application: {
-        letters: {
-          total: Number(letterStats?.totalLetters || 0),
-          userAuthored: Number(letterStats?.userAuthoredLetters || 0),
-          drafts: Number(letterStats?.draftLetters || 0),
-          curatedPublic: Number(letterStats?.curatedPublicLetters || 0),
-          inTrash: Number(letterStats?.trashedLetters || 0),
-        },
         journals: {
-          notebooks: Number(notebookStats?.totalNotebooks || 0),
-        },
-        folders: {
-          total: Number(folderStats?.totalFolders || 0),
-        },
-        savedLetters: {
-          total: Number(savedLetterStats?.totalSaved || 0),
+          notebooks: totalJournalsCount,
         },
         storageTracked: false,
+      },
+      content: {
+        totalJournals: totalJournalsCount,
       },
       recentEvents,
       recentEventsError,
@@ -386,8 +357,7 @@ async function listUsers(req, res) {
         u.ultimo_login,
         s.status AS subscription_status,
         s.periodo_fim AS subscription_period_end,
-        (SELECT COUNT(*) FROM cadernos c WHERE c.usuario_id = u.id) AS journals_count,
-        (SELECT COUNT(*) FROM cartas ct WHERE ct.usuario_id = u.id AND (ct.na_lixeira IS NULL OR ct.na_lixeira = FALSE)) AS letters_count
+        (SELECT COUNT(*) FROM cadernos c WHERE c.usuario_id = u.id) AS journals_count
       FROM usuarios u
       LEFT JOIN stripe_subscriptions s ON s.usuario_id = u.id
       ${whereSql}
@@ -412,7 +382,6 @@ async function listUsers(req, res) {
         criadoEm: row.criado_em || null,
         ultimoLogin: row.ultimo_login || null,
         journalsCount: Number(row.journals_count || 0),
-        lettersCount: Number(row.letters_count || 0),
       };
     });
 
@@ -488,18 +457,7 @@ async function getUserDetail(req, res) {
     );
     const sub = subRows[0] || null;
 
-    // Usage metrics from MariaDB
-    const [[letterBreakdown]] = await pool.query(
-      `SELECT
-        COUNT(*) AS totalAuthored,
-        SUM(CASE WHEN (na_lixeira IS NULL OR na_lixeira = FALSE) AND (status_carta IS NULL OR status_carta = 'completed') THEN 1 ELSE 0 END) AS activeLetters,
-        SUM(CASE WHEN (na_lixeira IS NULL OR na_lixeira = FALSE) AND status_carta = 'draft' THEN 1 ELSE 0 END) AS draftLetters,
-        SUM(CASE WHEN na_lixeira = TRUE THEN 1 ELSE 0 END) AS trashedLetters
-       FROM cartas
-       WHERE usuario_id = ?`,
-      [userId]
-    );
-
+    // Usage metrics from MariaDB (Journals)
     const [notebookRows] = await pool.query(
       `SELECT id, client_id, nome, cor_capa, paginas_json, criado_em, atualizado_em
        FROM cadernos
@@ -523,21 +481,6 @@ async function getUserDetail(req, res) {
         }
       } catch {}
     }
-
-    const [[folderStats]] = await pool.query(
-      'SELECT COUNT(*) AS count FROM pastas_cartas WHERE usuario_id = ?',
-      [userId]
-    );
-
-    const [[savedLettersStats]] = await pool.query(
-      'SELECT COUNT(*) AS count FROM carta_favoritos WHERE usuario_id = ?',
-      [userId]
-    );
-
-    const [[notesStats]] = await pool.query(
-      'SELECT COUNT(*) AS count FROM notas_cartas WHERE usuario_id = ?',
-      [userId]
-    );
 
     // Account activity events from log-service
     let recentActivity = [];
@@ -577,26 +520,6 @@ async function getUserDetail(req, res) {
             pagesCount: totalJournalPages,
             mediaAttachmentsCount: totalJournalMediaAttachments,
           },
-          letters: {
-            active: Number(letterBreakdown?.activeLetters || 0),
-            drafts: Number(letterBreakdown?.draftLetters || 0),
-            inTrash: Number(letterBreakdown?.trashedLetters || 0),
-            totalNonTrash:
-              Number(letterBreakdown?.activeLetters || 0) + Number(letterBreakdown?.draftLetters || 0),
-            totalAuthored: Number(letterBreakdown?.totalAuthored || 0),
-            limit: isProTier ? 30 : 10,
-          },
-          folders: {
-            count: Number(folderStats?.count || 0),
-            limit: isProTier ? 10 : 3,
-          },
-          savedArchiveLetters: {
-            count: Number(savedLettersStats?.count || 0),
-            limit: isProTier ? null : 5,
-          },
-          marginalNotes: {
-            count: Number(notesStats?.count || 0),
-          },
           storage: {
             trackedInDb: false,
             mediaAttachmentsCount: totalJournalMediaAttachments,
@@ -604,12 +527,8 @@ async function getUserDetail(req, res) {
           },
         },
         activity: {
-          letters:
-            Number(letterBreakdown?.activeLetters || 0) + Number(letterBreakdown?.draftLetters || 0),
           notebooks: notebookRows.length,
-          folders: Number(folderStats?.count || 0),
           pagesWritten: totalJournalPages,
-          savedArchiveLetters: Number(savedLettersStats?.count || 0),
         },
         subscription: sub
           ? {

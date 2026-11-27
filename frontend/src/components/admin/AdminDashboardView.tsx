@@ -144,7 +144,7 @@ export default function AdminDashboardView() {
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }>({
     logs: [],
-    availableEventTypes: ["AUTH", "JOURNAL", "LETTER", "FAVORITES", "ADMIN", "PAYMENT"],
+    availableEventTypes: ["AUTH", "JOURNAL", "FAVORITES", "ADMIN", "PAYMENT"],
     pagination: { page: 1, limit: 20, total: 0, totalPages: 1 },
   });
   const [logsPage, setLogsPage] = useState(1);
@@ -232,7 +232,7 @@ export default function AdminDashboardView() {
         logs: Array.isArray(data.logs) ? data.logs : [],
         availableEventTypes: Array.isArray(data.availableEventTypes)
           ? data.availableEventTypes
-          : ["AUTH", "JOURNAL", "LETTER", "FAVORITES", "ADMIN", "PAYMENT"],
+          : ["AUTH", "JOURNAL", "FAVORITES", "ADMIN", "PAYMENT"],
         pagination: data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 },
       });
     } catch (err: any) {
@@ -448,7 +448,7 @@ export default function AdminDashboardView() {
                 {loadingMetrics && !metrics ? "…" : metrics?.users?.free ?? 0}
               </div>
               <p style={{ fontSize: "12px", opacity: 0.75, margin: "6px 0 0" }}>
-                Standard quota (up to 3 journals, 10 letters)
+                Standard quota (up to 3 journals, 30 photos)
               </p>
             </div>
 
@@ -592,43 +592,14 @@ export default function AdminDashboardView() {
             }}
           >
             <div className="paper-panel" style={{ padding: "20px" }}>
-              <span className="object-kind">Total Letters</span>
-              <div className="display-title" style={{ fontSize: "32px", marginTop: "6px" }}>
-                {loadingMetrics && !metrics ? "…" : metrics?.content?.totalLetters ?? 0}
-              </div>
-              <p style={{ fontSize: "12px", opacity: 0.75, margin: "6px 0 0" }}>
-                Active: {metrics?.content?.activeLetters ?? 0} · Drafts:{" "}
-                {metrics?.content?.draftLetters ?? 0} · Trash: {metrics?.content?.trashedLetters ?? 0}
-              </p>
-            </div>
-
-            <div className="paper-panel" style={{ padding: "20px" }}>
               <span className="object-kind">Total Writing Journals</span>
               <div className="display-title" style={{ fontSize: "32px", marginTop: "6px" }}>
-                {loadingMetrics && !metrics ? "…" : metrics?.content?.totalJournals ?? 0}
+                {loadingMetrics && !metrics
+                  ? "…"
+                  : metrics?.application?.journals?.notebooks ?? metrics?.content?.totalJournals ?? 0}
               </div>
               <p style={{ fontSize: "12px", opacity: 0.75, margin: "6px 0 0" }}>
-                Stored in `cadernos_usuario`
-              </p>
-            </div>
-
-            <div className="paper-panel" style={{ padding: "20px" }}>
-              <span className="object-kind">Correspondence Folders</span>
-              <div className="display-title" style={{ fontSize: "32px", marginTop: "6px" }}>
-                {loadingMetrics && !metrics ? "…" : metrics?.content?.totalFolders ?? 0}
-              </div>
-              <p style={{ fontSize: "12px", opacity: 0.75, margin: "6px 0 0" }}>
-                Stored in `pastas_usuario`
-              </p>
-            </div>
-
-            <div className="paper-panel" style={{ padding: "20px" }}>
-              <span className="object-kind">Saved Archive Letters</span>
-              <div className="display-title" style={{ fontSize: "32px", marginTop: "6px" }}>
-                {loadingMetrics && !metrics ? "…" : metrics?.content?.totalSavedLetters ?? 0}
-              </div>
-              <p style={{ fontSize: "12px", opacity: 0.75, margin: "6px 0 0" }}>
-                Stored in `cartas_salvas`
+                Stored in `cadernos`
               </p>
             </div>
           </div>
@@ -1006,24 +977,16 @@ export default function AdminDashboardView() {
                       <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "165px 1fr", rowGap: "8px", fontSize: "13px" }}>
                         <dt style={{ opacity: 0.7 }}>Journals Created:</dt>
                         <dd style={{ margin: 0, fontWeight: 700 }}>
-                          {userDetail.usageInfo.totalJournals} ({userDetail.usageInfo.totalJournalPages} pages)
+                          {userDetail.usageInfo?.totalJournals ?? userDetail.user?.usage?.journals?.count ?? 0} (
+                          {userDetail.usageInfo?.totalJournalPages ?? userDetail.user?.usage?.journals?.pagesCount ?? 0} pages)
                         </dd>
                         <dt style={{ opacity: 0.7 }}>Journal Media Files:</dt>
                         <dd style={{ margin: 0 }}>
-                          {userDetail.usageInfo.totalJournalMediaAttachments} attachments (
-                          {formatBytes(userDetail.usageInfo.trackedMediaBytes)})
+                          {userDetail.usageInfo?.totalJournalMediaAttachments ??
+                            userDetail.user?.usage?.journals?.mediaAttachmentsCount ??
+                            0}{" "}
+                          attachments ({formatBytes(userDetail.usageInfo?.trackedMediaBytes)})
                         </dd>
-                        <dt style={{ opacity: 0.7 }}>Total Letters:</dt>
-                        <dd style={{ margin: 0, fontWeight: 700 }}>
-                          {userDetail.usageInfo.totalLetters} (Active: {userDetail.usageInfo.activeLetters}, Drafts:{" "}
-                          {userDetail.usageInfo.draftLetters}, Trash: {userDetail.usageInfo.trashedLetters})
-                        </dd>
-                        <dt style={{ opacity: 0.7 }}>Letter Folders:</dt>
-                        <dd style={{ margin: 0 }}>{userDetail.usageInfo.totalFolders}</dd>
-                        <dt style={{ opacity: 0.7 }}>Saved Archive Letters:</dt>
-                        <dd style={{ margin: 0 }}>{userDetail.usageInfo.savedArchiveLetters}</dd>
-                        <dt style={{ opacity: 0.7 }}>Personal Notes:</dt>
-                        <dd style={{ margin: 0 }}>{userDetail.usageInfo.personalNotes}</dd>
                       </dl>
                       <p style={{ fontSize: "11px", opacity: 0.75, marginTop: "10px", marginBottom: 0 }}>
                         {userDetail.usageInfo.storageTracking?.message}

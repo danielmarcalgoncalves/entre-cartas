@@ -1,6 +1,5 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
-const { cartasIniciais } = require('./seedCartas');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const DB_PASSWORD = process.env.DB_PASSWORD || '';
@@ -131,89 +130,14 @@ async function initDb(retries = 15, delay = 2000) {
     `);
 
     // ========================================================
-    // MODELAGEM ENTRE CARTAS (Catálogo Epistolar & Scrapbook)
+    // MODELAGEM BETWEEN LETTERS (Personal Journals & Auth)
+    // Legacy Letters tables (cartas, carta_favoritos, pastas_memorias,
+    // itens_pasta, notas_cartas, pastas_cartas) are no longer provisioned
+    // on fresh installs; historical tables are left untouched unless
+    // explicitly archived via backend/migrations/2026-11-27_decommission_letters_tables.sql.
     // ========================================================
 
-    // 4. Tabela de Cartas
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS cartas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        usuario_id INT NULL,
-        titulo VARCHAR(255) NOT NULL,
-        conteudo MEDIUMTEXT NOT NULL,
-        remetente_anonimo VARCHAR(100) DEFAULT 'Anônimo',
-        destinatario_anonimo VARCHAR(100) DEFAULT NULL,
-        categoria VARCHAR(50) NOT NULL DEFAULT 'desabafo',
-        tipo_papel VARCHAR(50) DEFAULT 'envelhecido',
-        selo_url VARCHAR(500) DEFAULT NULL,
-        lacre_cera_cor VARCHAR(30) DEFAULT 'vinho',
-        data_carta VARCHAR(100) DEFAULT NULL,
-        status_curadoria VARCHAR(30) DEFAULT 'aprovada',
-        is_public BOOLEAN NOT NULL DEFAULT FALSE,
-        leituras_count INT DEFAULT 0,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
-        INDEX idx_categoria (categoria),
-        INDEX idx_status (status_curadoria),
-        INDEX idx_public (is_public)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // 5. Tabela de Cartas Favoritadas com Carimbo Físico (Plano Free vs Pro)
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS carta_favoritos (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        usuario_id INT NOT NULL,
-        carta_id INT NOT NULL,
-        tipo_carimbo VARCHAR(50) DEFAULT 'LIDA',
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (carta_id) REFERENCES cartas(id) ON DELETE CASCADE,
-        UNIQUE KEY uk_usuario_carta (usuario_id, carta_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // 6. Pastas de Arquivo e Memórias (Scrapbook Folders)
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS pastas_memorias (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        usuario_id INT NOT NULL,
-        nome VARCHAR(255) NOT NULL,
-        descricao TEXT NULL,
-        cor_pasta VARCHAR(50) DEFAULT 'kraft',
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // 7. Itens dentro de cada pasta de memórias
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS itens_pasta (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        pasta_id INT NOT NULL,
-        carta_id INT NOT NULL,
-        nota_pessoal TEXT NULL,
-        adicionado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (pasta_id) REFERENCES pastas_memorias(id) ON DELETE CASCADE,
-        FOREIGN KEY (carta_id) REFERENCES cartas(id) ON DELETE CASCADE,
-        UNIQUE KEY uk_pasta_carta (pasta_id, carta_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // 8. Notas marginais / bilhetes anexados às cartas
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS notas_cartas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        carta_id INT NOT NULL,
-        usuario_id INT NOT NULL,
-        texto TEXT NOT NULL,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (carta_id) REFERENCES cartas(id) ON DELETE CASCADE,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // 8.1 Revoked session tokens (logout invalidation)
+    // 4. Revoked session tokens (logout invalidation)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS revoked_tokens (
         token_hash VARCHAR(64) PRIMARY KEY,
@@ -224,7 +148,7 @@ async function initDb(retries = 15, delay = 2000) {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
-    // 8.2 Personal Journal Volumes (cadernos) & Pages (persisted per authenticated user)
+    // 5. Personal Journal Volumes (cadernos) & Pages (persisted per authenticated user)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS cadernos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -239,43 +163,6 @@ async function initDb(retries = 15, delay = 2000) {
         UNIQUE KEY uk_usuario_caderno (usuario_id, client_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
-
-    // 8.3 Personal Correspondence Folders (pastas_cartas)
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS pastas_cartas (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        client_id VARCHAR(120) NOT NULL,
-        usuario_id INT NOT NULL,
-        nome VARCHAR(120) NOT NULL,
-        cor VARCHAR(30) DEFAULT 'marrom',
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        UNIQUE KEY uk_usuario_pasta (usuario_id, client_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    // Safe column extensions on cartas for personal archive sync (drafts, folders, fonts, soft-delete)
-    const cartasAlters = [
-      `ALTER TABLE cartas ADD COLUMN client_id VARCHAR(120) DEFAULT NULL`,
-      `ALTER TABLE cartas ADD COLUMN pasta_client_id VARCHAR(120) DEFAULT NULL`,
-      `ALTER TABLE cartas ADD COLUMN pasta_nome VARCHAR(120) DEFAULT NULL`,
-      `ALTER TABLE cartas ADD COLUMN fonte VARCHAR(50) DEFAULT 'caveat'`,
-      `ALTER TABLE cartas ADD COLUMN status_carta VARCHAR(30) DEFAULT 'completed'`,
-      `ALTER TABLE cartas ADD COLUMN tema_carta VARCHAR(60) DEFAULT NULL`,
-      `ALTER TABLE cartas ADD COLUMN favoritado BOOLEAN DEFAULT FALSE`,
-      `ALTER TABLE cartas ADD COLUMN na_lixeira BOOLEAN DEFAULT FALSE`,
-      `ALTER TABLE cartas ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE`
-    ];
-    for (const q of cartasAlters) {
-      try {
-        await connection.query(q);
-      } catch (e) {}
-    }
-
-    // Ensure seeded/curated archive letters (without an author user) are marked public
-    await connection.query(
-      `UPDATE cartas SET is_public = TRUE WHERE usuario_id IS NULL AND status_curadoria = 'aprovada' AND is_public = FALSE`
-    );
 
     // ========================================================
     // TABELAS STRIPE (Plano Pro & Assinaturas)
@@ -336,34 +223,6 @@ async function initDb(retries = 15, delay = 2000) {
         FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
-
-    // ========================================================
-    // SEED AUTOMÁTICO DE CARTAS INICIAIS
-    // ========================================================
-    const [cartasCount] = await connection.query('SELECT COUNT(*) as total FROM cartas');
-    if (cartasCount[0].total === 0) {
-      console.log('[Database] Tabela cartas vazia. Inserindo acervo epistolar inicial...');
-      for (const carta of cartasIniciais) {
-        await connection.query(
-          `INSERT INTO cartas (titulo, conteudo, remetente_anonimo, destinatario_anonimo, categoria, tipo_papel, lacre_cera_cor, data_carta, leituras_count, status_curadoria, is_public)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aprovada', TRUE)`,
-          [
-            carta.titulo,
-            carta.conteudo,
-            carta.remetente_anonimo,
-            carta.destinatario_anonimo,
-            carta.categoria,
-            carta.tipo_papel,
-            carta.lacre_cera_cor,
-            carta.data_carta,
-            carta.leituras_count || 0
-          ]
-        );
-      }
-      console.log(`[Database] Seed concluído: ${cartasIniciais.length} cartas inseridas no acervo com sucesso!`);
-    } else {
-      console.log(`[Database] Acervo de cartas pronto (${cartasCount[0].total} cartas catalogadas).`);
-    }
 
     connection.release();
     console.log('[Database] Todas as tabelas e índices verificados e prontos para uso.');

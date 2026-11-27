@@ -39,7 +39,7 @@ test('SEC-02: getAllowedOrigins includes configured APP_URL and rejects untruste
 test('SEC-02: csrfProtection rejects cookie-authenticated POST with missing Origin and Referer', () => {
   const req = {
     method: 'POST',
-    originalUrl: '/api/cartas',
+    originalUrl: '/api/journal/notebooks/test-nb',
     cookies: { access_token: 'dummy' },
     headers: { host: 'betweenletters.example' },
     app: { get: () => false }
@@ -54,7 +54,7 @@ test('SEC-02: csrfProtection rejects cookie-authenticated POST with missing Orig
 test('SEC-02: csrfProtection rejects forged X-Forwarded-Host when trust proxy is false', () => {
   const req = {
     method: 'POST',
-    originalUrl: '/api/cartas',
+    originalUrl: '/api/journal/notebooks/test-nb',
     cookies: { access_token: 'dummy' },
     headers: {
       host: 'betweenletters.example',
@@ -73,7 +73,7 @@ test('SEC-02: csrfProtection rejects forged X-Forwarded-Host when trust proxy is
 test('SEC-02: csrfProtection allows valid Origin matching APP_URL', () => {
   const req = {
     method: 'POST',
-    originalUrl: '/api/cartas',
+    originalUrl: '/api/journal/notebooks/test-nb',
     cookies: { access_token: 'dummy' },
     headers: {
       host: 'betweenletters.example',

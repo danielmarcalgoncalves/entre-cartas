@@ -36,7 +36,7 @@ const PROMPT_COPY: Record<
     kicker: "PERSONAL ARCHIVE · ACCOUNT REQUIRED",
     heading: "Your memories need a home.",
     description:
-      "Create an account to keep your journals and letters organized in your personal shelf, and access them whenever you return.",
+      "Create an account to keep your journals organized in your personal shelf, and access them whenever you return.",
     primaryLabel: "Create account",
     secondaryLabel: "Go back",
   },
